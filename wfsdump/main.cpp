@@ -60,10 +60,10 @@ int main(int argc, char *argv[]) {
 			("otp", boost::program_options::value<std::string>(), "otp file")
 			("seeprom", boost::program_options::value<std::string>(), "seeprom file (required if usb)")
 			("dump-path", boost::program_options::value<std::string>(&wfs_path)->default_value("/"), "directory to dump (default: \"/\")")
-			("mlc", "device is mlc (default: device is usb")
+			("mlc", "device is mlc (default: device is usb)")
 			("usb", "device is usb")
 			("verbos", "verbos output")
-			("sector-size", boost::program_options::value<uint32_t>(&sector_log2_size)->default_value(9), "sector log2 size of device (default: 9, if not working try 12)")
+			("sector-size", boost::program_options::value<uint32_t>(&sector_log2_size)->default_value(9), "sector log2 size of device. 9 for 512 bytes (default), 11 for 2048 bytes and 12 for 4096 bytes")
 			;
 
 		boost::program_options::variables_map vm;
@@ -77,7 +77,7 @@ int main(int argc, char *argv[]) {
 		if ((!vm.count("seeprom") && !vm.count("mlc"))) { std::cerr << "Missing seeprom file (--seeprom)" << std::endl; bad = true; }
 		if (vm.count("mlc") + vm.count("usb") > 1) { std::cerr << "Can't specify both --mlc and --usb" << std::endl; bad = true; }
 		if (vm.count("help") || bad) {
-			std::cout << "Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--sector-size 9/12] [--verbos]" << std::endl;
+			std::cout << "Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--sector-size 9/11/12] [--verbos]" << std::endl;
 			std::cout << desc << "\n";
 			return 1;
 		}
