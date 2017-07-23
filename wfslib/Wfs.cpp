@@ -16,19 +16,19 @@
 #include <boost/filesystem.hpp>
 
 
-Wfs::Wfs(std::shared_ptr<Device> device, std::vector<uint8_t>& key) : device(std::make_shared<DeviceEncryption>(device, key)) {
+Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key) : device(std::make_shared<DeviceEncryption>(device, key)) {
 	// Read first area
 	this->root_area = Area::LoadRootArea(this);
 }
 
-std::shared_ptr<File> Wfs::GetFile(const std::string filename) {
+std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
 	boost::filesystem::path path(filename);
 	auto dir = GetDirectory(path.parent_path().string());
 	if (!dir) return std::shared_ptr<File>();
 	return dir->GetFile(path.filename().string());
 }
 
-std::shared_ptr<Directory> Wfs::GetDirectory(const std::string filename) {
+std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
 	boost::filesystem::path path(filename);
 	std::shared_ptr<Directory> current_directory = this->root_area->GetRootDirectory();
 
@@ -41,7 +41,7 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string filename) {
 	return current_directory;
 }
 
-void Wfs::DetectSectorsCount(std::shared_ptr<FileDevice> device, std::vector<uint8_t>& key) {
+void Wfs::DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
 	auto block = MetadataBlock::LoadBlock(std::make_shared<DeviceEncryption>(device, key), 0, Block::BlockSize::Basic, 0, false);
 	auto wfs_header = reinterpret_cast<WfsHeader *>(&block->GetData()[sizeof(MetadataBlockHeader)]);
 	if (wfs_header->version.value() != 0x01010800)

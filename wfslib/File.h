@@ -22,7 +22,7 @@ struct DataBlocksClusterMetadata;
 
 class File : public WfsItem, public std::enable_shared_from_this<File> {
 public:
-	File(const std::string name, AttributesBlock attributes, std::shared_ptr<Area>& area) : WfsItem(name, attributes), area(area) {
+	File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area) : WfsItem(name, attributes), area(area) {
 	}
 
 	uint32_t GetSize();
@@ -38,14 +38,14 @@ private:
 	class DataCategory3Reader;
 	class DataCategory4Reader;
 
-	static std::shared_ptr<DataCategoryReader> CreateReader(std::shared_ptr<File>& file);
+	static std::shared_ptr<DataCategoryReader> CreateReader(const std::shared_ptr<File>& file);
 
 public:
 	class file_device {
 	public:
 		typedef uint8_t char_type;
 		typedef boost::iostreams::seekable_device_tag category;
-		file_device(std::shared_ptr<File>& file);
+		file_device(const std::shared_ptr<File>& file);
 
 		std::streamsize read(char_type* s, std::streamsize n);
 		std::streamsize write(const char_type* s, std::streamsize n);

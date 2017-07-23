@@ -13,7 +13,7 @@
 #include "Link.h"
 #include "SubBlockAllocator.h"
 
-std::shared_ptr<Directory> Directory::GetDirectory(const std::string name) {
+std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) {
 	AttributesBlock attributes_block = GetObjectAttributes(block, name);
 	auto attributes = attributes_block.Attributes();
 	if (!attributes || attributes->IsLink() || !attributes->IsDirectory()) {
@@ -23,7 +23,7 @@ std::shared_ptr<Directory> Directory::GetDirectory(const std::string name) {
 	return std::dynamic_pointer_cast<Directory>(Create(name, attributes_block));
 }
 
-std::shared_ptr<File> Directory::GetFile(const std::string name) {
+std::shared_ptr<File> Directory::GetFile(const std::string& name) {
 	AttributesBlock attributes_block = GetObjectAttributes(block, name);
 	auto attributes = attributes_block.Attributes();
 	if (!attributes || attributes->IsLink() || attributes->IsDirectory()) {
@@ -33,7 +33,7 @@ std::shared_ptr<File> Directory::GetFile(const std::string name) {
 	return std::dynamic_pointer_cast<File>(Create(name, attributes_block));
 }
 
-std::shared_ptr<WfsItem> Directory::Create(const std::string name, AttributesBlock& attributes_block) {
+std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const AttributesBlock& attributes_block) {
 	auto attributes = attributes_block.Attributes();
 	if (attributes->IsLink()) {
 		// TODO, I think that the link info is in the attributes metadata
@@ -58,7 +58,7 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string name, AttributesBlo
 	}
 }
 
-AttributesBlock Directory::GetObjectAttributes(std::shared_ptr<MetadataBlock>& block, const std::string& name) {
+AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name) {
 	SubBlockAllocator allocator(block);
 	auto current_node = allocator.GetRootNode<DirectoryTreeNode>();
 	if (block->Header()->block_flags.value() & block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {

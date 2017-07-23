@@ -16,11 +16,11 @@ struct WfsBlockIV {
 	boost::endian::big_uint32_buf_t iv[4];
 };
 
-DeviceEncryption::DeviceEncryption(std::shared_ptr<Device> device, std::vector<uint8_t>& key) : device(device), key(key)  {
+DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::vector<uint8_t>& key) : device(device), key(key)  {
 }
 
 
-void DeviceEncryption::HashData(std::vector<uint8_t>& data, std::vector<uint8_t>::iterator& hash) {
+void DeviceEncryption::HashData(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash) {
 	// Pad and hash
 	CryptoPP::SHA1 sha;
 	sha.Update(&*data.begin(), data.size());
@@ -30,7 +30,7 @@ void DeviceEncryption::HashData(std::vector<uint8_t>& data, std::vector<uint8_t>
 	sha.Final(&*hash);
 }
 
-void DeviceEncryption::CalculateHash(std::vector<uint8_t>& data, std::vector<uint8_t>::iterator& hash, bool hash_in_block) {
+void DeviceEncryption::CalculateHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block) {
 	// Fill hash space with 0xFF
 	if (hash_in_block)
 		std::fill(hash, hash + DIGEST_SIZE, 0xFF);
@@ -46,7 +46,8 @@ void DeviceEncryption::WriteBlock(uint32_t sector_address, std::vector<uint8_t>&
 	uint32_t sectors_count = static_cast<uint32_t>(data.size() / this->device->GetSectorSize());
 
 	// Encrypt
-	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&GetIV(sectors_count, iv)), 1);
+	auto _iv = GetIV(sectors_count, iv);
+	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv), 1);
 	encryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
 
 	// Write
@@ -58,14 +59,15 @@ std::vector<uint8_t> DeviceEncryption::ReadBlock(uint32_t sector_address, uint32
 
 	std::vector<uint8_t> data = this->device->ReadSectors(sector_address, sectors_count);
 
-	CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&GetIV(sectors_count, iv)));
+	auto _iv = GetIV(sectors_count, iv);
+	CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
 	decryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
 
 	//data.resize(length);
 	return data;
 }
 
-bool DeviceEncryption::CheckHash(std::vector<uint8_t>& data, std::vector<uint8_t>::iterator& hash, bool hash_in_block) {
+bool DeviceEncryption::CheckHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block) {
 	std::vector<uint8_t> placeholder_hash(DIGEST_SIZE, 0xFF);
 	if (hash_in_block)
 		std::swap_ranges(placeholder_hash.begin(), placeholder_hash.end(), hash);

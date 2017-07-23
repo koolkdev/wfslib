@@ -20,11 +20,11 @@ struct DirectoryTreeNode;
 
 class Directory : public WfsItem, public std::enable_shared_from_this<Directory> {
 public:
-	Directory(const std::string name, AttributesBlock attributes, std::shared_ptr<Area>& area, std::shared_ptr<MetadataBlock>& block) : WfsItem(name, attributes), area(area), block(block) {
+	Directory(const std::string& name, AttributesBlock attributes, const std::shared_ptr<Area>& area, const std::shared_ptr<MetadataBlock>& block) : WfsItem(name, attributes), area(area), block(block) {
 	}
 
-	std::shared_ptr<Directory> GetDirectory(const std::string name);
-	std::shared_ptr<File> GetFile(const std::string name);
+	std::shared_ptr<Directory> GetDirectory(const std::string& name);
+	std::shared_ptr<File> GetFile(const std::string& name);
 
 private:
 	// TODO: We may have cyclic reference here if we do cache in area.
@@ -32,8 +32,8 @@ private:
 
 	std::shared_ptr<MetadataBlock> block;
 
-	std::shared_ptr<WfsItem> Create(const std::string name, AttributesBlock& attributes);
-	AttributesBlock GetObjectAttributes(std::shared_ptr<MetadataBlock>& block, const std::string& name);
+	std::shared_ptr<WfsItem> Create(const std::string& name, const AttributesBlock& attributes);
+	AttributesBlock GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name);
 
 	struct NodeState {
 		std::shared_ptr<MetadataBlock> block;
@@ -49,7 +49,7 @@ public:
 		std::shared_ptr<NodeState> node_state;
 		std::shared_ptr<Directory> directory;
 	public:
-		FilesIterator(std::shared_ptr<Directory> directory, std::shared_ptr<NodeState> node_state) : directory(directory), node_state(std::move(node_state)) {}
+		FilesIterator(const std::shared_ptr<Directory>& directory, const std::shared_ptr<NodeState>& node_state) : directory(directory), node_state(std::move(node_state)) {}
 		FilesIterator(const FilesIterator& mit) : directory(mit.directory), node_state(mit.node_state) {}
 		FilesIterator& operator++();
 		FilesIterator operator++(int) { FilesIterator tmp(*this); operator++(); return tmp; }

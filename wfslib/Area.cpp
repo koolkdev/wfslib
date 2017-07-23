@@ -33,7 +33,7 @@ WfsHeader * Area::WfsData() {
 	}
 }
 
-Area::Area(Wfs* wfs, uint32_t block_number, std::shared_ptr<MetadataBlock>& block, std::string root_directory_name, AttributesBlock& root_directory_attributes) :
+Area::Area(Wfs* wfs, uint32_t block_number, const std::shared_ptr<MetadataBlock>& block, const std::string& root_directory_name, const AttributesBlock& root_directory_attributes) :
 	wfs(wfs), block_number(block_number), header_block(block), root_directory_name(root_directory_name), root_directory_attributes(root_directory_attributes) {
 }
 
@@ -48,7 +48,7 @@ std::shared_ptr<Area> Area::LoadRootArea(Wfs* wfs) {
 	return std::make_shared<Area>(wfs, 0, block, "", AttributesBlock {block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)});
 }
 
-std::shared_ptr<Directory> Area::GetDirectory(uint32_t block_number, std::string name, AttributesBlock& attributes) {
+std::shared_ptr<Directory> Area::GetDirectory(uint32_t block_number, const std::string& name, const AttributesBlock& attributes) {
 	// TODO: Cache
 	return std::make_shared<Directory>(name, attributes, shared_from_this(), GetMetadataBlock(block_number));
 }
@@ -57,7 +57,7 @@ std::shared_ptr<Directory> Area::GetRootDirectory() {
 	return GetDirectory(this->Data()->header.root_directory_block_number.value(), root_directory_name, root_directory_attributes);
 }
 
-std::shared_ptr<Area> Area::GetArea(uint32_t block_number, std::string root_directory_name, AttributesBlock& root_directory_attributes, Block::BlockSize size) {
+std::shared_ptr<Area> Area::GetArea(uint32_t block_number, const std::string& root_directory_name, const AttributesBlock& root_directory_attributes, Block::BlockSize size) {
 	return std::make_shared<Area>(this->wfs, this->block_number + ToBasicBlockNumber(block_number), GetMetadataBlock(block_number, size), root_directory_name, root_directory_attributes);
 }
 
@@ -74,7 +74,7 @@ std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Blo
 	return MetadataBlock::LoadBlock(this->wfs->GetDevice(), this->block_number + ToBasicBlockNumber(block_number), size, IV(block_number));
 }
 
-std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, DataBlock::DataBlockHash& data_hash) {
+std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
 	return DataBlock::LoadBlock(this->wfs->GetDevice(), this->block_number + ToBasicBlockNumber(block_number), size, data_size, IV(block_number), data_hash);
 }
 
@@ -86,6 +86,6 @@ size_t Area::GetDataBlockLog2Size() {
 	return this->Data()->header.log2_block_size.value();
 }
 
-uint32_t Area::GetBlockNumber(std::shared_ptr<Block> block) {
+uint32_t Area::GetBlockNumber(const std::shared_ptr<Block>& block) {
 	return (block->GetBlockNumber() - this->block_number) >> (this->Data()->header.log2_block_size.value() - Block::BlockSize::Basic);
 }

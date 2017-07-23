@@ -16,7 +16,7 @@ struct SubBlockAllocatorStruct;
 
 class SubBlockAllocator {
 public:
-	SubBlockAllocator(std::shared_ptr<MetadataBlock>& block) : block(block) {}
+	SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block(block) {}
 
 	template<typename T>
 	T * GetNode(uint16_t offset) {

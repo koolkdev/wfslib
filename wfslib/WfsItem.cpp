@@ -9,9 +9,9 @@
 #include "Structs.h"
 #include "MetadataBlock.h"
 
-WfsItem::WfsItem(const std::string name, AttributesBlock& attributes) : name(name), attributes(attributes) {}
+WfsItem::WfsItem(const std::string& name, const AttributesBlock& attributes) : name(name), attributes(attributes) {}
 
-Attributes * AttributesBlock::Attributes() {
+Attributes * AttributesBlock::Attributes() const {
 	if (!block) return NULL;
 	return reinterpret_cast<::Attributes *>(&block->GetData()[attributes_offset]);
 }

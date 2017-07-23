@@ -17,12 +17,12 @@ class MetadataBlock;
 struct AttributesBlock {
 	std::shared_ptr<MetadataBlock> block;
 	size_t attributes_offset;
-	Attributes * Attributes();
+	struct Attributes * Attributes() const;
 };
 
 class WfsItem {
 public:
-	WfsItem(const std::string name, AttributesBlock& block);
+	WfsItem(const std::string& name, const AttributesBlock& block);
 	const std::string & GetName() { return name; }
 	virtual bool IsDirectory();
 	virtual bool IsFile();

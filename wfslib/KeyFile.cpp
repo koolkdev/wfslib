@@ -12,7 +12,7 @@
 #include <cryptopp/aes.h>
 
 template<class T>
-T * KeyFile::LoadFromFile(std::string path, size_t size) {
+T * KeyFile::LoadFromFile(const std::string& path, size_t size) {
 	static_assert(std::is_base_of<KeyFile, T>::value, "T must be a descendant of KeyFile");
 
 	std::fstream file(path, std::ios::binary | std::ios::in);
@@ -27,33 +27,33 @@ T * KeyFile::LoadFromFile(std::string path, size_t size) {
 	return new T(data);
 }
 
-OTP * OTP::LoadFromFile(std::string path) {
+OTP * OTP::LoadFromFile(const std::string& path) {
 	return KeyFile::LoadFromFile<OTP>(path, OTP_SIZE);
 }
 
-SEEPROM * SEEPROM::LoadFromFile(std::string path) {
+SEEPROM * SEEPROM::LoadFromFile(const std::string& path) {
 	return KeyFile::LoadFromFile<SEEPROM>(path, SEEPROM_SIZE);
 }
 
-std::vector<uint8_t> KeyFile::GetKey(size_t offset, size_t size) {
+std::vector<uint8_t> KeyFile::GetKey(size_t offset, size_t size) const {
 	std::vector<uint8_t> key(size);
 	std::copy(data.begin() + offset, data.begin() + offset + size, key.begin());
 	return key;
 }
 
-std::vector<uint8_t> OTP::GetMLCKey() {
+std::vector<uint8_t> OTP::GetMLCKey() const {
 	return GetKey(0x180, 0x10);
 }
 
-std::vector<uint8_t> OTP::GetUSBSeedEncryptionKey() {
+std::vector<uint8_t> OTP::GetUSBSeedEncryptionKey() const {
 	return GetKey(0x130, 0x10);
 }
 
-std::vector<uint8_t> SEEPROM::GetUSBKeySeed() {
+std::vector<uint8_t> SEEPROM::GetUSBKeySeed() const {
 	return GetKey(0xB0, 0x10);
 }
 
-std::vector<uint8_t> SEEPROM::GetUSBKey(OTP& otp) {
+std::vector<uint8_t> SEEPROM::GetUSBKey(const OTP& otp) const {
 	std::vector<uint8_t> key(std::move(GetUSBKeySeed()));
 	std::vector<uint8_t> enc_key(std::move(otp.GetUSBSeedEncryptionKey()));
 	CryptoPP::ECB_Mode<CryptoPP::AES>::Encryption encryptor(&*enc_key.begin(), enc_key.size());

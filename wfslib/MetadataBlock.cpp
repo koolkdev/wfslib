@@ -10,7 +10,7 @@
 
 #include "Structs.h"
 
-MetadataBlock::MetadataBlock(std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv) : 
+MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv) :
 	Block(device, block_number, size_category, iv, std::move(std::vector<uint8_t>(1i64 << size_category, 0)), 1 << size_category) {
 }
 
@@ -25,7 +25,7 @@ void MetadataBlock::Flush() {
 	this->Block::Flush();
 }
 
-std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool check_hash) {
+std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool check_hash) {
 	auto block = std::make_shared<MetadataBlock>(device, block_number, size_category, iv);
 	block->Fetch(check_hash);
 	return block;

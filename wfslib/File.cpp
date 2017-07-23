@@ -15,13 +15,13 @@ uint32_t File::GetSize() {
 	return attributes.Attributes()->size.value();
 }
 
-static size_t GetOffsetInMetadataBlock(std::shared_ptr<MetadataBlock>& block, uint8_t* data) {
+static size_t GetOffsetInMetadataBlock(const std::shared_ptr<MetadataBlock>& block, uint8_t* data) {
 	return data - &block->GetData()[0];
 }
 
 class File::DataCategoryReader {
 public:
-	DataCategoryReader(std::shared_ptr<File>& file) : file(file) {}
+	DataCategoryReader(const std::shared_ptr<File>& file) : file(file) {}
 	virtual size_t GetAttributesMetadataSize() = 0;
 	virtual size_t Read(uint8_t* data, size_t offset, size_t size) = 0;
 protected:
@@ -38,7 +38,7 @@ protected:
 // Category 0 - File data is in the attribute metadata (limited to 512 bytes minus attribute size) (no minumum)
 class File::DataCategory0Reader : public File::DataCategoryReader {
 public:
-	DataCategory0Reader(std::shared_ptr<File>& file) : DataCategoryReader(file) {}
+	DataCategory0Reader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
 	virtual size_t GetAttributesMetadataSize() {
 		return file->attributes.Attributes()->size_on_disk.value();
@@ -53,7 +53,7 @@ public:
 
 class File::RegularDataCategoryReader : public File::DataCategoryReader {
 public:
-	RegularDataCategoryReader(std::shared_ptr<File>& file) : DataCategoryReader(file) {}
+	RegularDataCategoryReader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
 	virtual size_t GetAttributesMetadataSize() {
 		// round up dividation
@@ -83,7 +83,7 @@ protected:
 	}
 	std::shared_ptr<DataBlock> current_data_block;
 
-	void LoadDataBlock(uint32_t block_number, uint32_t data_size, DataBlock::DataBlockHash& data_hash) {
+	void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
 		if (current_data_block && file->area->GetBlockNumber(current_data_block) == block_number) return;
 		current_data_block = file->area->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash);
 	}
@@ -92,7 +92,7 @@ protected:
 // Category 1 - File data in regluar blocks, in the attribute metadata there is a reversed list of block numbers and hashes. Limited to 5 blocks. (no minumum)
 class File::DataCategory1Reader : public File::RegularDataCategoryReader {
 public:
-	DataCategory1Reader(std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
+	DataCategory1Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
 protected:
 	virtual size_t GetBlocksLog2CountInDataBlock() {
 		return 0;
@@ -102,7 +102,7 @@ protected:
 // Category 2 - File data in mega block (8 regular blocks), in the attribute metadata there is a reversed list of block numbers and hashes. Limited to 5 mega blocks. (minimum size of more than 1 regular block)
 class File::DataCategory2Reader : public File::RegularDataCategoryReader {
 public:
-	DataCategory2Reader(std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
+	DataCategory2Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
 protected:
 	virtual size_t GetBlocksLog2CountInDataBlock() {
 		return 3;
@@ -112,7 +112,7 @@ protected:
 // Category 3 - File data in clusters of mega block (8 mega blocksblocks), in the attribute metadata there is a reversed list of block number and 8 hashes for each cluster. Limited to 4 clusters. (minimum size of more than 1 mega block)
 class File::DataCategory3Reader : public File::DataCategory2Reader {
 public:
-	DataCategory3Reader(std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
+	DataCategory3Reader(const std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
 
 	virtual size_t GetAttributesMetadataSize() {
 		size_t data_blocks_clusters_count = ((file->attributes.Attributes()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) + 1;
@@ -123,7 +123,7 @@ public:
 		return ReadFromClustersList(data, offset, offset, size, file->attributes.block, reinterpret_cast<DataBlocksClusterMetadata *>(&*GetAttributesMetadataEnd()), true);
 	}
 protected:
-	size_t ReadFromClustersList(uint8_t* data, size_t offset, size_t original_offset, size_t size, std::shared_ptr<MetadataBlock>& metadata_block, DataBlocksClusterMetadata * clusters_list, bool reverse) {
+	size_t ReadFromClustersList(uint8_t* data, size_t offset, size_t original_offset, size_t size, const std::shared_ptr<MetadataBlock>& metadata_block, DataBlocksClusterMetadata * clusters_list, bool reverse) {
 		int64_t cluster_index = offset >> ClusterDataLog2Size();
 		size_t offset_in_cluster = offset & ((1 << ClusterDataLog2Size()) - 1);
 		size_t block_index = offset_in_cluster >> GetDataBlockSize();
@@ -151,7 +151,7 @@ protected:
 // Category 4 - File data in clusters of mega block (8 mega blocksblocks), in the attribute metadata there is list of block numbers of metadata block with lists of block number and 8 hashes for each cluster. Limited to 237 metadata blocks of lists. (max file size) (minumum size of more/equal than 1 cluster)
 class File::DataCategory4Reader : public File::DataCategory3Reader {
 public:
-	DataCategory4Reader(std::shared_ptr<File>& file) : DataCategory3Reader(file) {}
+	DataCategory4Reader(const std::shared_ptr<File>& file) : DataCategory3Reader(file) {}
 
 	virtual size_t GetAttributesMetadataSize() {
 		size_t data_blocks_clusters_count = ((file->attributes.Attributes()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) + 1;
@@ -183,7 +183,7 @@ protected:
 	}
 };
 
-std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<File>& file) {
+std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_ptr<File>& file) {
 	switch (file->attributes.Attributes()->size_category.value()) {
 	case 0: return std::make_shared<DataCategory0Reader>(file);
 	case 1: return std::make_shared<DataCategory1Reader>(file);
@@ -194,7 +194,7 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<Fil
 	}
 }
 
-File::file_device::file_device(std::shared_ptr<File>& file) : file(file), pos(0), reader(std::move(CreateReader(file))) {
+File::file_device::file_device(const std::shared_ptr<File>& file) : file(file), pos(0), reader(std::move(CreateReader(file))) {
 }
 
 size_t File::file_device::size() {

@@ -19,12 +19,12 @@ public:
 		size_t hash_offset;
 	};
 
-	DataBlock(std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, DataBlockHash& data_hash);
+	DataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash);
 
 	virtual void Fetch();
 	virtual void Flush();
 
-	static std::shared_ptr<DataBlock> LoadBlock(std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, DataBlockHash& data_hash);
+	static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash);
 
 private:
 	DataBlockHash data_hash;

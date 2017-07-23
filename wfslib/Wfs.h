@@ -19,16 +19,16 @@ class Directory;
 
 class Wfs {
 public:
-	Wfs(std::shared_ptr<Device> device, std::vector<uint8_t>& key);
+	Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key);
 
-	std::shared_ptr<DeviceEncryption> GetDevice() {
+	const std::shared_ptr<DeviceEncryption>& GetDevice() {
 		return device;
 	}
 
-	std::shared_ptr<File> GetFile(const std::string filename);
-	std::shared_ptr<Directory> GetDirectory(const std::string filename);
+	std::shared_ptr<File> GetFile(const std::string& filename);
+	std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-	static void DetectSectorsCount(std::shared_ptr<FileDevice> device, std::vector<uint8_t>& key);
+	static void DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 
 private:
 	std::shared_ptr<DeviceEncryption> device;
