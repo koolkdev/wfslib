@@ -17,7 +17,7 @@ class MetadataBlock;
 struct AttributesBlock {
 	std::shared_ptr<MetadataBlock> block;
 	size_t attributes_offset;
-	struct Attributes * Attributes() const;
+	::Attributes * Attributes() const;
 };
 
 class WfsItem {

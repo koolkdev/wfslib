@@ -9,6 +9,7 @@
 
 #include <boost/endian/buffers.hpp> 
 #include <vector>
+#include <string>
 
 size_t round_pow2(size_t size);
 

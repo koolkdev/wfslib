@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -14,7 +15,7 @@ class KeyFile {
 public:
 	KeyFile(const std::vector<uint8_t>& data, size_t expected_size) : data(std::move(data)) {
 		if (this->data.size() != expected_size)
-			throw std::exception("Unexpected key file size");
+			throw std::runtime_error("Unexpected key file size");
 	}
 
 protected:

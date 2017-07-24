@@ -15,7 +15,7 @@
 
 #include <wfslib/WfsLib.h>
 
-void dumpdir(boost::filesystem::path target, std::shared_ptr<Directory>& dir, boost::filesystem::path path, bool verbos) {
+void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Directory>& dir, const boost::filesystem::path& path, bool verbos) {
 	if (!boost::filesystem::exists(target / path)) {
 		if (!boost::filesystem::create_directories(target / path)) {
 			std::cerr << "Error: Failed to create directory " << (target / path) << std::endl;
@@ -121,7 +121,7 @@ int main(int argc, char *argv[]) {
 		dumpdir(boost::filesystem::path(vm["output"].as<std::string>()), dir, boost::filesystem::path(""), !!vm.count("verbos"));
 		std::cout << "Done!" << std::endl;
 	}
-	catch (std::exception & e) {
+	catch (std::exception& e) {
 		std::cerr << "Error: " << e.what() << std::endl;
 		return 1;
 	}

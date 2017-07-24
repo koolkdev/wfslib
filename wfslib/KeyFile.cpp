@@ -17,13 +17,13 @@ T * KeyFile::LoadFromFile(const std::string& path, size_t size) {
 
 	std::fstream file(path, std::ios::binary | std::ios::in);
 	if (file.fail()) {
-		throw std::exception("KeyFile: Failed to open file");
+		throw std::runtime_error("KeyFile: Failed to open file");
 	}
 
 	std::vector<uint8_t> data(size);
 	file.read(reinterpret_cast<char*>(&*data.begin()), size);
-	if (file.gcount() != size)
-		throw std::exception("KeyFile: KeyFile too small");
+	if (file.gcount() != static_cast<std::streamsize>(size))
+		throw std::runtime_error("KeyFile: KeyFile too small");
 	return new T(data);
 }
 

@@ -12,10 +12,10 @@
 FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size) : file(new std::fstream(path, std::ios::binary | std::ios::in)),
 	log2_sector_size(log2_sector_size) {
 	if (file->fail()) {
-		throw std::exception("FileDevice: Failed to open file");
+		throw std::runtime_error("FileDevice: Failed to open file");
 	}
 	if (log2_sector_size < 9) {
-		throw std::exception("FileDevice: Invalid sector size (<512)");
+		throw std::runtime_error("FileDevice: Invalid sector size (<512)");
 	}
 	/*file->seekg(0, std::ios::end);
 	if (file->tellg() >> 9 > UINT32_MAX) {
@@ -30,27 +30,27 @@ FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size) : fil
 
 std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t sectors_count) {
 	if (sector_address >= this->sectors_count || sector_address + sectors_count > this->sectors_count) {
-		throw std::exception("FileDevice: Read out of file.");
+		throw std::runtime_error("FileDevice: Read out of file.");
 	}
 	std::lock_guard<std::mutex> guard(io_lock);
 	file->seekg(static_cast<size_t>(sector_address) << log2_sector_size);
 	std::vector<uint8_t> data(sectors_count << log2_sector_size);
 	file->read(reinterpret_cast<char*>(&*data.begin()), data.size());
-	if (file->gcount() != data.size())
-		throw std::exception("FileDevice: Failed to read from file.");
+	if (file->gcount() != static_cast<std::streamsize>(data.size()))
+		throw std::runtime_error("FileDevice: Failed to read from file.");
 	return data;
 
 }
 void FileDevice::WriteSectors(std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
 	if (sector_address >= this->sectors_count || sector_address + sectors_count > this->sectors_count) {
-		throw std::exception("FileDevice: Write out of file.");
+		throw std::runtime_error("FileDevice: Write out of file.");
 	}
 	if (data.size() < sectors_count << log2_sector_size) {
-		throw std::exception("FileDevice: Not enough data for writing.");
+		throw std::runtime_error("FileDevice: Not enough data for writing.");
 	}
 	std::lock_guard<std::mutex> guard(io_lock);
 	file->seekp(static_cast<size_t>(sector_address) << log2_sector_size);
 	file->write(reinterpret_cast<char*>(&*data.begin()), sectors_count << log2_sector_size);
 	if (file->fail())
-		throw std::exception("FileDevice: Failed to write to file.");
+		throw std::runtime_error("FileDevice: Failed to write to file.");
 }

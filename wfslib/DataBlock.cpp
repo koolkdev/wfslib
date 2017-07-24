@@ -12,7 +12,7 @@
 #include "Structs.h"
 
 DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash) :
-	Block(device, block_number, size_category, iv, std::move(std::vector<uint8_t>(data_size, 0)), data_size), data_hash(data_hash) {
+	Block(device, block_number, size_category, iv, std::vector<uint8_t>(data_size, 0), data_size), data_hash(data_hash) {
 }
 
 void DataBlock::Fetch() {

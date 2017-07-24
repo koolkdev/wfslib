@@ -45,7 +45,7 @@ void Wfs::DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const st
 	auto block = MetadataBlock::LoadBlock(std::make_shared<DeviceEncryption>(device, key), 0, Block::BlockSize::Basic, 0, false);
 	auto wfs_header = reinterpret_cast<WfsHeader *>(&block->GetData()[sizeof(MetadataBlockHeader)]);
 	if (wfs_header->version.value() != 0x01010800)
-		throw std::exception("Unexpected WFS version (bad key?)");
+		throw std::runtime_error("Unexpected WFS version (bad key?)");
 	auto block_size = Block::BlockSize::Basic;
 	if (!(wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_BASIC) && (wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_REGULAR))
 		block_size = Block::BlockSize::Regular;

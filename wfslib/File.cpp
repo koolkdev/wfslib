@@ -27,10 +27,10 @@ public:
 protected:
 	std::shared_ptr<File> file;
 
-	std::vector<uint8_t>::iterator DataCategoryReader::GetAttributesMetadata() {
+	std::vector<uint8_t>::iterator GetAttributesMetadata() {
 		return file->attributes.block->GetData().begin() + file->attributes.attributes_offset + file->attributes.Attributes()->DataOffset();
 	}
-	std::vector<uint8_t>::iterator DataCategoryReader::GetAttributesMetadataEnd() {
+	std::vector<uint8_t>::iterator GetAttributesMetadataEnd() {
 		return file->attributes.block->GetData().begin() + file->attributes.attributes_offset + round_pow2(file->attributes.Attributes()->DataOffset() + GetAttributesMetadataSize());
 	}
 };
@@ -190,7 +190,7 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_p
 	case 2: return std::make_shared<DataCategory2Reader>(file);
 	case 3: return std::make_shared<DataCategory3Reader>(file);
 	case 4: return std::make_shared<DataCategory4Reader>(file);
-	default: throw std::exception("Unexpected file category");
+	default: throw std::runtime_error("Unexpected file category");
 	}
 }
 
