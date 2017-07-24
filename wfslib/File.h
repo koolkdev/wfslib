@@ -21,11 +21,6 @@ class MetadataBlock;
 struct DataBlocksClusterMetadata;
 
 class File : public WfsItem, public std::enable_shared_from_this<File> {
-public:
-	File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area) : WfsItem(name, attributes), area(area) {
-	}
-
-	uint32_t GetSize();
 private:
 	// TODO: We may have cyclic reference here if we do cache in area.
 	std::shared_ptr<Area> area;
@@ -41,6 +36,11 @@ private:
 	static std::shared_ptr<DataCategoryReader> CreateReader(const std::shared_ptr<File>& file);
 
 public:
+	File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area) : WfsItem(name, attributes), area(area) {
+	}
+
+	uint32_t GetSize();
+
 	class file_device {
 	public:
 		typedef uint8_t char_type;

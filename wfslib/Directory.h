@@ -46,8 +46,8 @@ private:
 public:
 	class FilesIterator : public std::iterator<std::input_iterator_tag, std::shared_ptr<WfsItem>> {
 	private:
-		std::shared_ptr<NodeState> node_state;
 		std::shared_ptr<Directory> directory;
+		std::shared_ptr<NodeState> node_state;
 	public:
 		FilesIterator(const std::shared_ptr<Directory>& directory, const std::shared_ptr<NodeState>& node_state) : directory(directory), node_state(std::move(node_state)) {}
 		FilesIterator(const FilesIterator& mit) : directory(mit.directory), node_state(mit.node_state) {}

@@ -194,7 +194,7 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_p
 	}
 }
 
-File::file_device::file_device(const std::shared_ptr<File>& file) : file(file), pos(0), reader(std::move(CreateReader(file))) {
+File::file_device::file_device(const std::shared_ptr<File>& file) : file(file), reader(std::move(CreateReader(file))), pos(0) {
 }
 
 size_t File::file_device::size() {

@@ -26,9 +26,9 @@ public:
 
 	void SetSectorsCount(uint32_t sectors_count) { this->sectors_count = sectors_count; }
 private:
-	uint32_t log2_sector_size;
-	uint32_t sectors_count;
-
 	std::unique_ptr<std::iostream> file;
 	std::mutex io_lock;
+
+	uint32_t log2_sector_size;
+	uint32_t sectors_count;
 };

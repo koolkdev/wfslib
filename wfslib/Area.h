@@ -23,7 +23,7 @@ struct WfsHeader;
 
 class Area : public std::enable_shared_from_this<Area> {
 public:
-	Area(Wfs* wfs, uint32_t block_number, const std::shared_ptr<MetadataBlock>& block, const std::string& root_directory_name, const AttributesBlock& root_directory_attributes);
+	Area(Wfs* wfs, const std::shared_ptr<MetadataBlock>& block, const std::string& root_directory_name, const AttributesBlock& root_directory_attributes);
 
 	static std::shared_ptr<Area> LoadRootArea(Wfs* wfs);
 
@@ -53,7 +53,6 @@ private:
 
 	std::shared_ptr<MetadataBlock> header_block;
 
-	uint32_t block_number;
-	AttributesBlock root_directory_attributes;
 	std::string root_directory_name;
+	AttributesBlock root_directory_attributes;
 };
