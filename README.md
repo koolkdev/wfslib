@@ -43,5 +43,29 @@ PhysicalSectorSize : 512
 ```
 For 512 bytes, specify 9 (the default), for 2048 bytes sepcify --sector-size 11, and for 4096 bytes specify --sector-size 12. Flash drives usually use sector size 512 bytes, and HDD usually uses 4096. (Older may use 2048).
 
+#### Dump USB device under Linux
+```
+sudo wfsdump --input /dev/sdb --output dump_dir --otp otp.bin --seeprom seeprom.bin --sector-size 9
+```
+You can figure out the sector size with the command
+```
+sudo fdisk -l
+```
+Example output:
+```
+Disk /dev/sdb: 29.8 GiB, 32018268160 bytes, 62535680 sectors
+Sector size (logical/physical): 512 bytes / 512 bytes
+```
+
 ## Build
-This project depends on the libraries boost and Crypto++. Visual Studio 2015 project file is provided (Configuration of those libraries include path and lib path is required).
+### Linux
+Install the requirements
+```
+sudo apt-get install libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
+```
+Run the makefile
+```
+make
+```
+### Visual Studio
+Visual Studio 2015 project file is provided. This project depends on the libraries boost and Crypto++. Configuration of those libraries include path and lib path is required.
