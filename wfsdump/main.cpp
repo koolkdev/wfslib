@@ -63,7 +63,7 @@ int main(int argc, char *argv[]) {
 			("mlc", "device is mlc (default: device is usb)")
 			("usb", "device is usb")
 			("verbos", "verbos output")
-			("sector-size", boost::program_options::value<uint32_t>(&sector_log2_size)->default_value(9), "sector log2 size of device. 9 for 512 bytes (default), 11 for 2048 bytes and 12 for 4096 bytes")
+			("sector-size", boost::program_options::value<uint32_t>(&sector_log2_size), "sector log2 size of device. 9 for 512 bytes, 11 for 2048 bytes and 12 for 4096 bytes (default: auto detect)")
 			;
 
 		boost::program_options::variables_map vm;
@@ -109,8 +109,18 @@ int main(int argc, char *argv[]) {
 			}
 			key = std::move(seeprom->GetUSBKey(*otp));
 		}
-		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), vm["sector-size"].as<uint32_t>());
+		uint32_t sector_size = 9; // default sector size before auto detecting
+		bool auto_detect = true;
+		if (vm.count("sector-size")) {
+			sector_size = vm["sector-size"].as<uint32_t>();
+			auto_detect = false;
+		}
+		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), sector_size);
 		Wfs::DetectSectorsCount(device, key);
+		if (auto_detect) {
+			// Auto detect
+			Wfs::DetectSectorSize(device, key);
+		}
 		auto dir = Wfs(device, key).GetDirectory(vm["dump-path"].as<std::string>());
 		if (!dir) {
 			std::cerr << "Error: Didn't find directory " << vm["dump-path"].as<std::string>() << " in wfs" << std::endl;

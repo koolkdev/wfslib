@@ -29,10 +29,13 @@ public:
 	std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
 	static void DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
+	static void DetectSectorSize(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 
 private:
 	std::shared_ptr<DeviceEncryption> device;
 
 	friend class Area;
 	std::shared_ptr<Area> root_area;
+
+	static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 };

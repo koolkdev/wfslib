@@ -51,3 +51,33 @@ void Wfs::DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const st
 		block_size = Block::BlockSize::Regular;
 	device->SetSectorsCount(wfs_header->root_area_attributes.blocks_count.value() << (block_size - device->GetLog2SectorSize()));
 }
+
+void Wfs::DetectSectorSize(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
+	bool detected = false;
+	for (auto sector_size : {9, 11, 12}) {
+		device->SetLog2SectorSize(sector_size);
+		if (VerifyDeviceAndKey(device, key)) {
+			detected = true;
+			break;
+		}
+	}
+	if (!detected) {
+		throw std::runtime_error("Wfs: Failed to detect sector size");
+	}
+}
+
+bool Wfs::VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
+	auto enc_device = std::make_shared<DeviceEncryption>(device, key);
+	try {
+		MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, true);
+	}
+	catch (Block::BadHash) {
+		try {
+			MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Regular, 0, true);
+		}
+		catch (Block::BadHash) {
+			return false;
+		}
+	}
+	return true;
+}
