@@ -51,7 +51,6 @@ void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Direct
 int main(int argc, char *argv[]) {
 	try {
 		boost::program_options::options_description desc("Allowed options");
-		uint32_t sector_log2_size;
 		std::string wfs_path;
 		desc.add_options()
 			("help", "produce help message")
@@ -63,7 +62,6 @@ int main(int argc, char *argv[]) {
 			("mlc", "device is mlc (default: device is usb)")
 			("usb", "device is usb")
 			("verbos", "verbos output")
-			("sector-size", boost::program_options::value<uint32_t>(&sector_log2_size), "sector log2 size of device. 9 for 512 bytes, 11 for 2048 bytes and 12 for 4096 bytes (default: auto detect)")
 			;
 
 		boost::program_options::variables_map vm;
@@ -77,7 +75,7 @@ int main(int argc, char *argv[]) {
 		if ((!vm.count("seeprom") && !vm.count("mlc"))) { std::cerr << "Missing seeprom file (--seeprom)" << std::endl; bad = true; }
 		if (vm.count("mlc") + vm.count("usb") > 1) { std::cerr << "Can't specify both --mlc and --usb" << std::endl; bad = true; }
 		if (vm.count("help") || bad) {
-			std::cout << "Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--sector-size 9/11/12] [--verbos]" << std::endl;
+			std::cout << "Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]" << std::endl;
 			std::cout << desc << "\n";
 			return 1;
 		}
@@ -101,7 +99,7 @@ int main(int argc, char *argv[]) {
 			// usb
 			std::unique_ptr<SEEPROM> seeprom;
 			try {
-				seeprom.reset(std::move(SEEPROM::LoadFromFile(vm["seeprom"].as<std::string>())));
+				seeprom.reset(SEEPROM::LoadFromFile(vm["seeprom"].as<std::string>()));
 			}
 			catch (std::exception& e) {
 				std::cerr << "Failed to open SEEPROM: " << e.what() << std::endl;
@@ -109,18 +107,9 @@ int main(int argc, char *argv[]) {
 			}
 			key = std::move(seeprom->GetUSBKey(*otp));
 		}
-		uint32_t sector_size = 9; // default sector size before auto detecting
-		bool auto_detect = true;
-		if (vm.count("sector-size")) {
-			sector_size = vm["sector-size"].as<uint32_t>();
-			auto_detect = false;
-		}
-		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), sector_size);
+		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), 9);
 		Wfs::DetectSectorsCount(device, key);
-		if (auto_detect) {
-			// Auto detect
-			Wfs::DetectSectorSize(device, key);
-		}
+		Wfs::DetectSectorSize(device, key);
 		auto dir = Wfs(device, key).GetDirectory(vm["dump-path"].as<std::string>());
 		if (!dir) {
 			std::cerr << "Error: Didn't find directory " << vm["dump-path"].as<std::string>() << " in wfs" << std::endl;
