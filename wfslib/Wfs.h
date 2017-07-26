@@ -14,6 +14,7 @@ class Device;
 class FileDevice;
 class DeviceEncryption;
 class Area;
+class WfsItem;
 class File;
 class Directory;
 
@@ -25,6 +26,7 @@ public:
 		return device;
 	}
 
+	std::shared_ptr<WfsItem> GetObject(const std::string& filename);
 	std::shared_ptr<File> GetFile(const std::string& filename);
 	std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 

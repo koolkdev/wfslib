@@ -21,6 +21,14 @@ Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key) : dev
 	this->root_area = Area::LoadRootArea(this->device);
 }
 
+std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
+	if (filename == "/") return GetDirectory("/");
+	boost::filesystem::path path(filename);
+	auto dir = GetDirectory(path.parent_path().string());
+	if (!dir) return std::shared_ptr<WfsItem>();
+	return dir->GetObject(path.filename().string());
+}
+
 std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
 	boost::filesystem::path path(filename);
 	auto dir = GetDirectory(path.parent_path().string());

@@ -13,6 +13,12 @@
 #include "Link.h"
 #include "SubBlockAllocator.h"
 
+std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) {
+	AttributesBlock attributes_block = GetObjectAttributes(block, name);
+	if (!attributes_block.block) return std::shared_ptr<WfsItem>();
+	return Create(name, attributes_block);
+}
+
 std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) {
 	AttributesBlock attributes_block = GetObjectAttributes(block, name);
 	auto attributes = attributes_block.Attributes();
@@ -125,6 +131,10 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
 		}
 		return GetObjectAttributes(area->GetMetadataBlock(last_block_number), name);
 	}
+}
+
+size_t Directory::GetItemsCount() {
+	return std::distance(begin(), end());
 }
 
 Directory::FilesIterator& Directory::FilesIterator::operator++() {

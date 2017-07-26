@@ -23,8 +23,11 @@ public:
 	Directory(const std::string& name, AttributesBlock attributes, const std::shared_ptr<Area>& area, const std::shared_ptr<MetadataBlock>& block) : WfsItem(name, attributes), area(area), block(block) {
 	}
 
+	std::shared_ptr<WfsItem> GetObject(const std::string& name);
 	std::shared_ptr<Directory> GetDirectory(const std::string& name);
 	std::shared_ptr<File> GetFile(const std::string& name);
+
+	size_t GetItemsCount();
 
 private:
 	// TODO: We may have cyclic reference here if we do cache in area.
