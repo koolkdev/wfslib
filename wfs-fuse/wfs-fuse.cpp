@@ -79,7 +79,7 @@ static int wfs_read(const char *path, char *buf, size_t size, off_t offset,
 	File::stream stream(std::dynamic_pointer_cast<File>(item));
 
 	stream.seekg(offset, stream.beg);
-	stream.read(reinterpret_cast<unsigned char*>(buf), size);
+	stream.read(buf, size);
 
 	return static_cast<int>(stream.gcount());
 }

@@ -43,7 +43,7 @@ public:
 
 	class file_device {
 	public:
-		typedef uint8_t char_type;
+		typedef char char_type;
 		typedef boost::iostreams::seekable_device_tag category;
 		file_device(const std::shared_ptr<File>& file);
 

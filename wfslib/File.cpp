@@ -210,7 +210,7 @@ std::streamsize File::file_device::read(char_type* s, std::streamsize n)
 
 	std::streamsize to_read = result;
 	while (to_read > 0) {
-		size_t read = reader->Read(s, static_cast<size_t>(pos), static_cast<size_t>(to_read));
+		size_t read = reader->Read(reinterpret_cast<uint8_t*>(s), static_cast<size_t>(pos), static_cast<size_t>(to_read));
 		s += read;
 		pos += read;
 		to_read -= read;
