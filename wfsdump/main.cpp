@@ -111,8 +111,7 @@ int main(int argc, char *argv[]) {
 		}
 		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), vm["sector-size"].as<uint32_t>());
 		Wfs::DetectSectorsCount(device, key);
-		Wfs wfs(device, key);
-		auto dir = wfs.GetDirectory(vm["dump-path"].as<std::string>());
+		auto dir = Wfs(device, key).GetDirectory(vm["dump-path"].as<std::string>());
 		if (!dir) {
 			std::cerr << "Error: Didn't find directory " << vm["dump-path"].as<std::string>() << " in wfs" << std::endl;
 			return 1;

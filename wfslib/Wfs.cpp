@@ -18,7 +18,7 @@
 
 Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key) : device(std::make_shared<DeviceEncryption>(device, key)) {
 	// Read first area
-	this->root_area = Area::LoadRootArea(this);
+	this->root_area = Area::LoadRootArea(this->device);
 }
 
 std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
