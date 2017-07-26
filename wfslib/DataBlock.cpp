@@ -15,9 +15,9 @@ DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t b
 	Block(device, block_number, size_category, iv, std::vector<uint8_t>(data_size, 0), data_size), data_hash(data_hash) {
 }
 
-void DataBlock::Fetch() {
+void DataBlock::Fetch(bool check_hash) {
 	this->Block::Fetch();
-	if (!this->device->CheckHash(data, data_hash.block->GetData().begin() + data_hash.hash_offset, false))
+	if (check_hash && !this->device->CheckHash(data, data_hash.block->GetData().begin() + data_hash.hash_offset, false))
 		throw Block::BadHash(block_number);
 }
 

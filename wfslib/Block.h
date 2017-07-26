@@ -10,6 +10,7 @@
 #include <memory>
 #include <vector>
 #include <exception>
+#include <string>
 
 #ifndef _MSC_VER
 #define NOEXCEPT noexcept
@@ -28,7 +29,7 @@ public:
 		MegaRegular = 16,
 	};
 
-	virtual void Fetch();
+	virtual void Fetch(bool check_hash = true);
 	virtual void Flush();
 
 	std::vector<uint8_t>& GetData() { return data; }

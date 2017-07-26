@@ -11,14 +11,14 @@
 #include <boost/format.hpp>
 
 Block::BadHash::BadHash(uint32_t block_number) : block_number(block_number),
-	msg((boost::format("Bad hash for block 0x%08X") % block_number).str()) {
+	msg((boost::format("Bad hash for block 0x%08X") % this->block_number).str()) {
 }
 char const* Block::BadHash::what() const NOEXCEPT {
 	return msg.c_str();
 }
 
-void Block::Fetch() {
-	this->data = std::move(this->device->ReadBlock(ToDeviceSector(this->block_number), this->data_size, this->iv));
+void Block::Fetch(bool check_hash) {
+	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), this->data_size, this->iv);
 }
 
 void Block::Flush() {

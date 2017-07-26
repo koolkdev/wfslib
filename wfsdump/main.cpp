@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 
 		if (vm.count("mlc")) {
 			// mlc
-			key = std::move(otp->GetMLCKey());
+			key = otp->GetMLCKey();
 		}
 		else {
 			// usb
@@ -105,7 +105,7 @@ int main(int argc, char *argv[]) {
 				std::cerr << "Failed to open SEEPROM: " << e.what() << std::endl;
 				return 1;
 			}
-			key = std::move(seeprom->GetUSBKey(*otp));
+			key = seeprom->GetUSBKey(*otp);
 		}
 		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), 9);
 		Wfs::DetectSectorsCount(device, key);

@@ -54,8 +54,8 @@ std::vector<uint8_t> SEEPROM::GetUSBKeySeed() const {
 }
 
 std::vector<uint8_t> SEEPROM::GetUSBKey(const OTP& otp) const {
-	std::vector<uint8_t> key(std::move(GetUSBKeySeed()));
-	std::vector<uint8_t> enc_key(std::move(otp.GetUSBSeedEncryptionKey()));
+	std::vector<uint8_t> key(GetUSBKeySeed());
+	std::vector<uint8_t> enc_key(otp.GetUSBSeedEncryptionKey());
 	CryptoPP::ECB_Mode<CryptoPP::AES>::Encryption encryptor(&*enc_key.begin(), enc_key.size());
 	encryptor.ProcessData(&*key.begin(), &*key.begin(), key.size());
 	return key;

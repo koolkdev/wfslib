@@ -2,7 +2,7 @@ CXX=g++
 LIB=-L../
 INC=-I../
 CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14
-LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options -lcryptopp
+LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options -lcryptopp -lstdc++
 SOURCES=main.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=wfsdump
