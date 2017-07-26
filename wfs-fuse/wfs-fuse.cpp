@@ -100,7 +100,7 @@ static const char *usage =
 "options:\n"
 "    --help|-h             print this help message\n"
 "    --otp|-o PATH         otp file\n"
-"    --seeprom|-s PATHH    seeprom file\n"
+"    --seeprom|-s PATHH    seeprom file (required if usb)\n"
 "    --usb|-u              device is usb (default)\n"
 "    --mlc|-m              device is mlc\n"
 "    -d   -o debug         enable debug output (implies -f)\n"
