@@ -2,10 +2,11 @@ WFSLIB_DIR=wfslib
 WFSDUMP_DIR=wfsdump
 WFSLIB_OUT=libwfs.a
 WFSDUMP_OUT=wfsdump/wfsdump
+OUTPUTS=$(WFSLIB_OUT) $(WFSDUMP_OUT)
 
 SUBDIRS=$(WFSLIB_DIR) $(WFSDUMP_DIR)
 
-.PHONY: all clean $(SUBDIRS)
+.PHONY: all clean $(SUBDIRS) $(OUTPUTS)
 
 all: $(WFSLIB_OUT) $(WFSDUMP_OUT)
 
