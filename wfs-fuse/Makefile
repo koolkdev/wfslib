@@ -9,7 +9,7 @@ EXECUTABLE=wfs-fuse
 
 all: $(SOURCES) $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS) 
+$(EXECUTABLE): $(OBJECTS) ../libwfs.a 
 	$(CXX) $(OBJECTS) $(LDFLAGS) -o $@
 
 .cpp.o:
