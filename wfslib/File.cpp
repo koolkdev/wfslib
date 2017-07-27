@@ -66,9 +66,10 @@ public:
 		int64_t block_index = offset >> GetDataBlockSize();
 		size_t offset_in_block = offset & ((1 << GetDataBlockSize()) - 1);
 		auto hash_block = file->attributes.block;
+		uint32_t block_offset = static_cast<uint32_t>((offset >> GetDataBlockSize()) << GetDataBlockSize());
 
 		LoadDataBlock(blocks_list[-block_index - 1].block_number.value(),
-			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - static_cast<uint32_t>(offset))),
+			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - block_offset)),
 			DataBlock::DataBlockHash{ hash_block, GetOffsetInMetadataBlock(hash_block, reinterpret_cast<uint8_t*>(&blocks_list[-block_index - 1].hash)) });
 		auto& block_data = current_data_block->GetData();
 		size = std::min(size, block_data.size() - offset_in_block);
@@ -128,6 +129,7 @@ protected:
 		size_t offset_in_cluster = offset & ((1 << ClusterDataLog2Size()) - 1);
 		size_t block_index = offset_in_cluster >> GetDataBlockSize();
 		size_t offset_in_block = offset_in_cluster & ((1 << GetDataBlockSize()) - 1);
+		uint32_t block_offset = static_cast<uint32_t>((original_offset >> GetDataBlockSize()) << GetDataBlockSize());
 
 		DataBlocksClusterMetadata * cluster = NULL;
 		if (reverse)
@@ -135,7 +137,7 @@ protected:
 		else
 			cluster = &clusters_list[cluster_index];
 		LoadDataBlock(cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
-			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - static_cast<uint32_t>(original_offset))),
+			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - block_offset)),
 			DataBlock::DataBlockHash{ metadata_block, GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<uint8_t*>(&cluster->hash[block_index])) });
 		auto& block_data = current_data_block->GetData();
 		size = std::min(size, block_data.size() - offset_in_block);
