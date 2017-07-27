@@ -9,7 +9,7 @@
 
 #include <vector>
 #include <memory>
-#include <cryptopp/sha.h>
+#include <botan/cipher_mode.h>
 
 class Device;
 struct WfsBlockIV;
@@ -26,14 +26,14 @@ public:
 
 	const std::shared_ptr<Device>& GetDevice() { return device; }
 
-	static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
+	static constexpr size_t DIGEST_SIZE = 20;
 
 private:
 	void HashData(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash);
-	WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv);
+	std::vector<uint8_t> GetIV(uint32_t sectors_count, uint32_t iv);
 	size_t ToSectorSize(size_t size);
 
 	std::shared_ptr<Device> device;
 
-	const std::vector<uint8_t> key;
+	std::unique_ptr<Botan::Cipher_Mode> encryptor, decryptor;
 };

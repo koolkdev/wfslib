@@ -8,8 +8,7 @@
 #include "KeyFile.h"
 
 #include <fstream>
-#include <cryptopp/modes.h>
-#include <cryptopp/aes.h>
+#include <botan/cipher_mode.h>
 
 template<class T>
 T * KeyFile::LoadFromFile(const std::string& path, size_t size) {
@@ -55,8 +54,8 @@ std::vector<uint8_t> SEEPROM::GetUSBKeySeed() const {
 
 std::vector<uint8_t> SEEPROM::GetUSBKey(const OTP& otp) const {
 	std::vector<uint8_t> key(GetUSBKeySeed());
-	std::vector<uint8_t> enc_key(otp.GetUSBSeedEncryptionKey());
-	CryptoPP::ECB_Mode<CryptoPP::AES>::Encryption encryptor(&*enc_key.begin(), enc_key.size());
-	encryptor.ProcessData(&*key.begin(), &*key.begin(), key.size());
+	std::unique_ptr<Botan::Cipher_Mode> encryptor(Botan::get_cipher_mode("AES-128/CBC", Botan::ENCRYPTION));
+	encryptor->set_key(otp.GetUSBSeedEncryptionKey());
+	encryptor->process(&key[0], key.size());
 	return key;
 }
