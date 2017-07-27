@@ -95,15 +95,16 @@ int wfs_readlink(const char *path, char *buf, size_t size) {
 }
 
 static const char *usage =
-"usage: wfs-fuse <device_file> <mountpoint> --otp OTP_PATH [--seeprom SEEPROM_PATH] [--usb] [--mlc]\n"
+"usage: wfs-fuse <device_file> <mountpoint> --otp <otp_path> [--seeprom <seeprom_path>] [--usb] [--mlc]\n"
 "\n"
 "options:\n"
 "    --help|-h             print this help message\n"
-"    --otp|-o PATH         otp file\n"
-"    --seeprom|-s PATHH    seeprom file (required if usb)\n"
-"    --usb|-u              device is usb (default)\n"
-"    --mlc|-m              device is mlc\n"
+"    --otp <path>          otp file\n"
+"    --seeprom <path>      seeprom file (required if usb)\n"
+"    --usb                 device is usb (default)\n"
+"    --mlc                 device is mlc\n"
 "    -d   -o debug         enable debug output (implies -f)\n"
+"    -o allow_other        allow access to the mount for all\n"
 "    -f                    foreground operation\n"
 "    -s                    disable multi-threaded operation\n"
 "\n";
@@ -120,13 +121,9 @@ struct wfs_param {
 #define WFS_OPT(t, p) { t, offsetof(struct wfs_param, p), 1 }
 
 static const struct fuse_opt wfs_opts[] = {
-	WFS_OPT("-o %s",		otp),
 	WFS_OPT("--otp %s",		otp),
-	WFS_OPT("-s %s",		seeprom),
 	WFS_OPT("--seeprom %s",		seeprom),
-	WFS_OPT("-u",			is_usb),
 	WFS_OPT("--usb",		is_usb),
-	WFS_OPT("-m",			is_mlc),
 	WFS_OPT("--mlc",		is_mlc),
 	FUSE_OPT_KEY("-h",		0),
 	FUSE_OPT_KEY("--help",		0),
