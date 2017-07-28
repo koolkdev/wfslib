@@ -26,17 +26,20 @@ Allowed options:
 wfs-fuse --help
 ```
 ```
-usage: wfs-fuse <device_file> <mountpoint> --otp OTP_PATH [--seeprom SEEPROM_PATH] [--usb] [--mlc]
+usage: wfs-fuse <device_file> <mountpoint> --otp <otp_path> [--seeprom <seeprom_path>] [--usb] [--mlc] [fuse options]
 
 options:
-    --help|-h             print this help message
-    --otp|-o PATH         otp file
-    --seeprom|-s PATHH    seeprom file
-    --usb|-u              device is usb (default)
-    --mlc|-m              device is mlc
-    -d   -o debug         enable debug output (implies -f)
-    -f                    foreground operation
-    -s                    disable multi-threaded operation
+    --help|-h              print this help message
+    --otp <path>           otp file
+    --seeprom <path>       seeprom file (required if usb)
+    --usb                  device is usb (default)
+    --mlc                  device is mlc
+    -d   -o debug          enable debug output (implies -f)
+    -o default_permissions check access permission instead the operation system
+    -o allow_other         allow access to the mount for all users
+    -f                     foreground operation
+    -s                     disable multi-threaded operation
+
 ```
 
 ### Example
@@ -57,19 +60,60 @@ Get-WmiObject Win32_DiskDrive
 
 #### Mount USB device in Linux
 ```
-sudo wfs-fuse /dev/sdb /mnt --otp otp.bin --seeprom seeprom.bin
+sudo wfs-fuse /dev/sdb /mnt --otp otp.bin --seeprom seeprom.bin -o default_permissions,allow_other
 ```
 
 ## Build
 ### Linux
 Install the requirements
 ```
-sudo apt-get install g++ make libfuse-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
+sudo apt-get install git g++ make libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
 ```
-Run the makefile
+Get the code:
+```
+git clone https://github.com/koolkdev/wfslib.git
+cd wfslib
+```
+Build
 ```
 make
 ```
 
 ### Visual Studio
 Visual Studio 2015 project file is provided. This project depends on the libraries boost and Crypto++. Configuration of those libraries include path and lib path is required.
+
+
+### Mac OS X
+Install Xcode command line tools:
+```
+xcode-select --install
+```
+Install brew if required
+```
+ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
+```
+Install git if required
+```
+brew install git
+```
+Install the requirements
+```
+brew install boost cryptopp
+brew tap caskroom/cask
+brew cask install osxfuse
+```
+```
+Get the code:
+```
+git clone https://github.com/koolkdev/wfslib.git
+cd wfslib
+```
+Modify the makefile:
+```
+perl -p -i -e 's/-lfuse /-lfuse_ino64 /g' wfs-fuse/Makefile
+```
+Build
+```
+make
+```
+Note: You must provide "-o default_permissions,allow_other" argument for wfs-fuse

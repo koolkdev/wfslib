@@ -95,18 +95,19 @@ int wfs_readlink(const char *path, char *buf, size_t size) {
 }
 
 static const char *usage =
-"usage: wfs-fuse <device_file> <mountpoint> --otp <otp_path> [--seeprom <seeprom_path>] [--usb] [--mlc]\n"
+"usage: wfs-fuse <device_file> <mountpoint> --otp <otp_path> [--seeprom <seeprom_path>] [--usb] [--mlc] [fuse options]\n"
 "\n"
 "options:\n"
-"    --help|-h             print this help message\n"
-"    --otp <path>          otp file\n"
-"    --seeprom <path>      seeprom file (required if usb)\n"
-"    --usb                 device is usb (default)\n"
-"    --mlc                 device is mlc\n"
-"    -d   -o debug         enable debug output (implies -f)\n"
-"    -o allow_other        allow access to the mount for all\n"
-"    -f                    foreground operation\n"
-"    -s                    disable multi-threaded operation\n"
+"    --help|-h              print this help message\n"
+"    --otp <path>           otp file\n"
+"    --seeprom <path>       seeprom file (required if usb)\n"
+"    --usb                  device is usb (default)\n"
+"    --mlc                  device is mlc\n"
+"    -d   -o debug          enable debug output (implies -f)\n"
+"    -o default_permissions check access permission instead the operation system\n"
+"    -o allow_other         allow access to the mount for all users\n"
+"    -f                     foreground operation\n"
+"    -s                     disable multi-threaded operation\n"
 "\n";
 
 struct wfs_param {
@@ -158,6 +159,10 @@ int main(int argc, char *argv[]) {
  	struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 	struct wfs_param param = { NULL, NULL, NULL, 0, 0, 0 };
 
+	if (argc < 3) {
+		fprintf(stderr, "%s", usage);
+		return 1;
+	}
 	if (fuse_opt_parse(&args, &param, wfs_opts, wfs_process_arg)) {
 		printf("failed to parse option\n");
 		return 1;
@@ -165,10 +170,6 @@ int main(int argc, char *argv[]) {
 
 	if (param.is_help) {
 		return 0;
-	}
-	if (!param.file) {
-		printf("Missing file (--file)\n");
-		return 1;
 	}
 	if (!param.otp) {
 		printf("Missing otp file (--otp)\n");
