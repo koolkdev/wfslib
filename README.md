@@ -102,7 +102,6 @@ brew install boost cryptopp
 brew tap caskroom/cask
 brew cask install osxfuse
 ```
-```
 Get the code:
 ```
 git clone https://github.com/koolkdev/wfslib.git
