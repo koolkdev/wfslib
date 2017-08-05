@@ -32,4 +32,5 @@ private:
 
 	uint32_t log2_sector_size;
 	uint32_t sectors_count;
+	bool read_only;
 };

@@ -10,7 +10,7 @@
 #include <fstream>
 
 FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only) : file(new std::fstream(path, std::ios::binary | std::ios::in | (!read_only ? std::ios::out : 0))),
-	log2_sector_size(log2_sector_size) {
+	log2_sector_size(log2_sector_size), read_only(read_only) {
 	if (file->fail()) {
 		throw std::runtime_error("FileDevice: Failed to open file");
 	}
@@ -42,6 +42,9 @@ std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t s
 
 }
 void FileDevice::WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
+	if (read_only) {
+		throw std::runtime_error("FileDevice: Can't write - read only mode");
+	}
 	if (sector_address >= this->sectors_count || sector_address + sectors_count > this->sectors_count) {
 		throw std::runtime_error("FileDevice: Write out of file.");
 	}
