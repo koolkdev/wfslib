@@ -9,7 +9,7 @@
 
 #include <fstream>
 
-FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only) : file(new std::fstream(path, std::ios::binary | std::ios::in | (!read_only ? std::ios::out : 0))),
+FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only) : file(new std::fstream(path, std::ios::binary | (!read_only ? (std::ios::out | std::ios::in) : std::ios::in))),
 	log2_sector_size(log2_sector_size), read_only(read_only) {
 	if (file->fail()) {
 		throw std::runtime_error("FileDevice: Failed to open file");
