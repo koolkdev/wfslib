@@ -40,6 +40,7 @@ public:
 	}
 
 	uint32_t GetSize();
+	void Resize(size_t new_size);
 
 	class file_device {
 	public:
