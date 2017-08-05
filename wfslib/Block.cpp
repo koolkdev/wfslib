@@ -18,7 +18,7 @@ char const* Block::BadHash::what() const NOEXCEPT {
 }
 
 void Block::Fetch(bool check_hash) {
-	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), this->data_size, this->iv);
+	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), static_cast<uint32_t>(this->data.size()), this->iv);
 }
 
 void Block::Flush() {

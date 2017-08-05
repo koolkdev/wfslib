@@ -47,8 +47,8 @@ private:
 	uint32_t ToDeviceSector(uint32_t block_number);
 
 protected:
-	Block(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, std::vector<uint8_t>&& data, uint32_t data_size) :
-		device(device), block_number(block_number), size_category(size_category), iv(iv), data(data), data_size(data_size) {
+	Block(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, std::vector<uint8_t>&& data) :
+		device(device), block_number(block_number), size_category(size_category), iv(iv), data(data) {
 	}
 
 	std::shared_ptr<DeviceEncryption> device;
@@ -59,5 +59,4 @@ protected:
 
 	// this vector will be rounded to sector after read
 	std::vector<uint8_t> data;
-	uint32_t data_size;
 };

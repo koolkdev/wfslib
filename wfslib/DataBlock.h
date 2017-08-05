@@ -24,7 +24,7 @@ public:
 	virtual void Fetch(bool check_hash = true);
 	virtual void Flush();
 
-	static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash);
+	static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool check_hash = true);
 
 private:
 	DataBlockHash data_hash;
