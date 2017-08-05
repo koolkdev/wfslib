@@ -80,7 +80,7 @@ int main(int argc, char *argv[]) {
 			return 1;
 		}
 		input_file.seekg(0, std::ios::end);
-		if (input_file.tellg() > SIZE_MAX) {
+		if (input_file.tellg() > static_cast<std::streampos>(SIZE_MAX)) {
 			std::cerr << "Error: File to inject too big" << std::endl;
 		}
 		size_t file_size = static_cast<size_t>(input_file.tellg());
