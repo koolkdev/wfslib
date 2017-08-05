@@ -24,6 +24,8 @@ void DataBlock::Fetch(bool check_hash) {
 void DataBlock::Flush() {
 	this->device->CalculateHash(data, data_hash.block->GetData().begin() + data_hash.hash_offset, false);
 	this->Block::Flush();
+	// TODO: Write now we write two blocks for each block written, we need some caching with option to commit changes
+	data_hash.block->Flush();
 }
 
 std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash) {
