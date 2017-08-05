@@ -45,12 +45,17 @@ public:
 	class file_device {
 	public:
 		typedef char char_type;
-		typedef boost::iostreams::seekable_device_tag category;
+		struct category : public boost::iostreams::seekable_device_tag,
+			public boost::iostreams::optimally_buffered_tag {};
 		file_device(const std::shared_ptr<File>& file);
 
 		std::streamsize read(char_type* s, std::streamsize n);
 		std::streamsize write(const char_type* s, std::streamsize n);
 		boost::iostreams::stream_offset seek(boost::iostreams::stream_offset off, std::ios_base::seekdir way);
+		std::streamsize optimal_buffer_size() const { 
+			// Max block size. TODO: By category
+			return 1 << Block::BlockSize::MegaRegular;
+		}
 
 	private:
 		size_t size();
