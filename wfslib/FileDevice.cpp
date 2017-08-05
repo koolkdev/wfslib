@@ -41,7 +41,7 @@ std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t s
 	return data;
 
 }
-void FileDevice::WriteSectors(std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
+void FileDevice::WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
 	if (sector_address >= this->sectors_count || sector_address + sectors_count > this->sectors_count) {
 		throw std::runtime_error("FileDevice: Write out of file.");
 	}
@@ -50,7 +50,7 @@ void FileDevice::WriteSectors(std::vector<uint8_t>& data, uint32_t sector_addres
 	}
 	std::lock_guard<std::mutex> guard(io_lock);
 	file->seekp(static_cast<size_t>(sector_address) << log2_sector_size);
-	file->write(reinterpret_cast<char*>(&*data.begin()), sectors_count << log2_sector_size);
+	file->write(reinterpret_cast<const char*>(&*data.begin()), sectors_count << log2_sector_size);
 	if (file->fail())
 		throw std::runtime_error("FileDevice: Failed to write to file.");
 }

@@ -13,7 +13,7 @@
 class Device {
 public:
 	virtual std::vector<uint8_t> ReadSectors(uint32_t sector_address, uint32_t sectors_count) = 0;
-	virtual void WriteSectors(std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) = 0;
+	virtual void WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) = 0;
 	virtual uint32_t GetSectorsCount() = 0;
 	virtual uint32_t GetLog2SectorSize() = 0;
 	uint32_t GetSectorSize() { return 1 << GetLog2SectorSize(); }

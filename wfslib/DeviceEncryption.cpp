@@ -38,20 +38,20 @@ void DeviceEncryption::CalculateHash(const std::vector<uint8_t>& data, const std
 	HashData(data, hash);
 }
 
-void DeviceEncryption::WriteBlock(uint32_t sector_address, std::vector<uint8_t>& data, uint32_t iv) {
+void DeviceEncryption::WriteBlock(uint32_t sector_address, const std::vector<uint8_t>& data, uint32_t iv) {
 	// Pad with zeros
-	data = std::vector<uint8_t>(data);
-	data.resize(ToSectorSize(data.size()), 0);
+	std::vector<uint8_t> enc_data(data);
+	enc_data.resize(ToSectorSize(data.size()), 0);
 
-	uint32_t sectors_count = static_cast<uint32_t>(data.size() / this->device->GetSectorSize());
+	uint32_t sectors_count = static_cast<uint32_t>(enc_data.size() / this->device->GetSectorSize());
 
 	// Encrypt
 	auto _iv = GetIV(sectors_count, iv);
 	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
-	encryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
+	encryptor.ProcessData(&*enc_data.begin(), &*enc_data.begin(), enc_data.size());
 
 	// Write
-	this->device->WriteSectors(data, sector_address, sectors_count);
+	this->device->WriteSectors(enc_data, sector_address, sectors_count);
 }
 
 std::vector<uint8_t> DeviceEncryption::ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv) {
