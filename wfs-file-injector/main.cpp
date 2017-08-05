@@ -42,7 +42,7 @@ int main(int argc, char *argv[]) {
 		if ((!vm.count("seeprom") && !vm.count("mlc"))) { std::cerr << "Missing seeprom file (--seeprom)" << std::endl; bad = true; }
 		if (vm.count("mlc") + vm.count("usb") > 1) { std::cerr << "Can't specify both --mlc and --usb" << std::endl; bad = true; }
 		if (vm.count("help") || bad) {
-			std::cout << "Usage: wfs-file-injector --image <wfs image> --inject-file <file to inject> --inject-path <file path in wfs> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]" << std::endl;
+			std::cout << "Usage: wfs-file-injector --image <wfs image> --inject-file <file to inject> --inject-path <file path in wfs> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb]" << std::endl;
 			std::cout << desc << "\n";
 			return 1;
 		}
