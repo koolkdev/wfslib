@@ -47,7 +47,7 @@ void DeviceEncryption::WriteBlock(uint32_t sector_address, std::vector<uint8_t>&
 
 	// Encrypt
 	auto _iv = GetIV(sectors_count, iv);
-	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv), 1);
+	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
 	encryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
 
 	// Write
