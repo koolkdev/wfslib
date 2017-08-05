@@ -23,6 +23,10 @@ uint32_t File::GetSize() {
 	return attributes.Attributes()->size.value();
 }
 
+uint32_t File::GetSizeOnDisk() {
+	return attributes.Attributes()->size_on_disk.value();
+}
+
 static size_t GetOffsetInMetadataBlock(const std::shared_ptr<MetadataBlock>& block, uint8_t* data) {
 	return data - &block->GetData()[0];
 }
