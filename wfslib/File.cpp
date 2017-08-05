@@ -118,34 +118,50 @@ public:
 	}
 
 	virtual void Resize(size_t old_size, size_t new_size) {
-		// We need to resize the last block, since 
-		// TODO: More efficent, we don't need to read all the blocks
-		// In this class and subclasses chunk_info.data_block is a whole DataBlock for our content
-		size_t offset = 0;
-		bool updated = false;
-		while (offset < new_size) {
-			// if new_size > old_size and new block, update the size in the attributes and ignore hash when reading
-			if (!updated && offset >= old_size) {
-				updated = true;
-				file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
-				file->attributes.block->Flush();
+		while (old_size != new_size) {
+			std::shared_ptr<Block> current_block;
+			size_t new_block_size = 0;
+			if (new_size < old_size) {
+				// Just update last block
+				if (new_size > 0) {
+					// Minus 1 because if it is right at the end of the block, we will get the next block
+					auto chunk_info = GetFileDataChunkInfo(new_size - 1, 1);
+					current_block = chunk_info.data_block;
+					new_block_size = std::min(chunk_info.offset_in_block + 1, static_cast<size_t>(1U) << GetDataBlockSize());
+				}
+				old_size = new_size;
+				file->attributes.Attributes()->size = static_cast<uint32_t>(old_size);
 			}
-			auto chunk_info = GetFileDataChunkInfo(offset, 1, offset >= old_size);
-			assert(std::dynamic_pointer_cast<DataBlock>(chunk_info.data_block));
-			assert(chunk_info.offset_in_block == 0);
-			auto& data = chunk_info.data_block->GetData();
-			size_t new_block_size = std::min(new_size - offset, static_cast<size_t>(1U) << GetDataBlockSize());
-			if (new_block_size != data.size()) {
-				data.resize(new_block_size);
-				chunk_info.data_block->Flush();
+			else {
+				if (old_size & ((1 << GetDataBlockSize()) - 1)) {
+					// We need to incrase the size of the last block
+					// Minus 1 because if it is right at the end of the block, we will get the next block
+					auto chunk_info = GetFileDataChunkInfo(old_size - 1, 1);
+					current_block = chunk_info.data_block;
+					new_block_size = std::min(chunk_info.offset_in_block + 1 + (new_size - old_size), static_cast<size_t>(1U) << GetDataBlockSize());
+					old_size += new_block_size - (chunk_info.offset_in_block + 1);
+					file->attributes.Attributes()->size = static_cast<uint32_t>(old_size);
+				}
+				else {
+					// Open new block
+					new_block_size = std::min(new_size - old_size, static_cast<size_t>(1U) << GetDataBlockSize());
+					file->attributes.Attributes()->size = static_cast<uint32_t>(old_size + new_block_size);
+					auto chunk_info = GetFileDataChunkInfo(old_size, 1, true);
+					current_block = chunk_info.data_block;
+					assert(chunk_info.offset_in_block == 0);
+					old_size += new_block_size;
+				}
 			}
-			offset += data.size();
+			if (current_block) {
+				assert(std::dynamic_pointer_cast<DataBlock>(current_block));
+				auto& data = current_block->GetData();
+				if (new_block_size != data.size()) {
+					data.resize(new_block_size);
+					current_block->Flush();
+				}
+			}
 		}
-		if (!updated) {
-			// If we didn't update the size in the attributes yet, update it now
-			file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
-			file->attributes.block->Flush();
-		}
+		file->attributes.block->Flush();
 	}
 
 	virtual void ClearCache() {
