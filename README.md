@@ -21,6 +21,22 @@ Allowed options:
   --verbos              verbos output
 ```
 
+### wfs-file-injector
+Change the content of files in wfs image. The injected file size must be smaller than the allocated size on the disk.
+**WARNING: May corrupt the file system, Use at your own risk. Make sure to backup the wfs image.**
+```
+Usage: wfs-file-injector --image <wfs image> --inject-file <file to inject> --inject-path <file path in wfs> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb]
+Allowed options:
+  --help                produce help message
+  --image arg           wfs image file
+  --inject-file arg     file to inject
+  --inject-path arg     wfs file path to replace
+  --otp arg             otp file
+  --seeprom arg         seeprom file (required if usb)
+  --mlc                 device is mlc (default: device is usb)
+  --usb                 device is usb
+```
+
 ### wfs-fuse (Linux only)
 ```
 wfs-fuse --help
@@ -58,6 +74,12 @@ You need to replace PhsyicalDrive3 with the correct device, you can figure it ou
 Get-WmiObject Win32_DiskDrive
 ```
 
+#### Inject rom.zip
+
+```
+wfsdump --image usb.img --inject-file rom.zip --inject-path /usr/title/00050000/101c3500/content/0010/rom.zip --otp otp.bin --seeprom seeprom.bin
+```
+
 #### Mount USB device in Linux
 ```
 sudo wfs-fuse /dev/sdb /mnt --otp otp.bin --seeprom seeprom.bin -o default_permissions,allow_other
@@ -91,10 +113,6 @@ xcode-select --install
 Install brew if required
 ```
 ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
-```
-Install git if required
-```
-brew install git
 ```
 Install the requirements
 ```
