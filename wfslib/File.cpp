@@ -118,13 +118,15 @@ public:
 		// TODO: More efficent, we don't need to read all the blocks
 		// In this class and subclasses chunk_info.data_block is a whole DataBlock for our content
 		size_t offset = 0;
+		bool updated = false;
 		while (offset < new_size) {
 			// if new_size > old_size and new block, update the size in the attributes and ignore hash when reading
-			if (offset > old_size) {
+			if (!updated && offset >= old_size) {
+				updated = true;
 				file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
 				file->attributes.block->Flush();
 			}
-			auto chunk_info = GetFileDataChunkInfo(offset, 1, offset > old_size);
+			auto chunk_info = GetFileDataChunkInfo(offset, 1, offset >= old_size);
 			assert(std::dynamic_pointer_cast<DataBlock>(chunk_info.data_block));
 			assert(chunk_info.offset_in_block == 0);
 			auto& data = chunk_info.data_block->GetData();
@@ -132,15 +134,13 @@ public:
 			if (new_block_size != data.size()) {
 				data.resize(new_block_size);
 				chunk_info.data_block->Flush();
-				if (offset <= old_size) {
-					// If we didn't update the size in the attributes yet, update it now
-					file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
-					file->attributes.block->Flush();
-				}
-				// We got the new_size
-				break;
 			}
 			offset += data.size();
+		}
+		if (!updated) {
+			// If we didn't update the size in the attributes yet, update it now
+			file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
+			file->attributes.block->Flush();
 		}
 	}
 
