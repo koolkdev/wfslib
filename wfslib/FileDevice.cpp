@@ -33,7 +33,7 @@ std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t s
 		throw std::runtime_error("FileDevice: Read out of file.");
 	}
 	std::lock_guard<std::mutex> guard(io_lock);
-	file->seekg(static_cast<size_t>(sector_address) << log2_sector_size);
+	file->seekg(static_cast<std::streampos>(sector_address) << log2_sector_size);
 	std::vector<uint8_t> data(sectors_count << log2_sector_size);
 	file->read(reinterpret_cast<char*>(&*data.begin()), data.size());
 	if (file->gcount() != static_cast<std::streamsize>(data.size()))
@@ -49,7 +49,7 @@ void FileDevice::WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_
 		throw std::runtime_error("FileDevice: Not enough data for writing.");
 	}
 	std::lock_guard<std::mutex> guard(io_lock);
-	file->seekp(static_cast<size_t>(sector_address) << log2_sector_size);
+	file->seekp(static_cast<std::streampos>(sector_address) << log2_sector_size);
 	file->write(reinterpret_cast<const char*>(&*data.begin()), sectors_count << log2_sector_size);
 	if (file->fail())
 		throw std::runtime_error("FileDevice: Failed to write to file.");

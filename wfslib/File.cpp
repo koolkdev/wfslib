@@ -309,7 +309,7 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n)
 	std::streamsize amt = static_cast<std::streamsize>(size() - pos);
 	if (n > amt) {
 		// Try to resize file
-		file->Resize(pos + n);
+		file->Resize(static_cast<size_t>(pos + n));
 		// TODO: Since we don't cache blocks right now globally, we need to reset all the referenced blocks, 
 		// becuase they may have changed by Resize
 		reader->ClearCache();
