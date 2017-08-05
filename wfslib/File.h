@@ -55,6 +55,7 @@ public:
 		boost::iostreams::stream_offset seek(boost::iostreams::stream_offset off, std::ios_base::seekdir way);
 		std::streamsize optimal_buffer_size() const { 
 			// Max block size. TODO: By category
+			// TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
 			return 1 << Block::BlockSize::MegaRegular;
 		}
 

@@ -50,10 +50,7 @@ public:
 		return chunk_info.size;
 	}
 
-	virtual void Resize(size_t old_size, size_t new_size) = 0;
-
-	virtual void ClearCache() {
-	}
+	virtual void Resize(size_t new_size) = 0;
 
 protected:
 	std::shared_ptr<File> file;
@@ -85,7 +82,7 @@ public:
 		return FileDataChunkInfo { file->attributes.block, GetAttributesMetadataOffset() + offset, size };
 	}
 
-	virtual void Resize(size_t old_size, size_t new_size) {
+	virtual void Resize(size_t new_size) {
 		// Just update the attribute, the data in the metadata block
 		file->attributes.Attributes()->size = static_cast<uint32_t>(new_size);
 		file->attributes.block->Flush();
@@ -117,7 +114,8 @@ public:
 		return FileDataChunkInfo{ current_data_block, offset_in_block, size };
 	}
 
-	virtual void Resize(size_t old_size, size_t new_size) {
+	virtual void Resize(size_t new_size) {
+		size_t old_size = file->attributes.Attributes()->size.value();
 		while (old_size != new_size) {
 			std::shared_ptr<Block> current_block;
 			size_t new_block_size = 0;
@@ -162,10 +160,6 @@ public:
 			}
 		}
 		file->attributes.block->Flush();
-	}
-
-	virtual void ClearCache() {
-		current_data_block.reset();
 	}
 
 protected:
@@ -260,11 +254,6 @@ public:
 			reinterpret_cast<DataBlocksClusterMetadata *>(&*(current_metadata_block->GetData().begin() + sizeof(MetadataBlockHeader))), false, ignore_hash);
 	}
 
-	virtual void ClearCache() {
-		File::DataCategory3Reader::ClearCache();
-		current_metadata_block.reset();
-	}
-
 protected:
 	std::shared_ptr<MetadataBlock> current_metadata_block;
 
@@ -297,7 +286,7 @@ void File::Resize(size_t new_size) {
 	new_size = std::min(new_size, static_cast<size_t>(attributes->size_on_disk.value()));
 	size_t old_size = attributes->size.value();
 	if (new_size != old_size) {
-		CreateReader(shared_from_this())->Resize(old_size, new_size);
+		CreateReader(shared_from_this())->Resize(new_size);
 	}
 }
 
@@ -329,10 +318,8 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n)
 	std::streamsize amt = static_cast<std::streamsize>(size() - pos);
 	if (n > amt) {
 		// Try to resize file
-		file->Resize(static_cast<size_t>(pos + n));
-		// TODO: Since we don't cache blocks right now globally, we need to reset all the referenced blocks, 
-		// becuase they may have changed by Resize
-		reader->ClearCache();
+		// TODO: This call can't stay like that when we will need to allocate new pages and even change the category
+		reader->Resize(std::min(static_cast<size_t>(file->GetSizeOnDisk()), static_cast<size_t>(pos + n)));
 		amt = static_cast<std::streamsize>(size() - pos);
 	}
 	std::streamsize result = std::min(n, amt);
