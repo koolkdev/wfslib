@@ -36,7 +36,7 @@ public:
 	std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number);
 	std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number, Block::BlockSize size);
 
-	std::shared_ptr<DataBlock> GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, const DataBlock::DataBlockHash& data_hash, bool check_hash = true);
+	std::shared_ptr<DataBlock> GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, const DataBlock::DataBlockHash& data_hash);
 
 	uint32_t GetBlockNumber(const std::shared_ptr<Block>& block);
 

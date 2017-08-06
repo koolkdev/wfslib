@@ -35,7 +35,7 @@ class File::DataCategoryReader {
 public:
 	DataCategoryReader(const std::shared_ptr<File>& file) : file(file) {}
 	virtual size_t GetAttributesMetadataSize() = 0;
-	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size, bool ignore_hash = false) = 0;
+	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) = 0;
 	size_t Read(uint8_t* data, size_t offset, size_t size) {
 		auto chunk_info = GetFileDataChunkInfo(offset, size);
 		auto data_begin = chunk_info.data_block->GetData().begin();
@@ -78,7 +78,7 @@ public:
 		return file->attributes.Attributes()->size_on_disk.value();
 	}
 
-	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size, bool ignore_hash = false) {
+	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
 		return FileDataChunkInfo { file->attributes.block, GetAttributesMetadataOffset() + offset, size };
 	}
 
@@ -99,7 +99,7 @@ public:
 		return sizeof(DataBlockMetadata) * data_blocks_count;
 	}
 
-	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size, bool ignore_hash = false) {
+	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
 		auto blocks_list = reinterpret_cast<DataBlockMetadata *>(&*GetAttributesMetadataEnd());
 		int64_t block_index = offset >> GetDataBlockSize();
 		size_t offset_in_block = offset & ((1 << GetDataBlockSize()) - 1);
@@ -108,8 +108,7 @@ public:
 
 		LoadDataBlock(blocks_list[-block_index - 1].block_number.value(),
 			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - block_offset)),
-			DataBlock::DataBlockHash{ hash_block, GetOffsetInMetadataBlock(hash_block, reinterpret_cast<uint8_t*>(&blocks_list[-block_index - 1].hash)) },
-			ignore_hash);
+			DataBlock::DataBlockHash{ hash_block, GetOffsetInMetadataBlock(hash_block, reinterpret_cast<uint8_t*>(&blocks_list[-block_index - 1].hash)) });
 		size = std::min(size, current_data_block->GetData().size() - offset_in_block);
 		return FileDataChunkInfo{ current_data_block, offset_in_block, size };
 	}
@@ -128,7 +127,6 @@ public:
 					new_block_size = std::min(chunk_info.offset_in_block + 1, static_cast<size_t>(1U) << GetDataBlockSize());
 				}
 				old_size = new_size;
-				file->attributes.Attributes()->size = static_cast<uint32_t>(old_size);
 			}
 			else {
 				if (old_size & ((1 << GetDataBlockSize()) - 1)) {
@@ -138,18 +136,17 @@ public:
 					current_block = chunk_info.data_block;
 					new_block_size = std::min(chunk_info.offset_in_block + 1 + (new_size - old_size), static_cast<size_t>(1U) << GetDataBlockSize());
 					old_size += new_block_size - (chunk_info.offset_in_block + 1);
-					file->attributes.Attributes()->size = static_cast<uint32_t>(old_size);
 				}
 				else {
-					// Open new block
-					new_block_size = std::min(new_size - old_size, static_cast<size_t>(1U) << GetDataBlockSize());
-					file->attributes.Attributes()->size = static_cast<uint32_t>(old_size + new_block_size);
-					auto chunk_info = GetFileDataChunkInfo(old_size, 1, true);
+					// Open new block, the size of the loaded block will be 0
+					auto chunk_info = GetFileDataChunkInfo(old_size, 0);
 					current_block = chunk_info.data_block;
 					assert(chunk_info.offset_in_block == 0);
+					new_block_size = std::min(new_size - old_size, static_cast<size_t>(1U) << GetDataBlockSize());
 					old_size += new_block_size;
 				}
 			}
+			file->attributes.Attributes()->size = static_cast<uint32_t>(old_size);
 			if (current_block) {
 				assert(std::dynamic_pointer_cast<DataBlock>(current_block));
 				auto& data = current_block->GetData();
@@ -169,9 +166,9 @@ protected:
 	}
 	std::shared_ptr<DataBlock> current_data_block;
 
-	void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash, bool ignore_hash) {
+	void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
 		if (current_data_block && file->area->GetBlockNumber(current_data_block) == block_number) return;
-		current_data_block = file->area->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash, !ignore_hash);
+		current_data_block = file->area->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash);
 	}
 };
 
@@ -205,11 +202,11 @@ public:
 		return sizeof(DataBlocksClusterMetadata) * data_blocks_clusters_count;
 	}
 
-	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size, bool ignore_hash = false) {
-		return GetFileDataChunkInfoFromClustersList(offset, offset, size, file->attributes.block, reinterpret_cast<DataBlocksClusterMetadata *>(&*GetAttributesMetadataEnd()), true, ignore_hash);
+	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
+		return GetFileDataChunkInfoFromClustersList(offset, offset, size, file->attributes.block, reinterpret_cast<DataBlocksClusterMetadata *>(&*GetAttributesMetadataEnd()), true);
 	}
 protected:
-	FileDataChunkInfo GetFileDataChunkInfoFromClustersList(size_t offset, size_t original_offset, size_t size, const std::shared_ptr<MetadataBlock>& metadata_block, DataBlocksClusterMetadata * clusters_list, bool reverse, bool ignore_hash) {
+	FileDataChunkInfo GetFileDataChunkInfoFromClustersList(size_t offset, size_t original_offset, size_t size, const std::shared_ptr<MetadataBlock>& metadata_block, DataBlocksClusterMetadata * clusters_list, bool reverse) {
 		int64_t cluster_index = offset >> ClusterDataLog2Size();
 		size_t offset_in_cluster = offset & ((1 << ClusterDataLog2Size()) - 1);
 		size_t block_index = offset_in_cluster >> GetDataBlockSize();
@@ -223,8 +220,7 @@ protected:
 			cluster = &clusters_list[cluster_index];
 		LoadDataBlock(cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
 			static_cast<uint32_t>(std::min(1U << GetDataBlockSize(), file->attributes.Attributes()->size.value() - block_offset)),
-			DataBlock::DataBlockHash{ metadata_block, GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<uint8_t*>(&cluster->hash[block_index])) }, 
-			ignore_hash);
+			DataBlock::DataBlockHash{ metadata_block, GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<uint8_t*>(&cluster->hash[block_index])) });
 		size = std::min(size, current_data_block->GetData().size() - offset_in_block);
 		return FileDataChunkInfo{ current_data_block, offset_in_block, size };
 	}
@@ -245,13 +241,13 @@ public:
 		return sizeof(boost::endian::big_uint32_buf_t) * blocks_count;
 	}
 
-	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size, bool ignore_hash = false) {
+	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
 		auto blocks_list = reinterpret_cast<boost::endian::big_uint32_buf_t *>(&*GetAttributesMetadataEnd());
 		int64_t block_index = offset / (ClustersInBlock() << ClusterDataLog2Size());
 		size_t offset_in_block = offset % (ClustersInBlock() << ClusterDataLog2Size());
 		LoadMetadataBlock(blocks_list[-block_index - 1].value());
 		return GetFileDataChunkInfoFromClustersList(offset_in_block, offset, size, current_metadata_block,
-			reinterpret_cast<DataBlocksClusterMetadata *>(&*(current_metadata_block->GetData().begin() + sizeof(MetadataBlockHeader))), false, ignore_hash);
+			reinterpret_cast<DataBlocksClusterMetadata *>(&*(current_metadata_block->GetData().begin() + sizeof(MetadataBlockHeader))), false);
 	}
 
 protected:

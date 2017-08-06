@@ -28,8 +28,11 @@ void DataBlock::Flush() {
 	data_hash.block->Flush();
 }
 
-std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool check_hash) {
+std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash) {
 	auto block = std::make_shared<DataBlock>(device, block_number, size_category, data_size, iv, data_hash);
-	block->Fetch(check_hash);
+	if (data_size) {
+		// Fetch block only if have data
+		block->Fetch();
+	}
 	return block;
 }
