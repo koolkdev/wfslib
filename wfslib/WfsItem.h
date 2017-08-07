@@ -24,6 +24,7 @@ class WfsItem {
 public:
 	WfsItem(const std::string& name, const AttributesBlock& block);
 	const std::string & GetName() { return name; }
+	std::string GetRealName();
 	virtual bool IsDirectory();
 	virtual bool IsFile();
 	virtual bool IsLink();

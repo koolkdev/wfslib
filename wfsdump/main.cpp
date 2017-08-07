@@ -23,7 +23,7 @@ void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Direct
 		}
 	}
 	for (auto item : *dir) {
-		boost::filesystem::path npath = path / item->GetName();
+		boost::filesystem::path npath = path / item->GetRealName();
 		if (verbos)
 			std::cout << "Dumping " << npath << std::endl;
 		if (item->IsDirectory()) dumpdir(target, std::dynamic_pointer_cast<Directory>(item), npath, verbos);

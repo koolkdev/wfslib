@@ -18,7 +18,7 @@ inline size_t divide_round_up(size_t n, size_t div) {
 }
 
 size_t Attributes::DataOffset() {
-	return offsetof(Attributes, some_bits_list) + divide_round_up(some_bits_count.value(), 8);
+	return offsetof(Attributes, case_bitmap) + divide_round_up(filename_length.value(), 8);
 }
 
 size_t InternalDirectoryTreeNode::size() {

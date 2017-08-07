@@ -78,8 +78,8 @@ struct Attributes {
 	Permissions permissions;
 	boost::endian::big_uint8_buf_t entry_log2_size; // log2 size of the whole entry, including this attributes
 	boost::endian::big_uint8_buf_t size_category; // 0-4, see File.c
-	boost::endian::big_uint8_buf_t some_bits_count;
-	boost::endian::big_uint8_buf_t some_bits_list; // This byte in the struct also behave as padding, but this field will be used to skip the some_bits_list and get to the entry data
+	boost::endian::big_uint8_buf_t filename_length;
+	boost::endian::big_uint8_buf_t case_bitmap; // This byte in the struct also behave as padding, it isn't really a byte, it is a bitmap of filename_length
 
 	bool IsDirectory() {
 		return !!(flags.value() & DIRECTORY);
