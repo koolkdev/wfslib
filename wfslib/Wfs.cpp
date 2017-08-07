@@ -50,10 +50,13 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
 }
 
 void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
-	// The encryption of the blocks depends on the device sector size and count, specificly, the IV.
-	// So if we get it wrong, the first 0x10 bytes will be wrong. The first 0x10 bytes are 4 bytes of type, and 0xC bytes of the hash
+	// The encryption of the blocks depends on the device sector size and count, which builds the IV
+	// We are going to find out the correct first 0x10 bytes, and than xor it with what we read to find out the correct IV
+	// From that IV we extract the sectors count and sector size of the device.
+	// Bytes 0-4 are going to be correct because the first 4 bytes of the IV is the block size, which we read from the first block. 
+	// The other bytes are part of the hash, so we will get them once we calculate the hash. So once we get the correct hash we find the correct IV.
 	// So it will fail hash check
-	// Let's read the first block first, ignore the hash and check the wfs version, and read the blocks count
+	// Let's read the first block first, ignore the hash and check the wfs version, and read the block size
 	// But lets set the sectors size to 9 and the sector size to 0x10, because this is the max we are going to read right now
 	device->SetSectorsCount(0x10);
 	device->SetLog2SectorSize(9);
@@ -65,7 +68,6 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
 	auto block_size = Block::BlockSize::Basic;
 	if (!(wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_BASIC) && (wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_REGULAR))
 		block_size = Block::BlockSize::Regular;
-	auto blocks_count = wfs_header->root_area_attributes.blocks_count.value();
 	// Now lets read it again, this time with the correct block size
 	block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
 	uint32_t xored_sectors_count, xored_sector_size;
