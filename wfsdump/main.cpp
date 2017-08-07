@@ -108,8 +108,7 @@ int main(int argc, char *argv[]) {
 			key = seeprom->GetUSBKey(*otp);
 		}
 		auto device = std::make_shared<FileDevice>(vm["input"].as<std::string>(), 9);
-		Wfs::DetectSectorsCount(device, key);
-		Wfs::DetectSectorSize(device, key);
+		Wfs::DetectDeviceSectorSizeAndCount(device, key);
 		auto dir = Wfs(device, key).GetDirectory(vm["dump-path"].as<std::string>());
 		if (!dir) {
 			std::cerr << "Error: Didn't find directory " << vm["dump-path"].as<std::string>() << " in wfs" << std::endl;

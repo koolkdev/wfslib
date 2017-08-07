@@ -88,8 +88,7 @@ int main(int argc, char *argv[]) {
 		input_file.seekg(0, std::ios::beg);
 
 		auto device = std::make_shared<FileDevice>(vm["image"].as<std::string>(), 9, false);
-		Wfs::DetectSectorsCount(device, key);
-		Wfs::DetectSectorSize(device, key);
+		Wfs::DetectDeviceSectorSizeAndCount(device, key);
 		auto file = Wfs(device, key).GetFile(vm["inject-path"].as<std::string>());
 		if (!file) {
 			std::cerr << "Error: Didn't find file " << vm["inject-path"].as<std::string>() << " in wfs" << std::endl;

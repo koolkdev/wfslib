@@ -30,8 +30,7 @@ public:
 	std::shared_ptr<File> GetFile(const std::string& filename);
 	std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-	static void DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
-	static void DetectSectorSize(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
+	static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 
 private:
 	std::shared_ptr<DeviceEncryption> device;

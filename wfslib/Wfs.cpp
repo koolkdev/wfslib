@@ -49,43 +49,46 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
 	return current_directory;
 }
 
-void Wfs::DetectSectorsCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
-	auto block = MetadataBlock::LoadBlock(std::make_shared<DeviceEncryption>(device, key), 0, Block::BlockSize::Basic, 0, false);
+void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
+	// The encryption of the blocks depends on the device sector size and count, specificly, the IV.
+	// So if we get it wrong, the first 0x10 bytes will be wrong. The first 0x10 bytes are 4 bytes of type, and 0xC bytes of the hash
+	// So it will fail hash check
+	// Let's read the first block first, ignore the hash and check the wfs version, and read the blocks count
+	// But lets set the sectors size to 9 and the sector size to 0x10, because this is the max we are going to read right now
+	device->SetSectorsCount(0x10);
+	device->SetLog2SectorSize(9);
+	auto enc_device = std::make_shared<DeviceEncryption>(device, key);
+	auto block = MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, false);
 	auto wfs_header = reinterpret_cast<WfsHeader *>(&block->GetData()[sizeof(MetadataBlockHeader)]);
 	if (wfs_header->version.value() != 0x01010800)
 		throw std::runtime_error("Unexpected WFS version (bad key?)");
 	auto block_size = Block::BlockSize::Basic;
 	if (!(wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_BASIC) && (wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_REGULAR))
 		block_size = Block::BlockSize::Regular;
-	device->SetSectorsCount(wfs_header->root_area_attributes.blocks_count.value() << (block_size - device->GetLog2SectorSize()));
-}
-
-void Wfs::DetectSectorSize(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
-	bool detected = false;
-	for (auto sector_size : {9, 11, 12}) {
-		device->SetLog2SectorSize(sector_size);
-		if (VerifyDeviceAndKey(device, key)) {
-			detected = true;
-			break;
-		}
-	}
-	if (!detected) {
-		throw std::runtime_error("Wfs: Failed to detect sector size");
-	}
-}
-
-bool Wfs::VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
-	auto enc_device = std::make_shared<DeviceEncryption>(device, key);
+	auto blocks_count = wfs_header->root_area_attributes.blocks_count.value();
+	// Now lets read it again, this time with the correct block size
+	block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
+	uint32_t xored_sectors_count, xored_sector_size;
+	// The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size and sector count, and with the hash
+	auto& data = block->GetData();
+	auto first_4_dwords = reinterpret_cast<boost::endian::big_uint32_buf_t*>(&data[0]);
+	xored_sectors_count = first_4_dwords[2].value();
+	xored_sector_size = first_4_dwords[3].value();
+	// Lets calculate the hash of the block
+	enc_device->CalculateHash(data, data.begin() + offsetof(MetadataBlockHeader, hash), true);
+	// Now xor it with the real hash
+	xored_sectors_count ^= first_4_dwords[2].value();
+	xored_sector_size ^= first_4_dwords[3].value();
+	// And xor it with our fake sectors count and block size
+	xored_sectors_count ^= 0x10;
+	xored_sector_size ^= 1 << 9;
+	device->SetLog2SectorSize(static_cast<uint32_t>(log2(xored_sector_size)));
+	device->SetSectorsCount(xored_sectors_count);
+	// Now try to fetch block again, this time check the hash, it will raise exception
 	try {
-		MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, true);
+		block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true);
 	}
 	catch (Block::BadHash) {
-		try {
-			MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Regular, 0, true);
-		}
-		catch (Block::BadHash) {
-			return false;
-		}
+		throw std::runtime_error("Wfs: Failed to detect sector size and sectors count");
 	}
-	return true;
 }

@@ -213,8 +213,7 @@ int main(int argc, char *argv[]) {
 			key = seeprom->GetUSBKey(*otp);
 		}
 		auto device = std::make_shared<FileDevice>(param.file, 9);
-		Wfs::DetectSectorsCount(device, key);
-		Wfs::DetectSectorSize(device, key);
+		Wfs::DetectDeviceSectorSizeAndCount(device, key);
 		wfs.reset(new Wfs(device, key));
 	}
 	catch (std::exception& e) {
