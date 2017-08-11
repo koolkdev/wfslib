@@ -1,0 +1,32 @@
+language: cpp
+
+matrix:
+  include:
+  - os: linux
+    sudo: required
+    services:
+      - docker
+    compiler: gcc
+    env:
+      - DOCKER=ubuntu:zesty
+  - os: linux
+    sudo: required
+    services:
+      - docker
+    compiler: clang
+    env:
+      - DOCKER=ubuntu:zesty
+
+before_install:
+  - docker pull ${DOCKER}
+  - docker ps -a
+  - docker run -it -d --name ubuntu ${DOCKER} bash
+  - docker cp . ubuntu:/
+
+install:
+  - docker exec ubuntu apt-get update
+  - docker exec ubuntu apt-get -y upgrade
+  - docker exec ubuntu apt-get -y install g++ clang make libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
+
+script:
+  - docker exec ubuntu make
