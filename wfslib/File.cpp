@@ -61,11 +61,9 @@ protected:
 	size_t GetAttributesMetadataEndOffset() {
 		return file->attributes.attributes_offset + round_pow2(file->attributes.Attributes()->DataOffset() + GetAttributesMetadataSize());
 	}
-	std::vector<uint8_t>::iterator GetAttributesMetadata() {
-		return file->attributes.block->GetData().begin() + GetAttributesMetadataOffset();
-	}
-	std::vector<uint8_t>::iterator GetAttributesMetadataEnd() {
-		return file->attributes.block->GetData().begin() + GetAttributesMetadataEndOffset();
+	uint8_t* GetAttributesMetadataEnd() {
+		// We can't do [GetAttributesMetadataEndOffset()] because it might point to data.end(), so in debug it will cause an error
+		return &file->attributes.block->GetData()[0] + GetAttributesMetadataEndOffset();
 	}
 };
 
@@ -100,7 +98,7 @@ public:
 	}
 
 	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
-		auto blocks_list = reinterpret_cast<DataBlockMetadata *>(&*GetAttributesMetadataEnd());
+		auto blocks_list = reinterpret_cast<DataBlockMetadata *>(GetAttributesMetadataEnd());
 		int64_t block_index = offset >> GetDataBlockSize();
 		size_t offset_in_block = offset & ((1 << GetDataBlockSize()) - 1);
 		auto hash_block = file->attributes.block;
@@ -203,7 +201,7 @@ public:
 	}
 
 	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
-		return GetFileDataChunkInfoFromClustersList(offset, offset, size, file->attributes.block, reinterpret_cast<DataBlocksClusterMetadata *>(&*GetAttributesMetadataEnd()), true);
+		return GetFileDataChunkInfoFromClustersList(offset, offset, size, file->attributes.block, reinterpret_cast<DataBlocksClusterMetadata *>(GetAttributesMetadataEnd()), true);
 	}
 protected:
 	FileDataChunkInfo GetFileDataChunkInfoFromClustersList(size_t offset, size_t original_offset, size_t size, const std::shared_ptr<MetadataBlock>& metadata_block, DataBlocksClusterMetadata * clusters_list, bool reverse) {
@@ -242,7 +240,7 @@ public:
 	}
 
 	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
-		auto blocks_list = reinterpret_cast<boost::endian::big_uint32_buf_t *>(&*GetAttributesMetadataEnd());
+		auto blocks_list = reinterpret_cast<boost::endian::big_uint32_buf_t *>(GetAttributesMetadataEnd());
 		int64_t block_index = offset / (ClustersInBlock() << ClusterDataLog2Size());
 		size_t offset_in_block = offset % (ClustersInBlock() << ClusterDataLog2Size());
 		LoadMetadataBlock(blocks_list[-block_index - 1].value());
