@@ -1,4 +1,3 @@
-CXX=g++
 LIB=-L../
 INC=-I../
 CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14 -D_FILE_OFFSET_BITS=64
