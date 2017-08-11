@@ -102,7 +102,7 @@ make
 ```
 
 ### Visual Studio
-Visual Studio 2015 project file is provided. This project depends on the libraries boost and Crypto++. Configuration of those libraries include path and lib path is required.
+Visual Studio 2015 solution file is provided. (The dependencies are Nuget packages)
 
 
 ### Mac OS X
