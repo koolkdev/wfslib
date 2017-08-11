@@ -1,6 +1,9 @@
 # wfslib
 WFS (WiiU File System) Library and Tools
 
+## Status
+[![Build status](https://ci.appveyor.com/api/projects/status/i6yjihammn0d053m/branch/master?svg=true)](https://ci.appveyor.com/project/koolkdev/wfslib/branch/master)
+
 ## Usage
 
 ### wfsdump
