@@ -29,4 +29,4 @@ install:
   - docker exec ubuntu apt-get -y install g++ clang make libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
 
 script:
-  - docker exec ubuntu make
+  - docker exec ubuntu make CXX=${CXX}
