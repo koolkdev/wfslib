@@ -35,6 +35,8 @@ artifacts:
 #  - packages -> **\packages.config
 
 deploy:
+  tag: $(appveyor_repo_tag_name)
+  release: WFS Tools v$(appveyor_build_version)
   description: WFS Tools v$(appveyor_build_version)
   provider: GitHub
   auth_token:
