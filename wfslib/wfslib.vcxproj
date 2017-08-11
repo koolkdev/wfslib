@@ -203,8 +203,6 @@
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="..\..\packages\cryptopp.android.5.6.5.2\build\native\cryptopp.android.targets" Condition="Exists('..\..\packages\cryptopp.android.5.6.5.2\build\native\cryptopp.android.targets')" />
-    <Import Project="..\..\packages\cryptopp.v120.5.6.5.2\build\native\cryptopp.v120.targets" Condition="Exists('..\..\packages\cryptopp.v120.5.6.5.2\build\native\cryptopp.v120.targets')" />
     <Import Project="..\..\packages\cryptopp.v140.5.6.5.2\build\native\cryptopp.v140.targets" Condition="Exists('..\..\packages\cryptopp.v140.5.6.5.2\build\native\cryptopp.v140.targets')" />
     <Import Project="..\..\packages\cryptopp.5.6.5.4\build\native\cryptopp.targets" Condition="Exists('..\..\packages\cryptopp.5.6.5.4\build\native\cryptopp.targets')" />
     <Import Project="..\..\packages\boost.1.64.0.0\build\native\boost.targets" Condition="Exists('..\..\packages\boost.1.64.0.0\build\native\boost.targets')" />
@@ -213,8 +211,6 @@
     <PropertyGroup>
       <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
     </PropertyGroup>
-    <Error Condition="!Exists('..\..\packages\cryptopp.android.5.6.5.2\build\native\cryptopp.android.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\cryptopp.android.5.6.5.2\build\native\cryptopp.android.targets'))" />
-    <Error Condition="!Exists('..\..\packages\cryptopp.v120.5.6.5.2\build\native\cryptopp.v120.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\cryptopp.v120.5.6.5.2\build\native\cryptopp.v120.targets'))" />
     <Error Condition="!Exists('..\..\packages\cryptopp.v140.5.6.5.2\build\native\cryptopp.v140.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\cryptopp.v140.5.6.5.2\build\native\cryptopp.v140.targets'))" />
     <Error Condition="!Exists('..\..\packages\cryptopp.5.6.5.4\build\native\cryptopp.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\cryptopp.5.6.5.4\build\native\cryptopp.targets'))" />
     <Error Condition="!Exists('..\..\packages\boost.1.64.0.0\build\native\boost.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\..\packages\boost.1.64.0.0\build\native\boost.targets'))" />
