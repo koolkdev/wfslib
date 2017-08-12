@@ -34,16 +34,16 @@ artifacts:
 #cache:
 #  - packages -> **\packages.config
 
-deploy:
-  tag: $(appveyor_repo_tag_name)
-  release: WFS Tools v$(appveyor_build_version)
-  description: WFS Tools v$(appveyor_build_version)
-  provider: GitHub
-  auth_token:
-    secure: zgIKVcub8f5Hp19YGIi0xwIaiLijYqzwF50SFD+83gpeLmZLHGZLonGEOlJAt6sc
-  artifact: /.*\.zip/
-  draft: false
-  prerelease: false
-  on:
-    branch: master
-    appveyor_repo_tag: true
+#deploy:
+#  tag: $(appveyor_repo_tag_name)
+#  release: WFS Tools v$(appveyor_build_version)
+#  description: WFS Tools v$(appveyor_build_version)
+#  provider: GitHub
+#  auth_token:
+#    secure: zgIKVcub8f5Hp19YGIi0xwIaiLijYqzwF50SFD+83gpeLmZLHGZLonGEOlJAt6sc
+#  artifact: /.*\.zip/
+#  draft: false
+#  prerelease: false
+#  on:
+#    branch: master
+#    appveyor_repo_tag: true
