@@ -9,9 +9,15 @@
 #include <assert.h>
 
 #include <string>
+#include <mutex>
 #include <wfslib/WfsLib.h>
 
 static std::shared_ptr<Wfs> wfs;
+
+struct locked_stream {
+	std::unique_ptr<File::stream> stream;
+	std::mutex lock;
+};
 
 static int wfs_getattr(const char *path, struct stat *stbuf) {
 	memset(stbuf, 0, sizeof(struct stat));
@@ -59,29 +65,38 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 }
 
 static int wfs_open(const char *path, struct fuse_file_info *fi) {
-	if (!wfs->GetObject(path))
+	auto item = wfs->GetObject(path);
+	if (!item->IsFile())
 		return -ENOENT;
 
 	if ((fi->flags & O_ACCMODE) != O_RDONLY)
 		return -EACCES;
 
-	    return 0;
+	fi->fh = reinterpret_cast<uint64_t>(new locked_stream { 
+		std::unique_ptr<File::stream>(new File::stream(std::dynamic_pointer_cast<File>(item)))
+	});
+
+	return 0;
+}
+
+static int wfs_release(const char *path, struct fuse_file_info *fi) {
+	(void) path;
+
+	delete reinterpret_cast<locked_stream *>(fi->fh);
+	return 0;
 }
 
 static int wfs_read(const char *path, char *buf, size_t size, off_t offset,
 		    struct fuse_file_info *fi) {
-	(void) fi;
+	(void) path;
 
-	auto item = wfs->GetObject(path);
-	if (!item || !item->IsFile())
-		return -ENOENT;
+	auto stream = reinterpret_cast<locked_stream *>(fi->fh);
+	std::lock_guard<std::mutex> guard(stream->lock);
 
-	File::stream stream(std::dynamic_pointer_cast<File>(item));
+	stream->stream->seekg(offset, stream->stream->beg);
+	stream->stream->read(buf, size);
 
-	stream.seekg(offset, stream.beg);
-	stream.read(buf, size);
-
-	return static_cast<int>(stream.gcount());
+	return static_cast<int>(stream->stream->gcount());
 }
 
 int wfs_readlink(const char *path, char *buf, size_t size) {
@@ -225,6 +240,7 @@ int main(int argc, char *argv[]) {
 	wfs_oper.getattr	= wfs_getattr;
 	wfs_oper.readdir	= wfs_readdir;
 	wfs_oper.open		= wfs_open;
+	wfs_oper.release	= wfs_release;
 	wfs_oper.read		= wfs_read;
 	wfs_oper.readlink	= wfs_readlink;
 
