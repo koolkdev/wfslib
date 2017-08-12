@@ -6,12 +6,12 @@ WFS (WiiU File System) Library and Tools
 
 ## Usage
 
-### wfsdump
+### wfs-extract
 ```
-wfsdump --help
+wfs-extract --help
 ```
 ```
-Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]
+Usage: wfs-extract --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]
 Allowed options:
   --help                produce help message
   --input arg           input file
@@ -64,13 +64,13 @@ options:
 ### Example
 #### Dump mlc from backup
 ```
-wfsdump --input mlc.full.img --output dump_dir --otp otp.bin --mlc
+wfs-extract --input mlc.full.img --output dump_dir --otp otp.bin --mlc
 ```
 
 #### Dump USB device under Windows
 (Needed to be run with administrator previliges, so run from privileged command line)
 ```
-wfsdump --input \\.\PhysicalDrive3 --output dump_dir --otp otp.bin --seeprom seeprom.bin
+wfs-extract --input \\.\PhysicalDrive3 --output dump_dir --otp otp.bin --seeprom seeprom.bin
 ```
 You need to replace PhsyicalDrive3 with the correct device, you can figure it out with this PowerShell command
 ```
@@ -80,7 +80,7 @@ Get-WmiObject Win32_DiskDrive
 #### Inject rom.zip
 
 ```
-wfsdump --image usb.img --inject-file rom.zip --inject-path /usr/title/00050000/101c3500/content/0010/rom.zip --otp otp.bin --seeprom seeprom.bin
+wfs-extract --image usb.img --inject-file rom.zip --inject-path /usr/title/00050000/101c3500/content/0010/rom.zip --otp otp.bin --seeprom seeprom.bin
 ```
 
 #### Mount USB device in Linux

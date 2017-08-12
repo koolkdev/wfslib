@@ -21,9 +21,9 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{D9119AFD-2072-4D2F-97A8-C2204D15BC76}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>wfsextract</RootNamespace>
+    <RootNamespace>wfs-extract</RootNamespace>
     <WindowsTargetPlatformVersion>8.1</WindowsTargetPlatformVersion>
-    <ProjectName>wfsdump</ProjectName>
+    <ProjectName>wfs-extract</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">

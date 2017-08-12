@@ -23,11 +23,11 @@ before_build:
   - nuget restore
 
 after_build:
-  - 7z a wfsdump-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip %APPVEYOR_BUILD_FOLDER%\%PLATFORM_DIR%\Release\wfsdump.exe
+  - 7z a wfs-extract-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip %APPVEYOR_BUILD_FOLDER%\%PLATFORM_DIR%\Release\wfs-extract.exe
   - 7z a wfs-file-injector-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip %APPVEYOR_BUILD_FOLDER%\%PLATFORM_DIR%\Release\wfs-file-injector.exe
 
 artifacts:
-  - path: wfsdump-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip
+  - path: wfs-extract-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip
   - path: wfs-file-injector-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip
 
 # cache nuget directory

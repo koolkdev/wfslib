@@ -45,6 +45,9 @@ void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Direct
 			}
 			output_file.close();
 		}
+		else {
+			printf("Test\n");
+		}
 	}
 }
 
@@ -75,7 +78,7 @@ int main(int argc, char *argv[]) {
 		if ((!vm.count("seeprom") && !vm.count("mlc"))) { std::cerr << "Missing seeprom file (--seeprom)" << std::endl; bad = true; }
 		if (vm.count("mlc") + vm.count("usb") > 1) { std::cerr << "Can't specify both --mlc and --usb" << std::endl; bad = true; }
 		if (vm.count("help") || bad) {
-			std::cout << "Usage: wfsdump --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]" << std::endl;
+			std::cout << "Usage: wfs-extract --input <input file> --output <output directory> --otp <opt path> [--seeprom <seeprom path>] [--mlc] [--usb] [--dump-path <directory to dump>] [--verbos]" << std::endl;
 			std::cout << desc << "\n";
 			return 1;
 		}
