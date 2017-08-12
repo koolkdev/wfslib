@@ -45,9 +45,6 @@ void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Direct
 			}
 			output_file.close();
 		}
-		else {
-			printf("Test\n");
-		}
 	}
 }
 
