@@ -1,6 +1,3 @@
-# Specify version format
-version: 0.5.{build}
-
 environment:
   matrix:
     - platform: x86
@@ -15,7 +12,6 @@ os:
 
 shallow_clone: true
 
-# build Configuration, i.e. Debug, Release, etc.
 configuration:
   - Release
 
@@ -29,21 +25,3 @@ after_build:
 artifacts:
   - path: wfs-extract-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip
   - path: wfs-file-injector-v%APPVEYOR_BUILD_VERSION%-windows-%PLATFORM_OUT%.zip
-
-# cache nuget directory
-#cache:
-#  - packages -> **\packages.config
-
-#deploy:
-#  tag: $(appveyor_repo_tag_name)
-#  release: WFS Tools v$(appveyor_build_version)
-#  description: WFS Tools v$(appveyor_build_version)
-#  provider: GitHub
-#  auth_token:
-#    secure: zgIKVcub8f5Hp19YGIi0xwIaiLijYqzwF50SFD+83gpeLmZLHGZLonGEOlJAt6sc
-#  artifact: /.*\.zip/
-#  draft: false
-#  prerelease: false
-#  on:
-#    branch: master
-#    appveyor_repo_tag: true
