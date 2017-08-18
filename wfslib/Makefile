@@ -12,6 +12,14 @@ $(OUT): $(OBJECTS)
 .cpp.o:
 	$(CXX) $(CXXFLAGS) $< -o $@
 
+depend: .depend
+
+.depend: $(SOURCES)
+	rm -f .depend
+	$(CXX) $(CXXFLAGS) -MM $^ > .depend
+
+include .depend
+
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS) $(OUT)
+	rm -f $(OBJECTS) $(OUT) .depend

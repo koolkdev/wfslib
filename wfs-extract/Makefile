@@ -14,6 +14,14 @@ $(EXECUTABLE): $(OBJECTS) ../libwfs.a
 .cpp.o:
 	$(CXX) $(CXXFLAGS) $< -o $@
 
+depend: .depend
+
+.depend: $(SOURCES)
+	rm -f .depend
+	$(CXX) $(CXXFLAGS) -MM $^ > .depend
+
+include .depend
+
 .PHONY: clean
 clean:
-	rm -f $(OBJECTS) $(EXECUTABLE)
+	rm -f $(OBJECTS) $(EXECUTABLE) .depend
