@@ -35,7 +35,7 @@ public:
 	std::vector<uint8_t>& GetData() { return data; }
 	uint32_t GetBlockNumber() { return block_number;  }
 
-	class BadHash : std::exception {
+	class BadHash : public std::exception {
 	public:
 		BadHash(uint32_t block_number);
 		virtual char const* what() const NOEXCEPT;
