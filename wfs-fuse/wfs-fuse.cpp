@@ -57,8 +57,8 @@ static int wfs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 	filler(buf, ".", NULL, 0);
 	filler(buf, "..", NULL, 0);
 
-	for (auto item : *std::dynamic_pointer_cast<Directory>(item)) {
-		filler(buf, item->GetName().c_str(), NULL, 0);
+	for (auto subitem : *std::dynamic_pointer_cast<Directory>(item)) {
+		filler(buf, subitem->GetName().c_str(), NULL, 0);
 	}
 
 	return 0;
