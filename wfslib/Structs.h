@@ -58,7 +58,7 @@ static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 // sizeof 0x2c
 struct Attributes {
 	enum Flags {
-		SOME_FILE_FLAG = 0x2000000,
+		UNENCRYPTED_FILE = 0x2000000,
 		LINK = 0x4000000,
 		AREA_SIZE_BASIC = 0x10000000,
 		AREA_SIZE_REGULAR = 0x20000000,

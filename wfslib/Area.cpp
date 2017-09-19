@@ -74,8 +74,8 @@ std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Blo
 	return MetadataBlock::LoadBlock(this->device, header_block->GetBlockNumber() + ToBasicBlockNumber(block_number), size, IV(block_number));
 }
 
-std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
-	return DataBlock::LoadBlock(this->device, header_block->GetBlockNumber() + ToBasicBlockNumber(block_number), size, data_size, IV(block_number), data_hash);
+std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number, Block::BlockSize size, uint32_t data_size, const DataBlock::DataBlockHash& data_hash, bool encrypted) {
+	return DataBlock::LoadBlock(this->device, header_block->GetBlockNumber() + ToBasicBlockNumber(block_number), size, data_size, IV(block_number), data_hash, encrypted);
 }
 
 uint32_t Area::ToBasicBlockNumber(uint32_t block_number) {

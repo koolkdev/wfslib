@@ -166,7 +166,7 @@ protected:
 
 	void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
 		if (current_data_block && file->area->GetBlockNumber(current_data_block) == block_number) return;
-		current_data_block = file->area->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash);
+		current_data_block = file->area->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash, !(file->attributes.Attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
 	}
 };
 

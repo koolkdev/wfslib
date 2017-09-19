@@ -11,7 +11,7 @@
 #include "Structs.h"
 
 MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv) :
-	Block(device, block_number, size_category, iv, std::vector<uint8_t>(1LL << size_category, 0)) {
+	Block(device, block_number, size_category, iv, std::vector<uint8_t>(1LL << size_category, 0), true) {
 }
 
 void MetadataBlock::Fetch(bool check_hash) {

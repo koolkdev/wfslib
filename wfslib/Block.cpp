@@ -18,11 +18,11 @@ char const* Block::BadHash::what() const NOEXCEPT {
 }
 
 void Block::Fetch(bool check_hash) {
-	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), static_cast<uint32_t>(this->data.size()), this->iv);
+	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), static_cast<uint32_t>(this->data.size()), this->iv, this->encrypted);
 }
 
 void Block::Flush() {
-	this->device->WriteBlock(ToDeviceSector(this->block_number), this->data, this->iv);
+	this->device->WriteBlock(ToDeviceSector(this->block_number), this->data, this->iv, this->encrypted);
 }
 
 uint32_t Block::ToDeviceSector(uint32_t block_number) {

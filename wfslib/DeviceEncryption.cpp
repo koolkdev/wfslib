@@ -38,30 +38,34 @@ void DeviceEncryption::CalculateHash(const std::vector<uint8_t>& data, const std
 	HashData(data, hash);
 }
 
-void DeviceEncryption::WriteBlock(uint32_t sector_address, const std::vector<uint8_t>& data, uint32_t iv) {
+void DeviceEncryption::WriteBlock(uint32_t sector_address, const std::vector<uint8_t>& data, uint32_t iv, bool encrypt) {
 	// Pad with zeros
 	std::vector<uint8_t> enc_data(data);
 	enc_data.resize(ToSectorSize(data.size()), 0);
 
 	uint32_t sectors_count = static_cast<uint32_t>(enc_data.size() / this->device->GetSectorSize());
 
-	// Encrypt
-	auto _iv = GetIV(sectors_count, iv);
-	CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
-	encryptor.ProcessData(&*enc_data.begin(), &*enc_data.begin(), enc_data.size());
+	if (encrypt) {
+		// Encrypt
+		auto _iv = GetIV(sectors_count, iv);
+		CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
+		encryptor.ProcessData(&*enc_data.begin(), &*enc_data.begin(), enc_data.size());
+	}
 
 	// Write
 	this->device->WriteSectors(enc_data, sector_address, sectors_count);
 }
 
-std::vector<uint8_t> DeviceEncryption::ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv) {
+std::vector<uint8_t> DeviceEncryption::ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt) {
 	uint8_t sectors_count = static_cast<uint8_t>(ToSectorSize(length) / this->device->GetSectorSize());
 
 	std::vector<uint8_t> data = this->device->ReadSectors(sector_address, sectors_count);
 
-	auto _iv = GetIV(sectors_count, iv);
-	CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
-	decryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
+	if (encrypt) {
+		auto _iv = GetIV(sectors_count, iv);
+		CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
+		decryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
+	}
 
 	//data.resize(length);
 	return data;
