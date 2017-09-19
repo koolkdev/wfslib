@@ -113,12 +113,12 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
 			if (!node_state) break;
 			// Enter nodes until we hit a node that has value
 			while (node_state->node->choices()[node_state->current_index]) {
-				auto block = node_state->block;
+				auto node_block = node_state->block;
 				uint16_t node_offset = 0;
 				node_offset = static_cast<InternalDirectoryTreeNode *>(node_state->node)->get_item(node_state->current_index).value();
-				auto current_node = allocator.GetNode<DirectoryTreeNode>(node_offset);
+				current_node = allocator.GetNode<DirectoryTreeNode>(node_offset);
 				std::string path = node_state->path + std::string(1, node_state->node->choices()[node_state->current_index]) + current_node->value();
-				node_state = std::make_shared<NodeState>(NodeState{ block, current_node, std::move(node_state), 0, path });
+				node_state = std::make_shared<NodeState>(NodeState{ node_block, current_node, std::move(node_state), 0, path });
 			}
 			// Check if our string is lexicographic smaller
 			if (node_state->path.size() && std::strncmp(&*name.begin(), &*node_state->path.begin(), std::min(name.size(), node_state->path.size())) < 0) break;
