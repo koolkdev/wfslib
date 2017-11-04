@@ -22,29 +22,34 @@ void dumpdir(const boost::filesystem::path& target, const std::shared_ptr<Direct
 			return;
 		}
 	}
-	for (auto item : *dir) {
-		boost::filesystem::path npath = path / item->GetRealName();
-		if (verbos)
-			std::cout << "Dumping " << npath << std::endl;
-		if (item->IsDirectory()) dumpdir(target, std::dynamic_pointer_cast<Directory>(item), npath, verbos);
-		else if (item->IsFile()) {
-			auto file = std::dynamic_pointer_cast<File>(item);
-			std::ofstream output_file((target / npath).string(), std::ios::binary | std::ios::out);
-			size_t to_read = file->GetSize();
-			File::stream stream(file);
-			std::vector<char> data(0x2000);
-			while (to_read > 0) {
-				stream.read(&*data.begin(), std::min(data.size(), to_read));
-				auto read = stream.gcount();
-				if (read <= 0) {
-					std::cerr << "Error: Failed to read " << npath << std::endl;
-					break;
+	try {
+		for (auto item : *dir) {
+			boost::filesystem::path npath = path / item->GetRealName();
+			if (verbos)
+				std::cout << "Dumping " << npath << std::endl;
+			if (item->IsDirectory()) dumpdir(target, std::dynamic_pointer_cast<Directory>(item), npath, verbos);
+			else if (item->IsFile()) {
+				auto file = std::dynamic_pointer_cast<File>(item);
+				std::ofstream output_file((target / npath).string(), std::ios::binary | std::ios::out);
+				size_t to_read = file->GetSize();
+				File::stream stream(file);
+				std::vector<char> data(0x2000);
+				while (to_read > 0) {
+					stream.read(&*data.begin(), std::min(data.size(), to_read));
+					auto read = stream.gcount();
+					if (read <= 0) {
+						std::cerr << "Error: Failed to read " << npath << std::endl;
+						break;
+					}
+					output_file.write((char*)&*data.begin(), read);
+					to_read -= static_cast<size_t>(read);
 				}
-				output_file.write((char*)&*data.begin(), read);
-				to_read -= static_cast<size_t>(read);
+				output_file.close();
 			}
-			output_file.close();
 		}
+	}
+	catch (Block::BadHash&) {
+		std::cerr << "Error: Failed to dump folder " << path << std::endl;
 	}
 }
 
