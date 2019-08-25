@@ -42,7 +42,7 @@ std::shared_ptr<Area> Area::LoadRootArea(const std::shared_ptr<DeviceEncryption>
 	try {
 		block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
 	}
-	catch (Block::BadHash) {
+	catch (const Block::BadHash &) {
 		block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Regular, 0);
 	}
 	return std::make_shared<Area>(device, std::shared_ptr<Area>(), block, "", AttributesBlock {block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)});
