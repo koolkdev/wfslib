@@ -80,7 +80,7 @@ Get-WmiObject Win32_DiskDrive
 #### Inject rom.zip
 
 ```
-wfs-extract --image usb.img --inject-file rom.zip --inject-path /usr/title/00050000/101c3500/content/0010/rom.zip --otp otp.bin --seeprom seeprom.bin
+wfs-file-injector --image usb.img --inject-file rom.zip --inject-path /usr/title/00050000/101c3500/content/0010/rom.zip --otp otp.bin --seeprom seeprom.bin
 ```
 
 #### Mount USB device in Linux
