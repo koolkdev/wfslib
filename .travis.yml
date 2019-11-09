@@ -11,6 +11,7 @@ matrix:
         packages:
           - g++
           - make
+          - pkg-config
           - libfuse-dev
           - libboost-dev
           - libboost-system-dev
@@ -26,6 +27,7 @@ matrix:
         packages:
           - clang
           - make
+          - pkg-config
           - libfuse-dev
           - libboost-dev
           - libboost-system-dev
@@ -37,6 +39,7 @@ matrix:
     addons:
       homebrew:
         packages:
+          - pkg-config
           - boost
           - cryptopp
         casks:
@@ -44,9 +47,4 @@ matrix:
         update: true
 
 script:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      make CXX=${CXX};
-    elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      perl -p -i -e 's/-lfuse /-lfuse_ino64 /g' wfs-fuse/Makefile;
-      make;
-    fi
+  - make
