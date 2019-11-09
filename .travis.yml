@@ -3,46 +3,49 @@ language: cpp
 matrix:
   include:
   - os: linux
+    dist: bionic
     sudo: required
-    services:
-      - docker
     compiler: gcc
-    env:
-      - DOCKER=ubuntu:zesty
+    addons:
+      apt:
+        packages:
+          - g++
+          - make
+          - libfuse-dev
+          - libboost-dev
+          - libboost-system-dev
+          - libboost-filesystem-dev
+          - libboost-program-options-dev
+          - libcrypto++-dev
   - os: linux
+    dist: bionic
     sudo: required
-    services:
-      - docker
     compiler: clang
-    env:
-      - DOCKER=ubuntu:zesty
+    addons:
+      apt:
+        packages:
+          - clang
+          - make
+          - libfuse-dev
+          - libboost-dev
+          - libboost-system-dev
+          - libboost-filesystem-dev
+          - libboost-program-options-dev
+          - libcrypto++-dev
   - os: osx
-    osx_image: xcode8.3
     compiler: clang
-
-# brew update for osx not necessary
-before_install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      docker pull ${DOCKER};
-      docker ps -a;
-      docker run -it -d --name ubuntu ${DOCKER} bash;
-      docker cp . ubuntu:/;
-    fi
-
-install:
-  - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      docker exec ubuntu apt-get update;
-      docker exec ubuntu apt-get -y upgrade;
-      docker exec ubuntu apt-get -y install g++ clang make libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev;
-    elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
-      brew install boost cryptopp;
-      brew tap caskroom/cask;
-      brew cask install osxfuse;
-    fi
+    addons:
+      homebrew:
+        packages:
+          - boost
+          - cryptopp
+        casks:
+          - osxfuse
+        update: true
 
 script:
   - if [[ "$TRAVIS_OS_NAME" == "linux" ]]; then
-      docker exec ubuntu make CXX=${CXX};
+      make CXX=${CXX};
     elif [[ "$TRAVIS_OS_NAME" == "osx" ]]; then
       perl -p -i -e 's/-lfuse /-lfuse_ino64 /g' wfs-fuse/Makefile;
       make;
