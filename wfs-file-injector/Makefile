@@ -1,7 +1,8 @@
-LIB=-L../
-INC=-I../
-CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14 $(shell pkg-config --cflags libcrypto++)
-LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options $(shell pkg-config --libs libcrypto++) -lstdc++
+include ../common.mk
+
+CXXFLAGS=$(WFSLIB_CFLAGS) -c -Wall -Werror -std=c++14
+LDFLAGS=$(WFSLIB_LIBS)
+
 SOURCES=main.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=wfs-file-injector

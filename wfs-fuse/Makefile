@@ -1,7 +1,15 @@
-LIB=-L../
-INC=-I../
-CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14 -D_FILE_OFFSET_BITS=64 $(shell pkg-config --cflags fuse libcrypto++)
-LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options $(shell pkg-config --libs fuse libcrypto++) -lstdc++
+include ../common.mk
+
+ifneq ($(shell pkg-config fuse; echo $$?),0)
+ $(error "Can' find fuse library")
+endif
+
+FUSE_CFLAGS=$(shell pkg-config --cflags fuse)
+FUSE_LIBS=$(shell pkg-config --libs fuse)
+
+CXXFLAGS=$(WFSLIB_CFLAGS) -c -Wall -Werror -std=c++14 $(FUSE_CFLAGS)
+LDFLAGS=$(WFSLIB_LIBS) $(FUSE_LIBS)
+
 SOURCES=wfs-fuse.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=wfs-fuse
