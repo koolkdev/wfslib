@@ -92,7 +92,7 @@ sudo wfs-fuse /dev/sdb /mnt --otp otp.bin --seeprom seeprom.bin -o default_permi
 ### Linux
 Install the requirements
 ```
-sudo apt-get install git g++ make libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
+sudo apt-get install git g++ make pkg-config libfuse-dev libboost-dev libboost-system-dev libboost-filesystem-dev libboost-program-options-dev libcrypto++-dev
 ```
 Get the code:
 ```
@@ -113,24 +113,16 @@ Install Xcode command line tools:
 ```
 xcode-select --install
 ```
-Install brew if required
-```
-ruby -e "$(curl -fsSL https://raw.github.com/Homebrew/homebrew/go/install)"
-```
+[Install Homebrew](https://brew.sh/)  
 Install the requirements
 ```
-brew install boost cryptopp
-brew tap caskroom/cask
+brew install pkg-config boost cryptopp
 brew cask install osxfuse
 ```
 Get the code:
 ```
 git clone https://github.com/koolkdev/wfslib.git
 cd wfslib
-```
-Modify the makefile:
-```
-perl -p -i -e 's/-lfuse /-lfuse_ino64 /g' wfs-fuse/Makefile
 ```
 Build
 ```
