@@ -34,6 +34,7 @@ static size_t GetOffsetInMetadataBlock(const std::shared_ptr<MetadataBlock>& blo
 class File::DataCategoryReader {
 public:
 	DataCategoryReader(const std::shared_ptr<File>& file) : file(file) {}
+	virtual ~DataCategoryReader() {}
 	virtual size_t GetAttributesMetadataSize() = 0;
 	virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) = 0;
 	size_t Read(uint8_t* data, size_t offset, size_t size) {

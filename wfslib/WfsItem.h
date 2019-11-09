@@ -23,6 +23,7 @@ struct AttributesBlock {
 class WfsItem {
 public:
 	WfsItem(const std::string& name, const AttributesBlock& block);
+	virtual ~WfsItem() {}
 	const std::string & GetName() { return name; }
 	std::string GetRealName();
 	virtual bool IsDirectory();

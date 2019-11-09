@@ -50,6 +50,7 @@ protected:
 	Block(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool encrypted, std::vector<uint8_t>&& data) :
 		device(device), block_number(block_number), size_category(size_category), iv(iv), encrypted(encrypted), data(data) {
 	}
+	virtual ~Block() {}
 
 	std::shared_ptr<DeviceEncryption> device;
 
