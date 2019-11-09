@@ -1,7 +1,7 @@
 LIB=-L../
 INC=-I../
-CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14
-LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options -lcryptopp -lstdc++
+CXXFLAGS=$(INC) -c -Wall -Werror -std=c++14 $(shell pkg-config --cflags libcrypto++)
+LDFLAGS=$(LIB) -lwfs -lboost_system -lboost_filesystem -lboost_program_options $(shell pkg-config --libs libcrypto++) -lstdc++
 SOURCES=main.cpp
 OBJECTS=$(SOURCES:.cpp=.o)
 EXECUTABLE=wfs-extract

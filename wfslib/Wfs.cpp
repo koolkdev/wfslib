@@ -99,7 +99,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
 	try {
 		block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true);
 	}
-	catch (Block::BadHash) {
+	catch (const Block::BadHash &) {
 		throw std::runtime_error("Wfs: Failed to detect sector size and sectors count");
 	}
 }
