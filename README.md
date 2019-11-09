@@ -2,7 +2,7 @@
 WFS (WiiU File System) Library and Tools
 
 ## Status
-[![Build Status](https://travis-ci.org/koolkdev/wfslib.svg?branch=master)](https://travis-ci.org/koolkdev/wfslib)[![Build status](https://ci.appveyor.com/api/projects/status/i6yjihammn0d053m/branch/master?svg=true)](https://ci.appveyor.com/project/koolkdev/wfslib/branch/master)
+[![Build Status](https://travis-ci.com/koolkdev/wfslib.svg?branch=master)](https://travis-ci.com/koolkdev/wfslib)[![Build status](https://ci.appveyor.com/api/projects/status/i6yjihammn0d053m/branch/master?svg=true)](https://ci.appveyor.com/project/koolkdev/wfslib/branch/master)
 
 ## Usage
 
