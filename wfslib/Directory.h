@@ -12,6 +12,10 @@
 
 #include "WfsItem.h"
 
+#ifdef _MSC_VER 
+#define strncasecmp _strnicmp
+#endif
+
 class Area;
 class MetadataBlock;
 class File;
