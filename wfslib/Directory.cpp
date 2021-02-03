@@ -75,13 +75,13 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
 				// not equal.. path too long
 				return AttributesBlock();
 			}
-			if (current_node->value_length.value() && std::strncmp(&*pos_in_path, current_node->value().c_str(), current_node->value_length.value())) {
+			if (current_node->value_length.value() && strncasecmp(&*pos_in_path, current_node->value().c_str(), current_node->value_length.value())) {
 				// not equal.. not found
 				return AttributesBlock();
 			}
 			pos_in_path += current_node->value_length.value();
 			char next_expected_char = 0;
-			if (pos_in_path < name.end()) next_expected_char = *pos_in_path;
+			if (pos_in_path < name.end()) next_expected_char = tolower(*pos_in_path);
 			auto choices = current_node->choices();
 			// This is sorted list, so we can find it with lower_bound
 			auto res = std::lower_bound(choices.begin(), choices.end(), next_expected_char);
@@ -121,7 +121,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
 				node_state = std::make_shared<NodeState>(NodeState{ node_block, current_node, std::move(node_state), 0, path });
 			}
 			// Check if our string is lexicographic smaller
-			if (node_state->path.size() && std::strncmp(&*name.begin(), &*node_state->path.begin(), std::min(name.size(), node_state->path.size())) < 0) break;
+			if (node_state->path.size() && strncasecmp(&*name.begin(), &*node_state->path.begin(), std::min(name.size(), node_state->path.size())) < 0) break;
 			last_block_number = static_cast<InternalDirectoryTreeNode  *>(node_state->node)->get_next_allocator_block_number().value();
 			if (node_state->path == name) break; // No need to continue with the search
 		}
