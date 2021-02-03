@@ -9,7 +9,7 @@
 
 #include <memory>
 #include <vector>
-#include <exception>
+#include <stdexcept>
 #include <string>
 
 #ifndef _MSC_VER
