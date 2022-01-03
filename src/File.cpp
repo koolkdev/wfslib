@@ -354,3 +354,9 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
 	pos = next;
 	return pos;
 }
+
+std::streamsize File::file_device::optimal_buffer_size() const { 
+    // Max block size. TODO: By category
+    // TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
+    return 1 << Block::BlockSize::MegaRegular;
+}

@@ -14,11 +14,8 @@
 #include <boost/iostreams/positioning.hpp>
 
 #include "WfsItem.h"
-#include "DataBlock.h"
 
 class Area;
-class MetadataBlock;
-struct DataBlocksClusterMetadata;
 
 class File : public WfsItem, public std::enable_shared_from_this<File> {
 private:
@@ -53,11 +50,7 @@ public:
 		std::streamsize read(char_type* s, std::streamsize n);
 		std::streamsize write(const char_type* s, std::streamsize n);
 		boost::iostreams::stream_offset seek(boost::iostreams::stream_offset off, std::ios_base::seekdir way);
-		std::streamsize optimal_buffer_size() const { 
-			// Max block size. TODO: By category
-			// TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
-			return 1 << Block::BlockSize::MegaRegular;
-		}
+		std::streamsize optimal_buffer_size() const;
 
 	private:
 		size_t size();

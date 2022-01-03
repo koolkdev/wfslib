@@ -12,12 +12,6 @@
 #include <stdexcept>
 #include <string>
 
-#ifndef _MSC_VER
-#define NOEXCEPT noexcept
-#else
-#define NOEXCEPT
-#endif
-
 class DeviceEncryption;
 
 class Block {
@@ -38,7 +32,7 @@ public:
 	class BadHash : public std::exception {
 	public:
 		BadHash(uint32_t block_number);
-		virtual char const* what() const NOEXCEPT;
+		virtual char const* what() const noexcept override;
 	private:
 		uint32_t block_number;
 		std::string msg;

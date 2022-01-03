@@ -13,7 +13,7 @@
 Block::BadHash::BadHash(uint32_t block_number) : block_number(block_number),
 	msg((boost::format("Bad hash for block 0x%08X") % this->block_number).str()) {
 }
-char const* Block::BadHash::what() const NOEXCEPT {
+char const* Block::BadHash::what() const noexcept {
 	return msg.c_str();
 }
 
