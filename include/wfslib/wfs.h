@@ -7,9 +7,9 @@
 
 #pragma once
 
-#include <vector>
 #include <memory>
 #include <string>
+#include <vector>
 
 class Device;
 class FileDevice;
@@ -20,22 +20,21 @@ class File;
 class Directory;
 
 class Wfs {
-public:
-	Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key);
+ public:
+  Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key);
 
-	const std::shared_ptr<DeviceEncryption>& GetDevice() {
-		return device_;
-	}
+  const std::shared_ptr<DeviceEncryption>& GetDevice() { return device_; }
 
-	std::shared_ptr<WfsItem> GetObject(const std::string& filename);
-	std::shared_ptr<File> GetFile(const std::string& filename);
-	std::shared_ptr<Directory> GetDirectory(const std::string& filename);
+  std::shared_ptr<WfsItem> GetObject(const std::string& filename);
+  std::shared_ptr<File> GetFile(const std::string& filename);
+  std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-	static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
+  static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device,
+                                             const std::vector<uint8_t>& key);
 
-private:
-	std::shared_ptr<DeviceEncryption> device_;
-	std::shared_ptr<Area> root_area_;
+ private:
+  std::shared_ptr<DeviceEncryption> device_;
+  std::shared_ptr<Area> root_area_;
 
-	static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
+  static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 };

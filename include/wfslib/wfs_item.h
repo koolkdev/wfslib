@@ -7,32 +7,32 @@
 
 #pragma once
 
-#include <string>
 #include <memory>
+#include <string>
 
 struct Attributes;
 struct AttributesBlock;
 class MetadataBlock;
 
 struct AttributesBlock {
-	std::shared_ptr<MetadataBlock> block;
-	size_t attributes_offset;
-	::Attributes * Attributes() const;
+  std::shared_ptr<MetadataBlock> block;
+  size_t attributes_offset;
+  ::Attributes* Attributes() const;
 };
 
 class WfsItem {
-public:
-	WfsItem(const std::string& name, const AttributesBlock& block);
-	virtual ~WfsItem() {}
-	const std::string & GetName() { return name_; }
-	std::string GetRealName();
-	virtual bool IsDirectory();
-	virtual bool IsFile();
-	virtual bool IsLink();
+ public:
+  WfsItem(const std::string& name, const AttributesBlock& block);
+  virtual ~WfsItem() {}
+  const std::string& GetName() { return name_; }
+  std::string GetRealName();
+  virtual bool IsDirectory();
+  virtual bool IsFile();
+  virtual bool IsLink();
 
-protected:
-	const AttributesBlock& attributes_data() const { return attributes_; }
+ protected:
+  const AttributesBlock& attributes_data() const { return attributes_; }
 
-	std::string name_;
-	AttributesBlock attributes_;
+  std::string name_;
+  AttributesBlock attributes_;
 };

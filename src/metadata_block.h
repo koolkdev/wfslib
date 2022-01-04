@@ -7,19 +7,26 @@
 
 #pragma once
 
-#include "block.h"
 #include <memory>
+#include "block.h"
 
 struct MetadataBlockHeader;
 
 class MetadataBlock : public Block {
-public:
-	MetadataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv);
+ public:
+  MetadataBlock(const std::shared_ptr<DeviceEncryption>& device,
+                uint32_t block_number,
+                Block::BlockSize size_category,
+                uint32_t iv);
 
-	virtual void Fetch(bool check_hash = true);
-	virtual void Flush();
+  virtual void Fetch(bool check_hash = true);
+  virtual void Flush();
 
-	static std::shared_ptr<MetadataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool check_hash = true);
+  static std::shared_ptr<MetadataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
+                                                  uint32_t block_number,
+                                                  Block::BlockSize size_category,
+                                                  uint32_t iv,
+                                                  bool check_hash = true);
 
-	MetadataBlockHeader * Header();
+  MetadataBlockHeader* Header();
 };

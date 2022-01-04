@@ -10,6 +10,6 @@
 #include "metadata_block.h"
 #include "structs.h"
 
-SubBlockAllocatorStruct * SubBlockAllocator::Header() {
-	return reinterpret_cast<SubBlockAllocatorStruct *>(&block_->GetData()[sizeof(MetadataBlockHeader)]);
+SubBlockAllocatorStruct* SubBlockAllocator::Header() {
+  return reinterpret_cast<SubBlockAllocatorStruct*>(&block_->GetData()[sizeof(MetadataBlockHeader)]);
 }

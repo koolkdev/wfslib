@@ -7,33 +7,33 @@
 
 #pragma once
 
-#include <vector>
-#include <memory>
 #include <cryptopp/sha.h>
+#include <memory>
+#include <vector>
 
 class Device;
 struct WfsBlockIV;
 
 class DeviceEncryption {
-public:
-	DeviceEncryption(const std::shared_ptr<Device>& device, const std::vector<uint8_t>& key);
+ public:
+  DeviceEncryption(const std::shared_ptr<Device>& device, const std::vector<uint8_t>& key);
 
-	void WriteBlock(uint32_t sector_address, const std::vector<uint8_t>& data, uint32_t iv, bool encrypt);
-	std::vector<uint8_t> ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt);
+  void WriteBlock(uint32_t sector_address, const std::vector<uint8_t>& data, uint32_t iv, bool encrypt);
+  std::vector<uint8_t> ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt);
 
-	void CalculateHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
-	bool CheckHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
+  void CalculateHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
+  bool CheckHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
 
-	const std::shared_ptr<Device>& GetDevice() { return device_; }
+  const std::shared_ptr<Device>& GetDevice() { return device_; }
 
-	static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
+  static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
 
-private:
-	void HashData(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash);
-	WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv);
-	size_t ToSectorSize(size_t size);
+ private:
+  void HashData(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash);
+  WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv);
+  size_t ToSectorSize(size_t size);
 
-	std::shared_ptr<Device> device_;
+  std::shared_ptr<Device> device_;
 
-	const std::vector<uint8_t> key_;
+  const std::vector<uint8_t> key_;
 };

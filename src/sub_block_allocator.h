@@ -13,24 +13,24 @@ class MetadataBlock;
 struct SubBlockAllocatorStruct;
 
 class SubBlockAllocator {
-public:
-	SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
+ public:
+  SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
 
-	template<typename T>
-	T * GetNode(uint16_t offset) {
-		return reinterpret_cast<T *>(&block_->GetData()[offset]);
-	}
+  template <typename T>
+  T* GetNode(uint16_t offset) {
+    return reinterpret_cast<T*>(&block_->GetData()[offset]);
+  }
 
-	template<typename T>
-	T * GetRootNode() {
-		return GetNode<T>(Header()->root.value());
-	}
+  template <typename T>
+  T* GetRootNode() {
+    return GetNode<T>(Header()->root.value());
+  }
 
-private:
-	std::shared_ptr<MetadataBlock> block_;
+ private:
+  std::shared_ptr<MetadataBlock> block_;
 
-	// TODO uint16_t Alloc(uint16_t size);
-	// TODO void Free(uint16_t offset);
+  // TODO uint16_t Alloc(uint16_t size);
+  // TODO void Free(uint16_t offset);
 
-	SubBlockAllocatorStruct * Header();
+  SubBlockAllocatorStruct* Header();
 };
