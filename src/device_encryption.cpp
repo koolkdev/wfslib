@@ -11,8 +11,8 @@
 #include <cryptopp/modes.h>
 #include <cryptopp/sha.h>
 #include <boost/endian/buffers.hpp>
+#include "device.h"
 
-#include "Device.h"
 struct WfsBlockIV {
   boost::endian::big_uint32_buf_t iv[4];
 };

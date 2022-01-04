@@ -8,6 +8,8 @@
 #pragma once
 
 #include <memory>
+#include "metadata_block.h"
+#include "structs.h"
 
 class MetadataBlock;
 struct SubBlockAllocatorStruct;
