@@ -5,8 +5,11 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "SubBlockAllocator.h"
+#include "sub_block_allocator.h"
+
+#include "metadata_block.h"
+#include "structs.h"
 
 SubBlockAllocatorStruct * SubBlockAllocator::Header() {
-	return reinterpret_cast<SubBlockAllocatorStruct *>(&block->GetData()[sizeof(MetadataBlockHeader)]);
+	return reinterpret_cast<SubBlockAllocatorStruct *>(&block_->GetData()[sizeof(MetadataBlockHeader)]);
 }

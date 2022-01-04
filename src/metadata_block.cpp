@@ -5,8 +5,9 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "MetadataBlock.h"
-#include "DeviceEncryption.h"
+#include "metadata_block.h"
+
+#include "device_encryption.h"
 
 #include "Structs.h"
 

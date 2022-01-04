@@ -5,7 +5,8 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "DeviceEncryption.h"
+#include "device_encryption.h"
+
 #include <boost/endian/buffers.hpp> 
 #include <cryptopp/modes.h>
 #include <cryptopp/aes.h>
@@ -16,7 +17,7 @@ struct WfsBlockIV {
 	boost::endian::big_uint32_buf_t iv[4];
 };
 
-DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::vector<uint8_t>& key) : device(device), key(key)  {
+DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::vector<uint8_t>& key) : device_(device), key_(key)  {
 }
 
 
@@ -43,27 +44,27 @@ void DeviceEncryption::WriteBlock(uint32_t sector_address, const std::vector<uin
 	std::vector<uint8_t> enc_data(data);
 	enc_data.resize(ToSectorSize(data.size()), 0);
 
-	uint32_t sectors_count = static_cast<uint32_t>(enc_data.size() / this->device->GetSectorSize());
+	uint32_t sectors_count = static_cast<uint32_t>(enc_data.size() / device_->GetSectorSize());
 
 	if (encrypt) {
 		// Encrypt
 		auto _iv = GetIV(sectors_count, iv);
-		CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
+		CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(&*key_.begin(), key_.size(), reinterpret_cast<uint8_t *>(&_iv));
 		encryptor.ProcessData(&*enc_data.begin(), &*enc_data.begin(), enc_data.size());
 	}
 
 	// Write
-	this->device->WriteSectors(enc_data, sector_address, sectors_count);
+	device_->WriteSectors(enc_data, sector_address, sectors_count);
 }
 
 std::vector<uint8_t> DeviceEncryption::ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt) {
-	uint8_t sectors_count = static_cast<uint8_t>(ToSectorSize(length) / this->device->GetSectorSize());
+	uint8_t sectors_count = static_cast<uint8_t>(ToSectorSize(length) / device_->GetSectorSize());
 
-	std::vector<uint8_t> data = this->device->ReadSectors(sector_address, sectors_count);
+	std::vector<uint8_t> data = device_->ReadSectors(sector_address, sectors_count);
 
 	if (encrypt) {
 		auto _iv = GetIV(sectors_count, iv);
-		CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key.begin(), key.size(), reinterpret_cast<uint8_t *>(&_iv));
+		CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(&*key_.begin(), key_.size(), reinterpret_cast<uint8_t *>(&_iv));
 		decryptor.ProcessData(&*data.begin(), &*data.begin(), data.size());
 	}
 
@@ -87,13 +88,13 @@ bool DeviceEncryption::CheckHash(const std::vector<uint8_t>& data, const std::ve
 
 WfsBlockIV DeviceEncryption::GetIV(uint32_t sectors_count, uint32_t iv) {
 	WfsBlockIV aes_iv;
-	aes_iv.iv[0] = sectors_count * this->device->GetSectorSize();
+	aes_iv.iv[0] = sectors_count * device_->GetSectorSize();
 	aes_iv.iv[1] = iv;
-	aes_iv.iv[2] = this->device->GetSectorsCount();
-	aes_iv.iv[3] = this->device->GetSectorSize();
+	aes_iv.iv[2] = device_->GetSectorsCount();
+	aes_iv.iv[3] = device_->GetSectorSize();
 	return aes_iv;
 }
 
 size_t DeviceEncryption::ToSectorSize(size_t size) {
-	return size + (-static_cast<int32_t>(size)) % this->device->GetSectorSize();
+	return size + (-static_cast<int32_t>(size)) % device_->GetSectorSize();
 }

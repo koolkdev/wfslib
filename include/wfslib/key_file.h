@@ -13,8 +13,8 @@
 
 class KeyFile {
 public:
-	KeyFile(const std::vector<uint8_t>& data, size_t expected_size) : data(std::move(data)) {
-		if (this->data.size() != expected_size)
+	KeyFile(const std::vector<uint8_t>& data, size_t expected_size) : data_(std::move(data)) {
+		if (data_.size() != expected_size)
 			throw std::runtime_error("Unexpected key file size");
 	}
 
@@ -22,7 +22,7 @@ protected:
 	template<class T>
 	static T * LoadFromFile(const std::string& path, size_t size);
 
-	std::vector<uint8_t> data;
+	std::vector<uint8_t> data_;
 
 	std::vector<uint8_t> GetKey(size_t offset, size_t size) const;
 };

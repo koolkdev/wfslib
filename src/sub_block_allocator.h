@@ -8,19 +8,17 @@
 #pragma once
 
 #include <memory>
-#include "MetadataBlock.h"
-#include "Structs.h"
 
-struct MetadataBlockHeader;
+class MetadataBlock;
 struct SubBlockAllocatorStruct;
 
 class SubBlockAllocator {
 public:
-	SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block(block) {}
+	SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
 
 	template<typename T>
 	T * GetNode(uint16_t offset) {
-		return reinterpret_cast<T *>(&block->GetData()[offset]);
+		return reinterpret_cast<T *>(&block_->GetData()[offset]);
 	}
 
 	template<typename T>
@@ -29,7 +27,7 @@ public:
 	}
 
 private:
-	std::shared_ptr<MetadataBlock> block;
+	std::shared_ptr<MetadataBlock> block_;
 
 	// TODO uint16_t Alloc(uint16_t size);
 	// TODO void Free(uint16_t offset);

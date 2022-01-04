@@ -24,7 +24,7 @@ public:
 	void CalculateHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
 	bool CheckHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block);
 
-	const std::shared_ptr<Device>& GetDevice() { return device; }
+	const std::shared_ptr<Device>& GetDevice() { return device_; }
 
 	static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
 
@@ -33,7 +33,7 @@ private:
 	WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv);
 	size_t ToSectorSize(size_t size);
 
-	std::shared_ptr<Device> device;
+	std::shared_ptr<Device> device_;
 
-	const std::vector<uint8_t> key;
+	const std::vector<uint8_t> key_;
 };

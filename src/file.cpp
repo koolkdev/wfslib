@@ -5,11 +5,12 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "File.h"
-#include "Structs.h"
-#include "MetadataBlock.h"
-#include "DataBlock.h"
-#include "Area.h"
+#include "file.h"
+
+#include "structs.h"
+#include "metadata_block.h"
+#include "data_block.h"
+#include "area.h"
 
 #include <cassert>
 

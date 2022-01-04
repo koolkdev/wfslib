@@ -5,11 +5,11 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "DataBlock.h"
-#include "MetadataBlock.h"
-#include "DeviceEncryption.h"
+#include "data_block.h"
 
-#include "Structs.h"
+#include "metadata_block.h"
+#include "device_encryption.h"
+#include "structs.h"
 
 DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool encrypted) :
 	Block(device, block_number, size_category, iv, encrypted, std::vector<uint8_t>(data_size, 0)), data_hash_(data_hash) {

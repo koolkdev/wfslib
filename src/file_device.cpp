@@ -5,13 +5,13 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "FileDevice.h"
+#include "file_device.h"
 
 #include <fstream>
 
-FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only) : file(new std::fstream(path, std::ios::binary | (!read_only ? (std::ios::out | std::ios::in) : std::ios::in))),
+FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only) : file_(new std::fstream(path, std::ios::binary | (!read_only ? (std::ios::out | std::ios::in) : std::ios::in))),
 	log2_sector_size_(log2_sector_size), read_only_(read_only) {
-	if (file->fail()) {
+	if (file_->fail()) {
 		throw std::runtime_error("FileDevice: Failed to open file");
 	}
 	if (log2_sector_size < 9) {
@@ -32,11 +32,11 @@ std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t s
 	if (sector_address >= sectors_count_ || sector_address + sectors_count > sectors_count_) {
 		throw std::runtime_error("FileDevice: Read out of file.");
 	}
-	std::lock_guard<std::mutex> guard(io_lock);
-	file->seekg(static_cast<std::streampos>(sector_address) << log2_sector_size_);
+	std::lock_guard<std::mutex> guard(io_lock_);
+	file_->seekg(static_cast<std::streampos>(sector_address) << log2_sector_size_);
 	std::vector<uint8_t> data(sectors_count << log2_sector_size_);
-	file->read(reinterpret_cast<char*>(&*data.begin()), data.size());
-	if (file->gcount() != static_cast<std::streamsize>(data.size()))
+	file_->read(reinterpret_cast<char*>(&*data.begin()), data.size());
+	if (file_->gcount() != static_cast<std::streamsize>(data.size()))
 		throw std::runtime_error("FileDevice: Failed to read from file.");
 	return data;
 
@@ -51,9 +51,9 @@ void FileDevice::WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_
 	if (data.size() < sectors_count << log2_sector_size_) {
 		throw std::runtime_error("FileDevice: Not enough data for writing.");
 	}
-	std::lock_guard<std::mutex> guard(io_lock);
-	file->seekp(static_cast<std::streampos>(sector_address) << log2_sector_size_);
-	file->write(reinterpret_cast<const char*>(&*data.begin()), sectors_count << log2_sector_size_);
-	if (file->fail())
+	std::lock_guard<std::mutex> guard(io_lock_);
+	file_->seekp(static_cast<std::streampos>(sector_address) << log2_sector_size_);
+	file_->write(reinterpret_cast<const char*>(&*data.begin()), sectors_count << log2_sector_size_);
+	if (file_->fail())
 		throw std::runtime_error("FileDevice: Failed to write to file.");
 }

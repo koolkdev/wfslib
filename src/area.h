@@ -9,10 +9,11 @@
 
 #include <memory>
 #include <vector>
+#include <string>
 
-#include "Block.h"
-#include "DataBlock.h"
-#include "WfsItem.h"
+#include "block.h"
+#include "data_block.h"
+#include "wfs_item.h"
 
 class MetadataBlock;
 class DeviceEncryption;

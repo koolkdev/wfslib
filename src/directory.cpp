@@ -5,13 +5,14 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "Directory.h"
-#include "Structs.h"
-#include "MetadataBlock.h"
-#include "Area.h"
-#include "File.h"
-#include "Link.h"
-#include "SubBlockAllocator.h"
+#include "directory.h"
+
+#include "structs.h"
+#include "metadata_block.h"
+#include "area.h"
+#include "file.h"
+#include "link.h"
+#include "sub_block_allocator.h"
 
 std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) {
 	AttributesBlock attributes_block = GetObjectAttributes(block_, name);

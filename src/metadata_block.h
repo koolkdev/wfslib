@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "Block.h"
+#include "block.h"
 #include <memory>
 
 struct MetadataBlockHeader;

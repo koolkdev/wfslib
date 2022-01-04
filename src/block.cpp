@@ -5,16 +5,17 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "Block.h"
-#include "DeviceEncryption.h"
-#include "Device.h"
+#include "block.h"
+
+#include "device_encryption.h"
+#include "device.h"
 #include <boost/format.hpp>
 
-Block::BadHash::BadHash(uint32_t block_number) : block_number(block_number),
-	msg((boost::format("Bad hash for block 0x%08X") % block_number).str()) {
+Block::BadHash::BadHash(uint32_t block_number) : block_number_(block_number),
+	msg_((boost::format("Bad hash for block 0x%08X") % block_number_).str()) {
 }
 char const* Block::BadHash::what() const noexcept {
-	return msg.c_str();
+	return msg_.c_str();
 }
 
 void Block::Fetch(bool) {

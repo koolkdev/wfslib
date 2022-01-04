@@ -34,8 +34,8 @@ public:
 		BadHash(uint32_t block_number);
 		virtual char const* what() const noexcept override;
 	private:
-		uint32_t block_number;
-		std::string msg;
+		uint32_t block_number_;
+		std::string msg_;
 	};
 private:
 	uint32_t ToDeviceSector(uint32_t block_number);

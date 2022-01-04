@@ -5,15 +5,14 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "Area.h"
-#include "MetadataBlock.h"
-#include "Wfs.h"
-#include "Directory.h"
+#include "area.h"
 
-#include "Structs.h"
-
-#include "Device.h"
-#include "DeviceEncryption.h"
+#include "metadata_block.h"
+#include "wfs.h"
+#include "directory.h"
+#include "structs.h"
+#include "device.h"
+#include "device_encryption.h"
 
 WfsArea * Area::Data() {
 	if (header_block_->GetBlockNumber() == 0) {

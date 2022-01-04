@@ -5,7 +5,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "Structs.h"
+#include "structs.h"
 
 size_t round_pow2(size_t size) {
 	size_t nsize = 1;

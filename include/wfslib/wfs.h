@@ -24,7 +24,7 @@ public:
 	Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key);
 
 	const std::shared_ptr<DeviceEncryption>& GetDevice() {
-		return device;
+		return device_;
 	}
 
 	std::shared_ptr<WfsItem> GetObject(const std::string& filename);
@@ -34,10 +34,8 @@ public:
 	static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 
 private:
-	std::shared_ptr<DeviceEncryption> device;
-
-	friend class Area;
-	std::shared_ptr<Area> root_area;
+	std::shared_ptr<DeviceEncryption> device_;
+	std::shared_ptr<Area> root_area_;
 
 	static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key);
 };

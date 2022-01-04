@@ -5,19 +5,19 @@ project(wfslib)
 option(BUILD_STATIC_MSVC "Build static with MSVC" OFF)
 
 add_library(wfslib
-    src/Area.cpp
-    src/Block.cpp
-    src/DataBlock.cpp
-    src/DeviceEncryption.cpp
-    src/Directory.cpp
-    src/File.cpp
-    src/FileDevice.cpp
-    src/KeyFile.cpp
-    src/MetadataBlock.cpp
-    src/Structs.cpp
-    src/SubBlockAllocator.cpp
-    src/Wfs.cpp
-    src/WfsItem.cpp
+    src/area.cpp
+    src/block.cpp
+    src/data_block.cpp
+    src/device_encryption.cpp
+    src/directory.cpp
+    src/file.cpp
+    src/file_device.cpp
+    src/key_file.cpp
+    src/metadata_block.cpp
+    src/structs.cpp
+    src/sub_block_allocator.cpp
+    src/wfs.cpp
+    src/wfs_item.cpp
 )
 
 if (BUILD_STATIC_MSVC)

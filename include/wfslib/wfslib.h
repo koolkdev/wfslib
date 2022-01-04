@@ -7,8 +7,8 @@
 
 #pragma once
 
-#include "Wfs.h"
-#include "FileDevice.h"
-#include "Directory.h"
-#include "File.h"
-#include "KeyFile.h"
+#include "wfs.h"
+#include "file_device.h"
+#include "directory.h"
+#include "file.h"
+#include "key_file.h"

@@ -5,20 +5,21 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "Wfs.h"
-#include "DeviceEncryption.h"
-#include "Area.h"
-#include "Directory.h"
-#include "FileDevice.h"
-#include "MetadataBlock.h"
-#include "Structs.h"
+#include "wfs.h"
+
+#include "device_encryption.h"
+#include "area.h"
+#include "directory.h"
+#include "file_device.h"
+#include "metadata_block.h"
+#include "structs.h"
 
 #include <boost/filesystem.hpp>
 
 
-Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key) : device(std::make_shared<DeviceEncryption>(device, key)) {
+Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key) : device_(std::make_shared<DeviceEncryption>(device, key)) {
 	// Read first area
-	this->root_area = Area::LoadRootArea(this->device);
+	root_area_ = Area::LoadRootArea(device_);
 }
 
 std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
@@ -38,7 +39,7 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
 
 std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
 	boost::filesystem::path path(filename);
-	std::shared_ptr<Directory> current_directory = this->root_area->GetRootDirectory();
+	std::shared_ptr<Directory> current_directory = root_area_->GetRootDirectory();
 
 	for (auto& part : path) {
 		// the first part is "/"

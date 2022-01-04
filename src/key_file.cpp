@@ -5,7 +5,7 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "KeyFile.h"
+#include "key_file.h"
 
 #include <fstream>
 #include <cryptopp/modes.h>
@@ -37,7 +37,7 @@ SEEPROM * SEEPROM::LoadFromFile(const std::string& path) {
 
 std::vector<uint8_t> KeyFile::GetKey(size_t offset, size_t size) const {
 	std::vector<uint8_t> key(size);
-	std::copy(data.begin() + offset, data.begin() + offset + size, key.begin());
+	std::copy(data_.begin() + offset, data_.begin() + offset + size, key.begin());
 	return key;
 }
 

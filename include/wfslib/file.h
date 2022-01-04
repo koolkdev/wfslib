@@ -13,7 +13,7 @@
 #include <boost/iostreams/categories.hpp>
 #include <boost/iostreams/positioning.hpp>
 
-#include "WfsItem.h"
+#include "wfs_item.h"
 
 class Area;
 

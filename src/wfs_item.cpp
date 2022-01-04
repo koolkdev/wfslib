@@ -5,10 +5,10 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "WfsItem.h"
-#include "Structs.h"
-#include "MetadataBlock.h"
+#include "wfs_item.h"
 
+#include "structs.h"
+#include "metadata_block.h"
 #include <cctype>
 
 WfsItem::WfsItem(const std::string& name, const AttributesBlock& attributes) : name_(name), attributes_(attributes) {}

@@ -9,7 +9,7 @@
 
 #include <memory>
 
-#include "WfsItem.h"
+#include "wfs_item.h"
 
 class Area;
 

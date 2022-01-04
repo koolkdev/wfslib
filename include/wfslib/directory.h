@@ -9,8 +9,7 @@
 
 #include <memory>
 #include <string>
-
-#include "WfsItem.h"
+#include "wfs_item.h"
 
 class Area;
 class MetadataBlock;
