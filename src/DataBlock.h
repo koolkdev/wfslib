@@ -27,5 +27,5 @@ public:
 	static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool encrypted);
 
 private:
-	DataBlockHash data_hash;
+	DataBlockHash data_hash_;
 };

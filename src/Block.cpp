@@ -11,20 +11,20 @@
 #include <boost/format.hpp>
 
 Block::BadHash::BadHash(uint32_t block_number) : block_number(block_number),
-	msg((boost::format("Bad hash for block 0x%08X") % this->block_number).str()) {
+	msg((boost::format("Bad hash for block 0x%08X") % block_number).str()) {
 }
 char const* Block::BadHash::what() const noexcept {
 	return msg.c_str();
 }
 
-void Block::Fetch(bool check_hash) {
-	this->data = this->device->ReadBlock(ToDeviceSector(this->block_number), static_cast<uint32_t>(this->data.size()), this->iv, this->encrypted);
+void Block::Fetch(bool) {
+	data_ = device_->ReadBlock(ToDeviceSector(block_number_), static_cast<uint32_t>(data_.size()), iv_, encrypted_);
 }
 
 void Block::Flush() {
-	this->device->WriteBlock(ToDeviceSector(this->block_number), this->data, this->iv, this->encrypted);
+	device_->WriteBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
 }
 
 uint32_t Block::ToDeviceSector(uint32_t block_number) {
-	return block_number << (BlockSize::Basic - this->device->GetDevice()->GetLog2SectorSize());
+	return block_number << (BlockSize::Basic - device_->GetDevice()->GetLog2SectorSize());
 }

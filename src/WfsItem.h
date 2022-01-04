@@ -24,13 +24,15 @@ class WfsItem {
 public:
 	WfsItem(const std::string& name, const AttributesBlock& block);
 	virtual ~WfsItem() {}
-	const std::string & GetName() { return name; }
+	const std::string & GetName() { return name_; }
 	std::string GetRealName();
 	virtual bool IsDirectory();
 	virtual bool IsFile();
 	virtual bool IsLink();
 
 protected:
-	std::string name;
-	AttributesBlock attributes;
+	const AttributesBlock& attributes_data() const { return attributes_; }
+
+	std::string name_;
+	AttributesBlock attributes_;
 };

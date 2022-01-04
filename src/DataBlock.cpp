@@ -12,20 +12,20 @@
 #include "Structs.h"
 
 DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool encrypted) :
-	Block(device, block_number, size_category, iv, encrypted, std::vector<uint8_t>(data_size, 0)), data_hash(data_hash) {
+	Block(device, block_number, size_category, iv, encrypted, std::vector<uint8_t>(data_size, 0)), data_hash_(data_hash) {
 }
 
 void DataBlock::Fetch(bool check_hash) {
-	this->Block::Fetch();
-	if (check_hash && !this->device->CheckHash(data, data_hash.block->GetData().begin() + data_hash.hash_offset, false))
-		throw Block::BadHash(block_number);
+	Block::Fetch();
+	if (check_hash && !device_->CheckHash(data_, data_hash_.block->GetData().begin() + data_hash_.hash_offset, false))
+		throw Block::BadHash(block_number_);
 }
 
 void DataBlock::Flush() {
-	this->device->CalculateHash(data, data_hash.block->GetData().begin() + data_hash.hash_offset, false);
-	this->Block::Flush();
+	device_->CalculateHash(data_, data_hash_.block->GetData().begin() + data_hash_.hash_offset, false);
+	Block::Flush();
 	// TODO: Write now we write two blocks for each block written, we need some caching with option to commit changes
-	data_hash.block->Flush();
+	data_hash_.block->Flush();
 }
 
 std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t data_size, uint32_t iv, const DataBlockHash& data_hash, bool encrypted) {

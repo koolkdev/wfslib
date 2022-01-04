@@ -15,14 +15,14 @@ MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device, ui
 }
 
 void MetadataBlock::Fetch(bool check_hash) {
-	this->Block::Fetch();
-	if (check_hash && !this->device->CheckHash(data, data.begin() + offsetof(MetadataBlockHeader, hash), true))
-		throw Block::BadHash(block_number);
+	Block::Fetch();
+	if (check_hash && !device_->CheckHash(data_, data_.begin() + offsetof(MetadataBlockHeader, hash), true))
+		throw Block::BadHash(block_number_);
 }
 
 void MetadataBlock::Flush() {
-	this->device->CalculateHash(data, data.begin() + offsetof(MetadataBlockHeader, hash), true);
-	this->Block::Flush();
+	device_->CalculateHash(data_, data_.begin() + offsetof(MetadataBlockHeader, hash), true);
+	Block::Flush();
 }
 
 std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool check_hash) {
@@ -32,5 +32,5 @@ std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<De
 }
 
 MetadataBlockHeader * MetadataBlock::Header() {
-	return reinterpret_cast<MetadataBlockHeader *>(&data[0]);
+	return reinterpret_cast<MetadataBlockHeader *>(&data_[0]);
 }

@@ -49,11 +49,11 @@ private:
 	uint32_t ToBasicBlockNumber(uint32_t block_number);
 	uint32_t IV(uint32_t block_number);
 
-	std::shared_ptr<DeviceEncryption> device;
-	std::shared_ptr<Area> root_area; // Empty pointer for root area
+	std::shared_ptr<DeviceEncryption> device_;
+	std::shared_ptr<Area> root_area_; // Empty pointer for root area
 
-	std::shared_ptr<MetadataBlock> header_block;
+	std::shared_ptr<MetadataBlock> header_block_;
 
-	std::string root_directory_name;
-	AttributesBlock root_directory_attributes;
+	std::string root_directory_name_;
+	AttributesBlock root_directory_attributes_;
 };

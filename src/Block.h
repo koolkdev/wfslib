@@ -26,8 +26,8 @@ public:
 	virtual void Fetch(bool check_hash = true);
 	virtual void Flush();
 
-	std::vector<uint8_t>& GetData() { return data; }
-	uint32_t GetBlockNumber() { return block_number;  }
+	std::vector<uint8_t>& GetData() { return data_; }
+	uint32_t GetBlockNumber() { return block_number_;  }
 
 	class BadHash : public std::exception {
 	public:
@@ -42,17 +42,17 @@ private:
 
 protected:
 	Block(const std::shared_ptr<DeviceEncryption>& device, uint32_t block_number, Block::BlockSize size_category, uint32_t iv, bool encrypted, std::vector<uint8_t>&& data) :
-		device(device), block_number(block_number), size_category(size_category), iv(iv), encrypted(encrypted), data(data) {
+		device_(device), block_number_(block_number), size_category_(size_category), iv_(iv), encrypted_(encrypted), data_(data) {
 	}
 	virtual ~Block() {}
 
-	std::shared_ptr<DeviceEncryption> device;
+	std::shared_ptr<DeviceEncryption> device_;
 
-	uint32_t block_number;
-	Block::BlockSize size_category;
-	uint32_t iv;
-	bool encrypted;
+	uint32_t block_number_;
+	Block::BlockSize size_category_;
+	uint32_t iv_;
+	bool encrypted_;
 
 	// this vector will be rounded to sector after read
-	std::vector<uint8_t> data;
+	std::vector<uint8_t> data_;
 };

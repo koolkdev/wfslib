@@ -33,7 +33,7 @@ void DeviceEncryption::HashData(const std::vector<uint8_t>& data, const std::vec
 void DeviceEncryption::CalculateHash(const std::vector<uint8_t>& data, const std::vector<uint8_t>::iterator& hash, bool hash_in_block) {
 	// Fill hash space with 0xFF
 	if (hash_in_block)
-		std::fill(hash, hash + DIGEST_SIZE, 0xFF);
+		std::fill(hash, hash + DIGEST_SIZE, (uint8_t)0xFF);
 
 	HashData(data, hash);
 }

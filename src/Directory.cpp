@@ -14,13 +14,13 @@
 #include "SubBlockAllocator.h"
 
 std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) {
-	AttributesBlock attributes_block = GetObjectAttributes(block, name);
+	AttributesBlock attributes_block = GetObjectAttributes(block_, name);
 	if (!attributes_block.block) return std::shared_ptr<WfsItem>();
 	return Create(name, attributes_block);
 }
 
 std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) {
-	AttributesBlock attributes_block = GetObjectAttributes(block, name);
+	AttributesBlock attributes_block = GetObjectAttributes(block_, name);
 	auto attributes = attributes_block.Attributes();
 	if (!attributes || attributes->IsLink() || !attributes->IsDirectory()) {
 		// Not found / Not a directory
@@ -30,7 +30,7 @@ std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) {
 }
 
 std::shared_ptr<File> Directory::GetFile(const std::string& name) {
-	AttributesBlock attributes_block = GetObjectAttributes(block, name);
+	AttributesBlock attributes_block = GetObjectAttributes(block_, name);
 	auto attributes = attributes_block.Attributes();
 	if (!attributes || attributes->IsLink() || attributes->IsDirectory()) {
 		// Not found / Not a file
@@ -43,7 +43,7 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const Attrib
 	auto attributes = attributes_block.Attributes();
 	if (attributes->IsLink()) {
 		// TODO, I think that the link info is in the attributes metadata
-		return std::make_shared<Link>(name, attributes_block, area);
+		return std::make_shared<Link>(name, attributes_block, area_);
 	}
 	else if (attributes->IsDirectory()) {
 		if (attributes->flags.value() & attributes->Flags::QUOTA) {
@@ -51,16 +51,16 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const Attrib
 			auto block_size = Block::BlockSize::Basic;
 			if (!(attributes->flags.value() & attributes->Flags::AREA_SIZE_BASIC) && (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
 				block_size = Block::BlockSize::Regular;
-			auto new_area = area->GetArea(attributes->directory_block_number.value(), name, attributes_block, block_size);
+			auto new_area = area_->GetArea(attributes->directory_block_number.value(), name, attributes_block, block_size);
 			return new_area->GetRootDirectory();
 		}
 		else {
-			return area->GetDirectory(attributes->directory_block_number.value(), name, attributes_block);
+			return area_->GetDirectory(attributes->directory_block_number.value(), name, attributes_block);
 		}
 	}
 	else {
 		// IsFile()
-		return std::make_shared<File>(name, attributes_block, area);
+		return std::make_shared<File>(name, attributes_block, area_);
 	}
 }
 
@@ -129,7 +129,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
 			// Not found
 			return AttributesBlock();
 		}
-		return GetObjectAttributes(area->GetMetadataBlock(last_block_number), name);
+		return GetObjectAttributes(area_->GetMetadataBlock(last_block_number), name);
 	}
 }
 
@@ -139,31 +139,31 @@ size_t Directory::GetItemsCount() {
 
 Directory::FilesIterator& Directory::FilesIterator::operator++() {
 	// Go back until we are not at the end of a node
-	while (++(node_state->current_index) == node_state->node->choices_count.value()) {
-		node_state = std::move(node_state->parent);
-		if (!node_state) return *this;
+	while (++(node_state_->current_index) == node_state_->node->choices_count.value()) {
+		node_state_ = std::move(node_state_->parent);
+		if (!node_state_) return *this;
 	}
 	// Enter nodes until we hit a node that has value
-	while (node_state->node->choices()[node_state->current_index]) {
-		auto block = node_state->block;
+	while (node_state_->node->choices()[node_state_->current_index]) {
+		auto block = node_state_->block;
 		uint16_t node_offset = 0;
-		if (node_state->block->Header()->block_flags.value() & node_state->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
-			node_offset = static_cast<ExternalDirectoryTreeNode *>(node_state->node)->get_item(node_state->current_index).value();
+		if (node_state_->block->Header()->block_flags.value() & node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
+			node_offset = static_cast<ExternalDirectoryTreeNode *>(node_state_->node)->get_item(node_state_->current_index).value();
 		}
 		else {
-			node_offset = static_cast<InternalDirectoryTreeNode  *>(node_state->node)->get_item(node_state->current_index).value();
+			node_offset = static_cast<InternalDirectoryTreeNode  *>(node_state_->node)->get_item(node_state_->current_index).value();
 		}
 		auto current_node = SubBlockAllocator(block).GetNode<DirectoryTreeNode>(node_offset);
-		std::string path = node_state->path + std::string(1, node_state->node->choices()[node_state->current_index]) + current_node->value();
-		node_state = std::make_shared<NodeState>(NodeState { block, current_node, std::move(node_state), 0, path });
+		std::string path = node_state_->path + std::string(1, node_state_->node->choices()[node_state_->current_index]) + current_node->value();
+		node_state_ = std::make_shared<NodeState>(NodeState { block, current_node, std::move(node_state_), 0, path });
 	}
-	if (!(node_state->block->Header()->block_flags.value() & node_state->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE)) {
+	if (!(node_state_->block->Header()->block_flags.value() & node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE)) {
 		// This is just internal node (in the directories trees tree), it just point to another tree
-		auto block = directory->area->GetMetadataBlock(static_cast<InternalDirectoryTreeNode  *>(node_state->node)->get_next_allocator_block_number().value());
+		auto block = directory_->area()->GetMetadataBlock(static_cast<InternalDirectoryTreeNode  *>(node_state_->node)->get_next_allocator_block_number().value());
 		auto current_node = SubBlockAllocator(block).GetRootNode<DirectoryTreeNode>();
-		node_state = std::make_shared<NodeState>(NodeState{ block, current_node, std::move(node_state), 0, current_node->value() });
+		node_state_ = std::make_shared<NodeState>(NodeState{ block, current_node, std::move(node_state_), 0, current_node->value() });
 		// -- because it will be advanced immedialty to 0 when we do ++
-		--node_state->current_index;
+		--node_state_->current_index;
 		// Go to the first node in this directory block
 		return operator++();
 	}
@@ -171,11 +171,11 @@ Directory::FilesIterator& Directory::FilesIterator::operator++() {
 }
 
 std::shared_ptr<WfsItem> Directory::FilesIterator::operator*() {
-	if (!node_state) return std::shared_ptr<WfsItem>();
-	if (node_state->block->Header()->block_flags.value() & node_state->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
-		auto block = node_state->block;
-		auto external_node = static_cast<ExternalDirectoryTreeNode *>(node_state->node);
-		return directory->Create(node_state->path, AttributesBlock { block, external_node->get_item(node_state->current_index).value() });
+	if (!node_state_) return std::shared_ptr<WfsItem>();
+	if (node_state_->block->Header()->block_flags.value() & node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
+		auto block = node_state_->block;
+		auto external_node = static_cast<ExternalDirectoryTreeNode *>(node_state_->node);
+		return directory_->Create(node_state_->path, AttributesBlock { block, external_node->get_item(node_state_->current_index).value() });
 	}
 	else {
 		// Should not happen (can't happen, the iterator should stop only at external trees)
@@ -184,9 +184,9 @@ std::shared_ptr<WfsItem> Directory::FilesIterator::operator*() {
 }
 
 Directory::FilesIterator Directory::begin() {
-	auto current_node = SubBlockAllocator(block).GetRootNode<DirectoryTreeNode>();
+	auto current_node = SubBlockAllocator(block_).GetRootNode<DirectoryTreeNode>();
 	if (!current_node->choices_count.value()) return end();
-	auto node_state = std::make_shared<NodeState>(NodeState{ block, current_node, std::shared_ptr<NodeState>(), 0, current_node->value() });
+	auto node_state = std::make_shared<NodeState>(NodeState{ block_, current_node, std::shared_ptr<NodeState>(), 0, current_node->value() });
 	// -- because it will be advanced immedialty to 0 when we do ++
 	--node_state->current_index;
 	auto res = FilesIterator(shared_from_this(), std::move(node_state));

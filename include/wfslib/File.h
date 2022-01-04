@@ -18,10 +18,7 @@
 class Area;
 
 class File : public WfsItem, public std::enable_shared_from_this<File> {
-private:
-	// TODO: We may have cyclic reference here if we do cache in area.
-	std::shared_ptr<Area> area;
-
+public:
 	class DataCategoryReader;
 	class DataCategory0Reader;
 	class RegularDataCategoryReader;
@@ -30,10 +27,7 @@ private:
 	class DataCategory3Reader;
 	class DataCategory4Reader;
 
-	static std::shared_ptr<DataCategoryReader> CreateReader(const std::shared_ptr<File>& file);
-
-public:
-	File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area) : WfsItem(name, attributes), area(area) {
+	File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area) : WfsItem(name, attributes), area_(area) {
 	}
 
 	uint32_t GetSize();
@@ -54,10 +48,18 @@ public:
 
 	private:
 		size_t size();
-		std::shared_ptr<File> file;
-		std::shared_ptr<DataCategoryReader> reader;
-		boost::iostreams::stream_offset pos;
+		std::shared_ptr<File> file_;
+		std::shared_ptr<DataCategoryReader> reader_;
+		boost::iostreams::stream_offset pos_;
 	};
 
 	typedef boost::iostreams::stream<file_device> stream;
+
+private:
+	const std::shared_ptr<Area>& area() const { return area_; }
+
+	// TODO: We may have cyclic reference here if we do cache in area.
+	std::shared_ptr<Area> area_;
+
+	static std::shared_ptr<DataCategoryReader> CreateReader(const std::shared_ptr<File>& file);
 };
