@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.19)
 
 project(wfslib)
 
+option(BUILD_STATIC_MSVC "Build static with MSVC" OFF)
+
 add_library(wfslib
     src/Area.cpp
     src/Block.cpp
@@ -17,6 +19,11 @@ add_library(wfslib
     src/Wfs.cpp
     src/WfsItem.cpp
 )
+
+if (BUILD_STATIC_MSVC)
+    set_property(TARGET ${PROJECT_NAME} PROPERTY
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+endif()
 
 target_compile_features(wfslib PRIVATE cxx_std_11)
 #target_compile_options(${PROJECT_NAME} PRIVATE

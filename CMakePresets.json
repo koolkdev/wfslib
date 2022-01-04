@@ -16,6 +16,16 @@
       "cacheVariables": {
         "CMAKE_TOOLCHAIN_FILE": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake"
       }
+    },
+    {
+      "name": "windows-static",
+      "inherits": ["default"],
+      "generator": "Ninja",
+      "cacheVariables": {
+        "VCPKG_TARGET_TRIPLET": "$env{VSCMD_ARG_TGT_ARCH}-windows-static",
+        "CMAKE_BUILD_TYPE": "Release",
+        "BUILD_STATIC_MSVC": "ON"
+      }
     }
   ],
   "buildPresets": [
