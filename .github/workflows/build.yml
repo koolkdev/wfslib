@@ -2,9 +2,6 @@ name: Build
 
 on: [push, pull_request]
 
-env:
-  BUILD_TYPE: Release
-
 jobs:
   build:
     strategy:

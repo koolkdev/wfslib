@@ -4,7 +4,7 @@ project(wfslib)
 
 option(BUILD_STATIC_MSVC "Build static with MSVC" OFF)
 
-add_library(wfslib
+add_library(${PROJECT_NAME}
     src/area.cpp
     src/block.cpp
     src/data_block.cpp
@@ -25,13 +25,13 @@ if (BUILD_STATIC_MSVC)
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-target_compile_features(wfslib PRIVATE cxx_std_11)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_11)
 target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
 )
 
-target_include_directories(wfslib
+target_include_directories(${PROJECT_NAME}
     PUBLIC 
         $<INSTALL_INTERFACE:include>    
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -42,7 +42,7 @@ target_include_directories(wfslib
 
 find_package(Boost 1.64.0 COMPONENTS filesystem REQUIRED)
 find_package(cryptopp REQUIRED CONFIG)
-target_link_libraries(wfslib
+target_link_libraries(${PROJECT_NAME}
     PUBLIC
         Boost::boost Boost::filesystem
     PRIVATE
