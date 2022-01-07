@@ -17,11 +17,14 @@ char const* Block::BadHash::what() const noexcept {
   return msg_.c_str();
 }
 
-void Block::Fetch(bool) {
+void Block::Fetch(bool check_hash) {
   data_ = device_->ReadBlock(ToDeviceSector(block_number_), static_cast<uint32_t>(data_.size()), iv_, encrypted_);
+  if (check_hash && !device_->CheckHash(data_, GetHash(), IsHashInBlock()))
+    throw Block::BadHash(block_number_);
 }
 
 void Block::Flush() {
+  device_->CalculateHash(data_, GetHash(), IsHashInBlock());
   device_->WriteBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
 }
 

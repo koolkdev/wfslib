@@ -19,9 +19,6 @@ class MetadataBlock : public Block {
                 Block::BlockSize size_category,
                 uint32_t iv);
 
-  virtual void Fetch(bool check_hash = true);
-  virtual void Flush();
-
   static std::shared_ptr<MetadataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                                   uint32_t block_number,
                                                   Block::BlockSize size_category,
@@ -29,4 +26,8 @@ class MetadataBlock : public Block {
                                                   bool check_hash = true);
 
   MetadataBlockHeader* Header();
+
+ protected:
+  std::span<uint8_t> GetHash() override;
+  bool IsHashInBlock() override { return true; };
 };

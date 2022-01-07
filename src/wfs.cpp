@@ -15,7 +15,7 @@
 #include "metadata_block.h"
 #include "structs.h"
 
-Wfs::Wfs(const std::shared_ptr<Device>& device, std::vector<uint8_t>& key)
+Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<uint8_t>& key)
     : device_(std::make_shared<DeviceEncryption>(device, key)) {
   // Read first area
   root_area_ = Area::LoadRootArea(device_);
@@ -54,7 +54,7 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   return current_directory;
 }
 
-void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::vector<uint8_t>& key) {
+void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::span<uint8_t>& key) {
   // The encryption of the blocks depends on the device sector size and count, which builds the IV
   // We are going to find out the correct first 0x10 bytes, and than xor it with what we read to find out the correct IV
   // From that IV we extract the sectors count and sector size of the device.
@@ -84,7 +84,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   xored_sectors_count = first_4_dwords[2].value();
   xored_sector_size = first_4_dwords[3].value();
   // Lets calculate the hash of the block
-  enc_device->CalculateHash(data, data.begin() + offsetof(MetadataBlockHeader, hash), true);
+  enc_device->CalculateHash(data, {data.begin() + offsetof(MetadataBlockHeader, hash), enc_device->DIGEST_SIZE}, true);
   // Now xor it with the real hash
   xored_sectors_count ^= first_4_dwords[2].value();
   xored_sector_size ^= first_4_dwords[3].value();

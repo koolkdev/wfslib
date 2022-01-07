@@ -44,7 +44,7 @@ std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t s
     throw std::runtime_error("FileDevice: Failed to read from file.");
   return data;
 }
-void FileDevice::WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
+void FileDevice::WriteSectors(const std::span<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
   if (read_only_) {
     throw std::runtime_error("FileDevice: Can't write - read only mode");
   }

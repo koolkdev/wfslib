@@ -16,7 +16,7 @@ class FileDevice : public Device {
  public:
   FileDevice(const std::string& path, uint32_t log2_sector_size = 9 /* 512 */, bool read_only = true);
   std::vector<uint8_t> ReadSectors(uint32_t sector_address, uint32_t sectors_count);
-  void WriteSectors(const std::vector<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count);
+  void WriteSectors(const std::span<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count);
   uint32_t GetSectorsCount() { return sectors_count_; }
   uint32_t GetLog2SectorSize() { return log2_sector_size_; }
 

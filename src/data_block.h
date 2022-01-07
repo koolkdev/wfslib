@@ -27,8 +27,7 @@ class DataBlock : public Block {
             const DataBlockHash& data_hash,
             bool encrypted);
 
-  virtual void Fetch(bool check_hash = true);
-  virtual void Flush();
+  void Flush() override;
 
   static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                               uint32_t block_number,
@@ -37,6 +36,10 @@ class DataBlock : public Block {
                                               uint32_t iv,
                                               const DataBlockHash& data_hash,
                                               bool encrypted);
+
+ protected:
+  std::span<uint8_t> GetHash() override;
+  bool IsHashInBlock() override { return false; };
 
  private:
   DataBlockHash data_hash_;

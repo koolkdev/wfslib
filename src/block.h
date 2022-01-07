@@ -8,6 +8,7 @@
 #pragma once
 
 #include <memory>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -56,6 +57,9 @@ class Block {
         encrypted_(encrypted),
         data_(data) {}
   virtual ~Block() {}
+
+  virtual std::span<uint8_t> GetHash() = 0;
+  virtual bool IsHashInBlock() = 0;
 
   std::shared_ptr<DeviceEncryption> device_;
 
