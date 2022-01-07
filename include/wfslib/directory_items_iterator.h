@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <iterator>
 #include <memory>
 #include <string>
 
@@ -16,8 +17,12 @@ class MetadataBlock;
 
 struct DirectoryTreeNode;
 
-class DirectoryItemsIterator : public std::iterator<std::input_iterator_tag, std::shared_ptr<WfsItem>> {
+class DirectoryItemsIterator {
  public:
+  using iterator_category = std::input_iterator_tag;
+  using difference_type = std::ptrdiff_t;
+  using value_type = std::shared_ptr<WfsItem>;
+
   struct NodeState {
     std::shared_ptr<MetadataBlock> block;
     DirectoryTreeNode* node;
