@@ -27,7 +27,7 @@ std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
   boost::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
-    return std::shared_ptr<WfsItem>();
+    return nullptr;
   return dir->GetObject(path.filename().string());
 }
 
@@ -35,7 +35,7 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
   boost::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
-    return std::shared_ptr<File>();
+    return nullptr;
   return dir->GetFile(path.filename().string());
 }
 

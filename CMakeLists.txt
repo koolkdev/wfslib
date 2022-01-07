@@ -10,6 +10,7 @@ add_library(${PROJECT_NAME}
     src/data_block.cpp
     src/device_encryption.cpp
     src/directory.cpp
+    src/directory_items_iterator.cpp
     src/file.cpp
     src/file_device.cpp
     src/key_file.cpp
