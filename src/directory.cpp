@@ -71,16 +71,16 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
     auto pos_in_path = name.begin();
     while (true) {
       auto external_node = static_cast<ExternalDirectoryTreeNode*>(current_node);
-      if (current_node->value_length.value() > name.end() - pos_in_path) {
+      if (current_node->prefix_length.value() > static_cast<size_t>(std::distance(pos_in_path, name.end()))) {
         // not equal.. path too long
         return {};
       }
-      if (current_node->value_length.value() &&
-          std::strncmp(&*pos_in_path, current_node->value().c_str(), current_node->value_length.value())) {
+      if (current_node->prefix_length.value() &&
+          std::strncmp(&*pos_in_path, current_node->prefix().data(), current_node->prefix_length.value())) {
         // not equal.. not found
         return {};
       }
-      pos_in_path += current_node->value_length.value();
+      pos_in_path += current_node->prefix_length.value();
       char next_expected_char = 0;
       if (pos_in_path < name.end())
         next_expected_char = *pos_in_path;
@@ -103,7 +103,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
   } else {
     // Arghh, trees over trees
     auto node_state = std::make_shared<DirectoryItemsIterator::NodeState>(
-        DirectoryItemsIterator::NodeState{block, current_node, nullptr, 0, current_node->value()});
+        DirectoryItemsIterator::NodeState{block, current_node, nullptr, 0, current_node->prefix()});
     // -- because it will be advanced immedialty to 0 when we do ++
     --node_state->current_index;
     uint32_t last_block_number = 0;
@@ -125,9 +125,9 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
-            current_node->value();
-        node_state = std::make_shared<DirectoryItemsIterator::NodeState>(
-            DirectoryItemsIterator::NodeState{node_block, current_node, std::move(node_state), 0, path});
+            current_node->prefix();
+        node_state = std::make_shared<DirectoryItemsIterator::NodeState>(node_block, current_node,
+                                                                         std::move(node_state), 0, path);
       }
       // Check if our string is lexicographic smaller
       if (node_state->path.size() &&
@@ -155,7 +155,7 @@ DirectoryItemsIterator Directory::begin() {
   if (!current_node->choices_count.value())
     return end();
   auto node_state = std::make_shared<DirectoryItemsIterator::NodeState>(
-      DirectoryItemsIterator::NodeState{block_, current_node, nullptr, 0, current_node->value()});
+      DirectoryItemsIterator::NodeState{block_, current_node, nullptr, 0, current_node->prefix()});
   // -- because it will be advanced immedialty to 0 when we do ++
   --node_state->current_index;
   auto res = DirectoryItemsIterator(shared_from_this(), std::move(node_state));

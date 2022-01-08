@@ -20,7 +20,7 @@ class DeviceEncryption {
   DeviceEncryption(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
 
   void WriteBlock(uint32_t sector_address, const std::span<std::byte>& data, uint32_t iv, bool encrypt);
-  std::vector<std::byte> ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt);
+  void ReadBlock(uint32_t sector_address, const std::span<std::byte>& data, uint32_t iv, bool encrypt);
 
   void CalculateHash(const std::span<std::byte>& data, const std::span<std::byte>& hash);
   bool CheckHash(const std::span<std::byte>& data, const std::span<std::byte>& hash);
@@ -32,7 +32,6 @@ class DeviceEncryption {
  private:
   void HashData(const std::span<std::byte>& data, const std::span<std::byte>& hash);
   WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv);
-  size_t ToSectorSize(size_t size);
 
   std::shared_ptr<Device> device_;
 

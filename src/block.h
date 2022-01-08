@@ -28,7 +28,7 @@ class Block {
   virtual void Flush();
 
   std::span<std::byte> Data() { return data_; }
-  void Resize(size_t new_size) { data_.resize(new_size); }
+  void Resize(size_t new_size);
   uint32_t BlockNumber() { return block_number_; }
 
   class BadHash : public std::exception {
@@ -50,14 +50,8 @@ class Block {
         Block::BlockSize size_category,
         uint32_t iv,
         bool encrypted,
-        std::vector<std::byte>&& data)
-      : device_(device),
-        block_number_(block_number),
-        size_category_(size_category),
-        iv_(iv),
-        encrypted_(encrypted),
-        data_(data) {}
-  virtual ~Block() {}
+        std::vector<std::byte>&& data);
+  virtual ~Block() = default;
 
   virtual std::span<std::byte> Hash() = 0;
 

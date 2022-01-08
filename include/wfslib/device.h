@@ -14,7 +14,7 @@
 class Device {
  public:
   virtual ~Device() {}
-  virtual std::vector<std::byte> ReadSectors(uint32_t sector_address, uint32_t sectors_count) = 0;
+  virtual void ReadSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) = 0;
   virtual void WriteSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) = 0;
   virtual uint32_t SectorsCount() = 0;
   virtual uint32_t Log2SectorSize() = 0;

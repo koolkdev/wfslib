@@ -7,14 +7,10 @@
 
 #pragma once
 
-#include <bit>
 #include <boost/endian/buffers.hpp>
+#include <span>
 #include <string>
 #include <vector>
-
-inline size_t align_to_power_of_2(size_t size) {
-  return static_cast<size_t>(1ULL << std::bit_width(size));
-}
 
 // sizeof 0x18
 struct MetadataBlockHeader {
@@ -165,29 +161,20 @@ struct SubBlockAllocatorStruct {
 static_assert(sizeof(SubBlockAllocatorStruct) == 0x24, "Incorrect sizeof SubBlockAllocatorStruct");
 
 struct DirectoryTreeNode {
-  boost::endian::big_uint8_buf_t value_length;
+  boost::endian::big_uint8_buf_t prefix_length;
   boost::endian::big_uint8_buf_t choices_count;
 
  public:
-  std::string value() { return std::string(reinterpret_cast<char*>(this) + sizeof(*this), value_length.value()); }
-  std::vector<std::byte> choices() {
-    return std::vector<std::byte>(
-        reinterpret_cast<std::byte*>(this) + sizeof(*this) + value_length.value(),
-        reinterpret_cast<std::byte*>(this) + sizeof(*this) + value_length.value() + choices_count.value());
+  std::string prefix() { return {&reinterpret_cast<char*>(this)[sizeof(*this)], prefix_length.value()}; }
+  std::span<std::byte> choices() {
+    return {&reinterpret_cast<std::byte*>(this)[sizeof(*this) + prefix_length.value()], choices_count.value()};
   }
 };
 static_assert(sizeof(DirectoryTreeNode) == 0x2, "Incorrect sizeof DirectoryTreeNode");
 
 struct ExternalDirectoryTreeNode : DirectoryTreeNode {
  private:
-  size_t size() {
-    size_t total_size = sizeof(DirectoryTreeNode) + value_length.value() + choices_count.value() +
-                        choices_count.value() * sizeof(boost::endian::big_uint16_buf_t);
-    size_t size = 1;
-    while (size < total_size)
-      size <<= 1;
-    return size;
-  }
+  size_t size();
 
  public:
   boost::endian::big_uint16_buf_t get_item(size_t index) {

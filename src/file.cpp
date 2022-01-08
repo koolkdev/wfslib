@@ -7,12 +7,12 @@
 
 #include "file.h"
 
+#include <cassert>
 #include "area.h"
 #include "data_block.h"
 #include "metadata_block.h"
 #include "structs.h"
-
-#include <cassert>
+#include "utils.h"
 
 struct FileDataChunkInfo {
   std::shared_ptr<Block> data_block;

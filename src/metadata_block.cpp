@@ -14,8 +14,7 @@ MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device,
                              uint32_t block_number,
                              Block::BlockSize size_category,
                              uint32_t iv)
-    : Block(device, block_number, size_category, iv, true, std::vector<std::byte>(1LL << size_category, std::byte{0})) {
-}
+    : Block(device, block_number, size_category, iv, true, {1ULL << size_category, std::byte{0}}) {}
 
 std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                                         uint32_t block_number,

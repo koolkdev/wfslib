@@ -43,7 +43,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
     auto current_node = SubBlockAllocator(block).GetNode<DirectoryTreeNode>(node_offset);
     std::string path = node_state_->path +
                        std::string(1, std::to_integer<char>(node_state_->node->choices()[node_state_->current_index])) +
-                       current_node->value();
+                       current_node->prefix();
     node_state_ = std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, path});
   }
   if (!(node_state_->block->Header()->block_flags.value() &
@@ -52,8 +52,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
     auto block = directory_->area()->GetMetadataBlock(
         static_cast<InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
     auto current_node = SubBlockAllocator(block).GetRootNode<DirectoryTreeNode>();
-    node_state_ =
-        std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, current_node->value()});
+    node_state_ = std::make_shared<NodeState>(block, current_node, std::move(node_state_), 0, current_node->prefix());
     // -- because it will be advanced immedialty to 0 when we do ++
     --node_state_->current_index;
     // Go to the first node in this directory block
