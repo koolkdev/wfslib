@@ -41,7 +41,7 @@ target_include_directories(${PROJECT_NAME}
         ${CMAKE_CURRENT_SOURCE_DIR}/include/wfslib
 )
 
-find_package(Boost 1.64.0 COMPONENTS filesystem REQUIRED)
+find_package(Boost 1.64.0 REQUIRED)
 find_package(cryptopp REQUIRED CONFIG)
 
 # Search for cryptopp in case it was installed by other means
@@ -51,7 +51,7 @@ endif()
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
-        Boost::boost Boost::filesystem
+        Boost::boost
     PRIVATE
         cryptopp-static
 )

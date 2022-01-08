@@ -7,7 +7,7 @@
 
 #include "wfs.h"
 
-#include <boost/filesystem.hpp>
+#include <filesystem>
 #include "area.h"
 #include "device_encryption.h"
 #include "directory.h"
@@ -24,7 +24,7 @@ Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
 std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
   if (filename == "/")
     return GetDirectory("/");
-  boost::filesystem::path path(filename);
+  std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
@@ -32,7 +32,7 @@ std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
 }
 
 std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
-  boost::filesystem::path path(filename);
+  std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
@@ -40,7 +40,7 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
 }
 
 std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
-  boost::filesystem::path path(filename);
+  std::filesystem::path path(filename);
   std::shared_ptr<Directory> current_directory = root_area_->GetRootDirectory();
 
   for (auto& part : path) {
