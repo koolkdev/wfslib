@@ -27,8 +27,9 @@ class Block {
   virtual void Fetch(bool check_hash = true);
   virtual void Flush();
 
-  std::vector<uint8_t>& GetData() { return data_; }
-  uint32_t GetBlockNumber() { return block_number_; }
+  std::span<uint8_t> Data() { return data_; }
+  void Resize(size_t new_size) { data_.resize(new_size); }
+  uint32_t BlockNumber() { return block_number_; }
 
   class BadHash : public std::exception {
    public:
@@ -58,8 +59,7 @@ class Block {
         data_(data) {}
   virtual ~Block() {}
 
-  virtual std::span<uint8_t> GetHash() = 0;
-  virtual bool IsHashInBlock() = 0;
+  virtual std::span<uint8_t> Hash() = 0;
 
   std::shared_ptr<DeviceEncryption> device_;
 

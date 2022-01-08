@@ -16,7 +16,7 @@ WfsItem::WfsItem(const std::string& name, const AttributesBlock& attributes) : n
 Attributes* AttributesBlock::Attributes() const {
   if (!block)
     return NULL;
-  return reinterpret_cast<::Attributes*>(&block->GetData()[attributes_offset]);
+  return reinterpret_cast<::Attributes*>(&block->Data()[attributes_offset]);
 }
 
 bool WfsItem::IsDirectory() {

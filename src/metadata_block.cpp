@@ -30,6 +30,6 @@ MetadataBlockHeader* MetadataBlock::Header() {
   return reinterpret_cast<MetadataBlockHeader*>(&data_[0]);
 }
 
-std::span<uint8_t> MetadataBlock::GetHash() {
-  return {data_.begin() + offsetof(MetadataBlockHeader, hash), device_->DIGEST_SIZE};
+std::span<uint8_t> MetadataBlock::Hash() {
+  return {&data_[offsetof(MetadataBlockHeader, hash)], device_->DIGEST_SIZE};
 }

@@ -52,7 +52,7 @@ class Area : public std::enable_shared_from_this<Area> {
                                           const DataBlock::DataBlockHash& data_hash,
                                           bool encrypted);
 
-  uint32_t GetBlockNumber(const std::shared_ptr<Block>& block);
+  uint32_t BlockNumber(const std::shared_ptr<Block>& block);
 
   size_t GetDataBlockLog2Size();
 

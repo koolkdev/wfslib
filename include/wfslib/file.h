@@ -29,8 +29,8 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area)
       : WfsItem(name, attributes), area_(area) {}
 
-  uint32_t GetSize();
-  uint32_t GetSizeOnDisk();
+  uint32_t Size();
+  uint32_t SizeOnDisk();
   void Resize(size_t new_size);
 
   class file_device {

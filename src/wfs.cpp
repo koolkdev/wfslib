@@ -67,7 +67,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   device->SetLog2SectorSize(9);
   auto enc_device = std::make_shared<DeviceEncryption>(device, key);
   auto block = MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, false);
-  auto wfs_header = reinterpret_cast<WfsHeader*>(&block->GetData()[sizeof(MetadataBlockHeader)]);
+  auto wfs_header = reinterpret_cast<WfsHeader*>(&block->Data()[sizeof(MetadataBlockHeader)]);
   if (wfs_header->version.value() != 0x01010800)
     throw std::runtime_error("Unexpected WFS version (bad key?)");
   auto block_size = Block::BlockSize::Basic;
@@ -79,12 +79,12 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   uint32_t xored_sectors_count, xored_sector_size;
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
-  auto& data = block->GetData();
+  auto data = block->Data();
   auto first_4_dwords = reinterpret_cast<boost::endian::big_uint32_buf_t*>(&data[0]);
   xored_sectors_count = first_4_dwords[2].value();
   xored_sector_size = first_4_dwords[3].value();
   // Lets calculate the hash of the block
-  enc_device->CalculateHash(data, {data.begin() + offsetof(MetadataBlockHeader, hash), enc_device->DIGEST_SIZE}, true);
+  enc_device->CalculateHash(data, {&data[offsetof(MetadataBlockHeader, hash)], enc_device->DIGEST_SIZE});
   // Now xor it with the real hash
   xored_sectors_count ^= first_4_dwords[2].value();
   xored_sector_size ^= first_4_dwords[3].value();

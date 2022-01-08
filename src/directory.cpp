@@ -144,7 +144,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
   }
 }
 
-size_t Directory::GetItemsCount() {
+size_t Directory::Size() {
   return std::distance(begin(), end());
 }
 

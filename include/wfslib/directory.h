@@ -30,7 +30,7 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   std::shared_ptr<Directory> GetDirectory(const std::string& name);
   std::shared_ptr<File> GetFile(const std::string& name);
 
-  size_t GetItemsCount();
+  size_t Size();
   DirectoryItemsIterator begin();
   DirectoryItemsIterator end();
 

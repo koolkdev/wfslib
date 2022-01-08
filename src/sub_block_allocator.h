@@ -20,7 +20,7 @@ class SubBlockAllocator {
 
   template <typename T>
   T* GetNode(uint16_t offset) {
-    return reinterpret_cast<T*>(&block_->GetData()[offset]);
+    return reinterpret_cast<T*>(&block_->Data()[offset]);
   }
 
   template <typename T>

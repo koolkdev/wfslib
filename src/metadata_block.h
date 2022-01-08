@@ -28,6 +28,5 @@ class MetadataBlock : public Block {
   MetadataBlockHeader* Header();
 
  protected:
-  std::span<uint8_t> GetHash() override;
-  bool IsHashInBlock() override { return true; };
+  std::span<uint8_t> Hash() override;
 };

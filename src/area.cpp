@@ -15,16 +15,16 @@
 #include "wfs.h"
 
 WfsArea* Area::Data() {
-  if (header_block_->GetBlockNumber() == 0) {
-    return reinterpret_cast<WfsArea*>(&header_block_->GetData()[sizeof(MetadataBlockHeader) + sizeof(WfsHeader)]);
+  if (header_block_->BlockNumber() == 0) {
+    return reinterpret_cast<WfsArea*>(&header_block_->Data()[sizeof(MetadataBlockHeader) + sizeof(WfsHeader)]);
   } else {
-    return reinterpret_cast<WfsArea*>(&header_block_->GetData()[sizeof(MetadataBlockHeader)]);
+    return reinterpret_cast<WfsArea*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
   }
 }
 
 WfsHeader* Area::WfsData() {
-  if (header_block_->GetBlockNumber() == 0) {
-    return reinterpret_cast<WfsHeader*>(&header_block_->GetData()[sizeof(MetadataBlockHeader)]);
+  if (header_block_->BlockNumber() == 0) {
+    return reinterpret_cast<WfsHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
   } else {
     return NULL;
   }
@@ -79,11 +79,11 @@ std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number) {
 
 uint32_t Area::IV(uint32_t block_number) {
   return (Data()->header.iv.value() ^ (root_area_ ? root_area_.get() : this)->WfsData()->iv.value()) +
-         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->GetDevice()->GetLog2SectorSize()));
+         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->GetDevice()->Log2SectorSize()));
 }
 
 std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Block::BlockSize size) {
-  return MetadataBlock::LoadBlock(device_, header_block_->GetBlockNumber() + ToBasicBlockNumber(block_number), size,
+  return MetadataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size,
                                   IV(block_number));
 }
 
@@ -92,8 +92,8 @@ std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number,
                                               uint32_t data_size,
                                               const DataBlock::DataBlockHash& data_hash,
                                               bool encrypted) {
-  return DataBlock::LoadBlock(device_, header_block_->GetBlockNumber() + ToBasicBlockNumber(block_number), size,
-                              data_size, IV(block_number), data_hash, encrypted);
+  return DataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size, data_size,
+                              IV(block_number), data_hash, encrypted);
 }
 
 uint32_t Area::ToBasicBlockNumber(uint32_t block_number) {
@@ -104,7 +104,7 @@ size_t Area::GetDataBlockLog2Size() {
   return Data()->header.log2_block_size.value();
 }
 
-uint32_t Area::GetBlockNumber(const std::shared_ptr<Block>& block) {
-  return (block->GetBlockNumber() - header_block_->GetBlockNumber()) >>
+uint32_t Area::BlockNumber(const std::shared_ptr<Block>& block) {
+  return (block->BlockNumber() - header_block_->BlockNumber()) >>
          (Data()->header.log2_block_size.value() - Block::BlockSize::Basic);
 }

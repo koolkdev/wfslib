@@ -19,15 +19,15 @@ char const* Block::BadHash::what() const noexcept {
 
 void Block::Fetch(bool check_hash) {
   data_ = device_->ReadBlock(ToDeviceSector(block_number_), static_cast<uint32_t>(data_.size()), iv_, encrypted_);
-  if (check_hash && !device_->CheckHash(data_, GetHash(), IsHashInBlock()))
+  if (check_hash && !device_->CheckHash(data_, Hash()))
     throw Block::BadHash(block_number_);
 }
 
 void Block::Flush() {
-  device_->CalculateHash(data_, GetHash(), IsHashInBlock());
+  device_->CalculateHash(data_, Hash());
   device_->WriteBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
 }
 
 uint32_t Block::ToDeviceSector(uint32_t block_number) {
-  return block_number << (BlockSize::Basic - device_->GetDevice()->GetLog2SectorSize());
+  return block_number << (BlockSize::Basic - device_->GetDevice()->Log2SectorSize());
 }

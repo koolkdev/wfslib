@@ -8,5 +8,5 @@
 #include "sub_block_allocator.h"
 
 SubBlockAllocatorStruct* SubBlockAllocator::Header() {
-  return reinterpret_cast<SubBlockAllocatorStruct*>(&block_->GetData()[sizeof(MetadataBlockHeader)]);
+  return reinterpret_cast<SubBlockAllocatorStruct*>(&block_->Data()[sizeof(MetadataBlockHeader)]);
 }

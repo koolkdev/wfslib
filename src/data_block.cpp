@@ -42,6 +42,6 @@ std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncr
   return block;
 }
 
-std::span<uint8_t> DataBlock::GetHash() {
-  return {data_hash_.block->GetData().begin() + data_hash_.hash_offset, device_->DIGEST_SIZE};
+std::span<uint8_t> DataBlock::Hash() {
+  return {&data_hash_.block->Data()[data_hash_.hash_offset], device_->DIGEST_SIZE};
 }

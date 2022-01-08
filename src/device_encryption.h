@@ -22,8 +22,8 @@ class DeviceEncryption {
   void WriteBlock(uint32_t sector_address, const std::span<uint8_t>& data, uint32_t iv, bool encrypt);
   std::vector<uint8_t> ReadBlock(uint32_t sector_address, uint32_t length, uint32_t iv, bool encrypt);
 
-  void CalculateHash(const std::span<uint8_t>& data, const std::span<uint8_t>& hash, bool hash_in_block);
-  bool CheckHash(const std::span<uint8_t>& data, const std::span<uint8_t>& hash, bool hash_in_block);
+  void CalculateHash(const std::span<uint8_t>& data, const std::span<uint8_t>& hash);
+  bool CheckHash(const std::span<uint8_t>& data, const std::span<uint8_t>& hash);
 
   const std::shared_ptr<Device>& GetDevice() { return device_; }
 
