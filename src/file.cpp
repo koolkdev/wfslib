@@ -67,7 +67,7 @@ class File::DataCategoryReader {
   std::byte* GetAttributesMetadataEnd() {
     // We can't do [GetAttributesMetadataEndOffset()] because it might point to data.end(), so in debug it will cause an
     // error
-    return &file_->attributes_data().block->Data()[GetAttributesMetadataEndOffset()];
+    return file_->attributes_data().block->Data().data() + GetAttributesMetadataEndOffset();
   }
 };
 
