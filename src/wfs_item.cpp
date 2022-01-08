@@ -41,13 +41,14 @@ std::string WfsItem::GetRealName() {
   if (attributes->filename_length.value() != filename.size()) {
     throw std::runtime_error("Unexepected filename length");
   }
-  uint8_t* bitmap_pos = reinterpret_cast<uint8_t*>(&attributes->case_bitmap);
-  uint8_t cur = 0, i = 0;
+  std::byte* bitmap_pos = reinterpret_cast<std::byte*>(&attributes->case_bitmap);
+  std::byte cur = std::byte{0};
+  int i = 0;
   for (char c : name_) {
     if (i++ % 8 == 0) {
       cur = *bitmap_pos++;
     }
-    if (cur & 1)
+    if ((cur & std::byte{1}) == std::byte{1})
       c = static_cast<char>(std::toupper(c));
     cur >>= 1;
     real_filename += c;

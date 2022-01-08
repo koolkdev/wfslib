@@ -167,10 +167,10 @@ struct DirectoryTreeNode {
 
  public:
   std::string value() { return std::string(reinterpret_cast<char*>(this) + sizeof(*this), value_length.value()); }
-  std::vector<uint8_t> choices() {
-    return std::vector<uint8_t>(
-        reinterpret_cast<uint8_t*>(this) + sizeof(*this) + value_length.value(),
-        reinterpret_cast<uint8_t*>(this) + sizeof(*this) + value_length.value() + choices_count.value());
+  std::vector<std::byte> choices() {
+    return std::vector<std::byte>(
+        reinterpret_cast<std::byte*>(this) + sizeof(*this) + value_length.value(),
+        reinterpret_cast<std::byte*>(this) + sizeof(*this) + value_length.value() + choices_count.value());
   }
 };
 static_assert(sizeof(DirectoryTreeNode) == 0x2, "Incorrect sizeof DirectoryTreeNode");
@@ -188,7 +188,7 @@ struct ExternalDirectoryTreeNode : DirectoryTreeNode {
 
  public:
   boost::endian::big_uint16_buf_t get_item(size_t index) {
-    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<uint8_t*>(this) +
+    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<std::byte*>(this) +
                                                               size())[-static_cast<int>(index) - 1];
   }
 };
@@ -200,12 +200,12 @@ struct InternalDirectoryTreeNode : DirectoryTreeNode {
  public:
   boost::endian::big_uint16_buf_t get_item(size_t index) {
     size_t adjust_offset = 0;
-    if (choices()[0] == 0)
+    if (choices()[0] == std::byte{0})
       adjust_offset = 2;
-    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<uint8_t*>(this) + size() -
+    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<std::byte*>(this) + size() -
                                                               adjust_offset)[-static_cast<int>(index) - 1];
   }
   boost::endian::big_uint32_buf_t get_next_allocator_block_number() {
-    return reinterpret_cast<boost::endian::big_uint32_buf_t*>(reinterpret_cast<uint8_t*>(this) + size())[-1];
+    return reinterpret_cast<boost::endian::big_uint32_buf_t*>(reinterpret_cast<std::byte*>(this) + size())[-1];
   }
 };

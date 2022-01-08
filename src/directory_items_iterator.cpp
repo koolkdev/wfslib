@@ -29,7 +29,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
       return *this;
   }
   // Enter nodes until we hit a node that has value
-  while (node_state_->node->choices()[node_state_->current_index]) {
+  while (node_state_->node->choices()[node_state_->current_index] != std::byte{0}) {
     auto block = node_state_->block;
     uint16_t node_offset = 0;
     if (node_state_->block->Header()->block_flags.value() &
@@ -41,7 +41,8 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
           static_cast<InternalDirectoryTreeNode*>(node_state_->node)->get_item(node_state_->current_index).value();
     }
     auto current_node = SubBlockAllocator(block).GetNode<DirectoryTreeNode>(node_offset);
-    std::string path = node_state_->path + std::string(1, node_state_->node->choices()[node_state_->current_index]) +
+    std::string path = node_state_->path +
+                       std::string(1, std::to_integer<char>(node_state_->node->choices()[node_state_->current_index])) +
                        current_node->value();
     node_state_ = std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, path});
   }

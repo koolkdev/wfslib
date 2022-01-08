@@ -38,7 +38,7 @@ class DataBlock : public Block {
                                               bool encrypted);
 
  protected:
-  std::span<uint8_t> Hash() override;
+  std::span<std::byte> Hash() override;
 
  private:
   DataBlockHash data_hash_;

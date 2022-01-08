@@ -27,7 +27,7 @@ class Block {
   virtual void Fetch(bool check_hash = true);
   virtual void Flush();
 
-  std::span<uint8_t> Data() { return data_; }
+  std::span<std::byte> Data() { return data_; }
   void Resize(size_t new_size) { data_.resize(new_size); }
   uint32_t BlockNumber() { return block_number_; }
 
@@ -50,7 +50,7 @@ class Block {
         Block::BlockSize size_category,
         uint32_t iv,
         bool encrypted,
-        std::vector<uint8_t>&& data)
+        std::vector<std::byte>&& data)
       : device_(device),
         block_number_(block_number),
         size_category_(size_category),
@@ -59,7 +59,7 @@ class Block {
         data_(data) {}
   virtual ~Block() {}
 
-  virtual std::span<uint8_t> Hash() = 0;
+  virtual std::span<std::byte> Hash() = 0;
 
   std::shared_ptr<DeviceEncryption> device_;
 
@@ -69,5 +69,5 @@ class Block {
   bool encrypted_;
 
   // this vector will be rounded to sector after read
-  std::vector<uint8_t> data_;
+  std::vector<std::byte> data_;
 };

@@ -15,7 +15,7 @@
 #include "metadata_block.h"
 #include "structs.h"
 
-Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<uint8_t>& key)
+Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
     : device_(std::make_shared<DeviceEncryption>(device, key)) {
   // Read first area
   root_area_ = Area::LoadRootArea(device_);
@@ -54,7 +54,7 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   return current_directory;
 }
 
-void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::span<uint8_t>& key) {
+void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::span<std::byte>& key) {
   // The encryption of the blocks depends on the device sector size and count, which builds the IV
   // We are going to find out the correct first 0x10 bytes, and than xor it with what we read to find out the correct IV
   // From that IV we extract the sectors count and sector size of the device.
@@ -80,7 +80,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
   auto data = block->Data();
-  auto first_4_dwords = reinterpret_cast<boost::endian::big_uint32_buf_t*>(&data[0]);
+  auto first_4_dwords = reinterpret_cast<boost::endian::big_uint32_buf_t*>(data.data());
   xored_sectors_count = first_4_dwords[2].value();
   xored_sector_size = first_4_dwords[3].value();
   // Lets calculate the hash of the block

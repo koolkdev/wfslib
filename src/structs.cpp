@@ -25,7 +25,7 @@ size_t Attributes::DataOffset() {
 size_t InternalDirectoryTreeNode::size() {
   size_t total_size = sizeof(DirectoryTreeNode) + value_length.value() + choices_count.value() +
                       choices_count.value() * sizeof(boost::endian::big_uint16_buf_t);
-  if (choices_count.value() > 0 && choices()[0] == 0)
+  if (choices_count.value() > 0 && choices()[0] == std::byte{0})
     total_size += 2;
   return round_pow2(total_size);
 }

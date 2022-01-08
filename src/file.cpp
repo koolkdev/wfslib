@@ -28,8 +28,8 @@ uint32_t File::SizeOnDisk() {
   return attributes_.Attributes()->size_on_disk.value();
 }
 
-static size_t GetOffsetInMetadataBlock(const std::shared_ptr<MetadataBlock>& block, uint8_t* data) {
-  return data - &block->Data()[0];
+static size_t GetOffsetInMetadataBlock(const std::shared_ptr<MetadataBlock>& block, std::byte* data) {
+  return data - block->Data().data();
 }
 
 class File::DataCategoryReader {
@@ -38,13 +38,13 @@ class File::DataCategoryReader {
   virtual ~DataCategoryReader() {}
   virtual size_t GetAttributesMetadataSize() = 0;
   virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) = 0;
-  size_t Read(uint8_t* data, size_t offset, size_t size) {
+  size_t Read(std::byte* data, size_t offset, size_t size) {
     auto chunk_info = GetFileDataChunkInfo(offset, size);
     auto data_begin = chunk_info.data_block->Data().begin();
     std::copy(data_begin + chunk_info.offset_in_block, data_begin + chunk_info.offset_in_block + chunk_info.size, data);
     return chunk_info.size;
   }
-  size_t Write(const uint8_t* data, size_t offset, size_t size) {
+  size_t Write(const std::byte* data, size_t offset, size_t size) {
     auto chunk_info = GetFileDataChunkInfo(offset, size);
     auto data_begin = chunk_info.data_block->Data().begin();
     std::copy(data, data + chunk_info.size, data_begin + chunk_info.offset_in_block);
@@ -64,10 +64,10 @@ class File::DataCategoryReader {
     return file_->attributes_data().attributes_offset +
            round_pow2(file_->attributes_data().Attributes()->DataOffset() + GetAttributesMetadataSize());
   }
-  uint8_t* GetAttributesMetadataEnd() {
+  std::byte* GetAttributesMetadataEnd() {
     // We can't do [GetAttributesMetadataEndOffset()] because it might point to data.end(), so in debug it will cause an
     // error
-    return &file_->attributes_data().block->Data()[0] + GetAttributesMetadataEndOffset();
+    return &file_->attributes_data().block->Data()[GetAttributesMetadataEndOffset()];
   }
 };
 
@@ -111,7 +111,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
                   static_cast<uint32_t>(std::min(1U << GetDataBlockSize(),
                                                  file_->attributes_data().Attributes()->size.value() - block_offset)),
                   {hash_block, GetOffsetInMetadataBlock(
-                                   hash_block, reinterpret_cast<uint8_t*>(&blocks_list[-block_index - 1].hash))});
+                                   hash_block, reinterpret_cast<std::byte*>(&blocks_list[-block_index - 1].hash))});
     size = std::min(size, current_data_block->Data().size() - offset_in_block);
     return FileDataChunkInfo{current_data_block, offset_in_block, size};
   }
@@ -235,8 +235,8 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
     LoadDataBlock(cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
                   static_cast<uint32_t>(std::min(1U << GetDataBlockSize(),
                                                  file_->attributes_data().Attributes()->size.value() - block_offset)),
-                  {metadata_block,
-                   GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<uint8_t*>(&cluster->hash[block_index]))});
+                  {metadata_block, GetOffsetInMetadataBlock(
+                                       metadata_block, reinterpret_cast<std::byte*>(&cluster->hash[block_index]))});
     size = std::min(size, current_data_block->Data().size() - offset_in_block);
     return FileDataChunkInfo{current_data_block, offset_in_block, size};
   }
@@ -328,7 +328,8 @@ std::streamsize File::file_device::read(char_type* s, std::streamsize n) {
 
   std::streamsize to_read = result;
   while (to_read > 0) {
-    size_t read = reader_->Read(reinterpret_cast<uint8_t*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_read));
+    size_t read =
+        reader_->Read(reinterpret_cast<std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_read));
     s += read;
     pos_ += read;
     to_read -= read;
@@ -351,7 +352,7 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n) 
   std::streamsize to_write = result;
   while (to_write > 0) {
     size_t wrote =
-        reader_->Write(reinterpret_cast<const uint8_t*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_write));
+        reader_->Write(reinterpret_cast<const std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_write));
     s += wrote;
     pos_ += wrote;
     to_write -= wrote;

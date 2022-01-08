@@ -14,7 +14,8 @@ MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device,
                              uint32_t block_number,
                              Block::BlockSize size_category,
                              uint32_t iv)
-    : Block(device, block_number, size_category, iv, true, std::vector<uint8_t>(1LL << size_category, 0)) {}
+    : Block(device, block_number, size_category, iv, true, std::vector<std::byte>(1LL << size_category, std::byte{0})) {
+}
 
 std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                                         uint32_t block_number,
@@ -27,9 +28,9 @@ std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<De
 }
 
 MetadataBlockHeader* MetadataBlock::Header() {
-  return reinterpret_cast<MetadataBlockHeader*>(&data_[0]);
+  return reinterpret_cast<MetadataBlockHeader*>(data_.data());
 }
 
-std::span<uint8_t> MetadataBlock::Hash() {
+std::span<std::byte> MetadataBlock::Hash() {
   return {&data_[offsetof(MetadataBlockHeader, hash)], device_->DIGEST_SIZE};
 }

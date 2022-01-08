@@ -86,8 +86,8 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
         next_expected_char = *pos_in_path;
       auto choices = current_node->choices();
       // This is sorted list, so we can find it with lower_bound
-      auto res = std::lower_bound(choices.begin(), choices.end(), next_expected_char);
-      if (res == choices.end() || *res != next_expected_char) {
+      auto res = std::lower_bound(choices.begin(), choices.end(), std::byte{(uint8_t)next_expected_char});
+      if (res == choices.end() || std::to_integer<char>(*res) != next_expected_char) {
         // Not found
         return {};
       }
@@ -116,14 +116,16 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
         continue;
       }
       // Enter nodes until we hit a node that has value
-      while (node_state->node->choices()[node_state->current_index]) {
+      while (node_state->node->choices()[node_state->current_index] != std::byte{0}) {
         auto node_block = node_state->block;
         uint16_t node_offset = 0;
         node_offset =
             static_cast<InternalDirectoryTreeNode*>(node_state->node)->get_item(node_state->current_index).value();
         current_node = allocator.GetNode<DirectoryTreeNode>(node_offset);
-        std::string path = node_state->path + std::string(1, node_state->node->choices()[node_state->current_index]) +
-                           current_node->value();
+        std::string path =
+            node_state->path +
+            std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
+            current_node->value();
         node_state = std::make_shared<DirectoryItemsIterator::NodeState>(
             DirectoryItemsIterator::NodeState{node_block, current_node, std::move(node_state), 0, path});
       }

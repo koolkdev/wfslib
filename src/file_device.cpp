@@ -32,19 +32,19 @@ FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool 
                           // Wfs::DetectSectorsCount
 }
 
-std::vector<uint8_t> FileDevice::ReadSectors(uint32_t sector_address, uint32_t sectors_count) {
+std::vector<std::byte> FileDevice::ReadSectors(uint32_t sector_address, uint32_t sectors_count) {
   if (sector_address >= sectors_count_ || sector_address + sectors_count > sectors_count_) {
     throw std::runtime_error("FileDevice: Read out of file.");
   }
   std::lock_guard<std::mutex> guard(io_lock_);
   file_->seekg(static_cast<std::streampos>(sector_address) << log2_sector_size_);
-  std::vector<uint8_t> data(sectors_count << log2_sector_size_);
+  std::vector<std::byte> data(sectors_count << log2_sector_size_);
   file_->read(reinterpret_cast<char*>(&*data.begin()), data.size());
   if (file_->gcount() != static_cast<std::streamsize>(data.size()))
     throw std::runtime_error("FileDevice: Failed to read from file.");
   return data;
 }
-void FileDevice::WriteSectors(const std::span<uint8_t>& data, uint32_t sector_address, uint32_t sectors_count) {
+void FileDevice::WriteSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) {
   if (read_only_) {
     throw std::runtime_error("FileDevice: Can't write - read only mode");
   }
