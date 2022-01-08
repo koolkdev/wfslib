@@ -7,6 +7,7 @@
 
 #include "wfs.h"
 
+#include <bit>
 #include <filesystem>
 #include "area.h"
 #include "device_encryption.h"
@@ -91,16 +92,11 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   // And xor it with our fake sectors count and block size
   xored_sectors_count ^= 0x10;
   xored_sector_size ^= 1 << 9;
-  uint32_t sector_size = 0;
-  while (!(xored_sector_size & 1)) {
-    xored_sector_size >>= 1;
-    sector_size++;
-  }
-  if (xored_sector_size >> 1) {
+  if (std::popcount(xored_sector_size) != 1) {
     // Not pow of 2
     throw std::runtime_error("Wfs: Failed to detect sector size and sectors count");
   }
-  device->SetLog2SectorSize(sector_size);
+  device->SetLog2SectorSize(std::bit_width(xored_sector_size) - 1);
   device->SetSectorsCount(xored_sectors_count);
   // Now try to fetch block again, this time check the hash, it will raise exception
   try {

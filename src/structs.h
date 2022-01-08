@@ -7,11 +7,14 @@
 
 #pragma once
 
+#include <bit>
 #include <boost/endian/buffers.hpp>
 #include <string>
 #include <vector>
 
-size_t round_pow2(size_t size);
+inline size_t align_to_power_of_2(size_t size) {
+  return static_cast<size_t>(1ULL << std::bit_width(size));
+}
 
 // sizeof 0x18
 struct MetadataBlockHeader {

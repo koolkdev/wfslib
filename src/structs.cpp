@@ -7,13 +7,6 @@
 
 #include "structs.h"
 
-size_t round_pow2(size_t size) {
-  size_t nsize = 1;
-  while (nsize < size)
-    nsize <<= 1;
-  return nsize;
-}
-
 inline size_t divide_round_up(size_t n, size_t div) {
   return (n + div - 1) / div;
 }
@@ -27,5 +20,5 @@ size_t InternalDirectoryTreeNode::size() {
                       choices_count.value() * sizeof(boost::endian::big_uint16_buf_t);
   if (choices_count.value() > 0 && choices()[0] == std::byte{0})
     total_size += 2;
-  return round_pow2(total_size);
+  return align_to_power_of_2(total_size);
 }

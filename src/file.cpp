@@ -62,7 +62,7 @@ class File::DataCategoryReader {
   }
   size_t GetAttributesMetadataEndOffset() {
     return file_->attributes_data().attributes_offset +
-           round_pow2(file_->attributes_data().Attributes()->DataOffset() + GetAttributesMetadataSize());
+           align_to_power_of_2(file_->attributes_data().Attributes()->DataOffset() + GetAttributesMetadataSize());
   }
   std::byte* GetAttributesMetadataEnd() {
     // We can't do [GetAttributesMetadataEndOffset()] because it might point to data.end(), so in debug it will cause an
