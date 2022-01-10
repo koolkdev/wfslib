@@ -80,9 +80,9 @@ struct Attributes {
   boost::endian::big_uint8_buf_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
                                                // byte, it is a bitmap of filename_length
 
-  bool IsDirectory() { return !!(flags.value() & DIRECTORY); }
+  bool IsDirectory() { return !!(flags.value() & Flags::DIRECTORY); }
   bool IsFile() { return !IsDirectory(); }
-  bool IsLink() { return !!(flags.value() & LINK); }
+  bool IsLink() { return !!(flags.value() & Flags::LINK); }
 
   size_t DataOffset();
 };
@@ -95,49 +95,78 @@ struct WfsHeader {
   boost::endian::big_uint16_buf_t device_type;  // usb - 0x16a2. mlc - 0x136a?
   boost::endian::big_uint16_buf_t _pad;
   Attributes root_area_attributes;
-  boost::endian::big_uint32_buf_t root_area_directory_block_number;  // should be 12 (6*2, when regular block size used)
+  boost::endian::big_uint32_buf_t
+      transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
   boost::endian::big_uint32_buf_t root_area_blocks_count;
   boost::endian::big_uint32_buf_t unknown[2];  // not used??
 };
 static_assert(sizeof(WfsHeader) == 0x48, "Incorrect sizeof WfsHeader");
 
-// sizeof 0x44
-struct WfsAreaHeaderCacheRelated {
-  boost::endian::big_uint32_buf_t unknown_zero;        // init to zero. unknown
-  boost::endian::big_uint32_buf_t cache_blocks_count;  // some cache blocks count, not sure
-  // TODO...
-  boost::endian::big_uint8_buf_t unknown[0x38];
-  boost::endian::big_uint32_buf_t cache_log2_block_size;  // some cache block size, not sure
+// sizof 0x8
+struct WfsAreaFragmentInfo {
+  boost::endian::big_uint32_buf_t block_number;
+  boost::endian::big_uint32_buf_t blocks_count;
 };
-static_assert(sizeof(WfsAreaHeaderCacheRelated) == 0x44, "Incorrect sizeof WfsAreaHeaderCacheRelated");
+static_assert(sizeof(WfsAreaFragmentInfo) == 0x8, "Incorrect sizeof WfsAreaFragmentInfo");
 
-/// sizeof 0x60
+// sizeof 0x60
 struct WfsAreaHeader {
+  enum class AreaType : uint8_t {
+    RootArea = 0,
+    QuotaArea = 1,
+  };
   boost::endian::big_uint32_buf_t iv;  // used for blocks  encryption
   boost::endian::big_uint32_buf_t blocks_count;
-  boost::endian::big_uint32_buf_t root_directory_block_number;       // is 6
-  boost::endian::big_uint32_buf_t unknown_allocator_block_number_4;  // is 4
-  boost::endian::big_uint32_buf_t unknown_allocator_block_number_5;  // is 5
-  boost::endian::big_uint8_buf_t depth;                              // how many total parents area this area has
-  boost::endian::big_uint8_buf_t log2_block_size;                    // 12/13
-  boost::endian::big_uint8_buf_t log2_mega_block_size;               // mega block - 8 blocks. so 15/16
-  boost::endian::big_uint8_buf_t log2_mega_blocks_cluster_size;      // mega blocks cluster - 8 mega blocks. so 18/19
-  boost::endian::big_uint8_buf_t data_type;                          // not sure. bool? (0 or 1)
-  boost::endian::big_uint8_buf_t unknown_zero;                       // init to zero. does it used/changed by something?
+  boost::endian::big_uint32_buf_t root_directory_block_number;  // is 6
+  // Those two directories are not used. It was supposed to be some kind of refcount mechansism. not really sure.
+  // But nothing uses it in the WiiU
+  boost::endian::big_uint32_buf_t shadow_directory_block_number_1;  // is 4
+  boost::endian::big_uint32_buf_t shadow_directory_block_number_2;  // is 5
+  boost::endian::big_uint8_buf_t depth;                             // how many total parents area this area has
+  boost::endian::big_uint8_buf_t log2_block_size;                   // 12/13
+  boost::endian::big_uint8_buf_t log2_mega_block_size;              // mega block - 8 blocks. so 15/16
+  boost::endian::big_uint8_buf_t log2_mega_blocks_cluster_size;     // mega blocks cluster - 8 mega blocks. so 18/19
+  boost::endian::big_uint8_buf_t area_type;          // 0 - root area, 1 - data (not relavent for transactions area)
+  boost::endian::big_uint8_buf_t maybe_always_zero;  // init to zero. doesn't seem to be changed by anything
   boost::endian::big_uint16_buf_t
       spare_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota. (parent area
                            // blocks, so in parent area block size)
-
-  WfsAreaHeaderCacheRelated cache_related;
+  WfsAreaFragmentInfo first_fragments[8];  // On which blocks this area is spread on (if there aren't enough free
+                                           // sequentials blocks it will framgnet the area). parent area blocks, so in
+                                           // parent area block size. This list contains only the first 8 fragments
+  boost::endian::big_uint32_buf_t fragments_log2_block_size;  // block size of parent area
 };
 static_assert(sizeof(WfsAreaHeader) == 0x60, "Incorrect sizeof WfsAreaHeader");
 
-struct WfsArea {
+// sizof 0x8
+struct WfsAreaFragmentsInfo {
+  boost::endian::big_uint16_buf_t max_fragments_count;  // 480
+  boost::endian::big_uint16_buf_t
+      fragments_log2_block_size;  // block size of parent area. In root area it is the minimum block size (12)
+  boost::endian::big_uint32_buf_t fragments_count;
+  WfsAreaFragmentInfo fragments[480];  // On which blocks this area is spread on (if there aren't enough free
+                                       // sequentials blocks it will framgnet the area). parent area blocks, so in
+                                       // parent area block size.
+};
+static_assert(sizeof(WfsAreaFragmentsInfo) == 0xF08, "Incorrect sizeof WfsAreaFragmentsInfo");
+
+struct WfsQuotaArea {
   WfsAreaHeader header;
 
-  // TODO: beyond this it is mostly unknown, and depends on header.data_type. So I don't even bother right now...
+  WfsAreaFragmentsInfo framgnets;
 };
-// static_assert(sizeof(WfsArea) == ,,, "Incorrect sizeof WfsArea");
+static_assert(sizeof(WfsQuotaArea) == 0x60 + 0xF08, "Incorrect sizeof WfsQuotaArea");
+
+struct WfsTransactionsArea {
+  WfsAreaHeader header;
+
+  // This is the area that responsible for creating transaction when making changes to the file system (until the quota
+  // is flushed to the disk).
+  // Most of the structures of this area are known, but it isn't interesting since it is cleared every time the WiiU
+  // mount the file system. (transactions from previous boot that weren't flushed to the disk are lost)
+  boost::endian::big_uint8_buf_t unknown[0x3B4];
+};
+static_assert(sizeof(WfsTransactionsArea) == 0x60 + 0x3B4, "Incorrect sizeof WfsTransactionsArea");
 
 struct SubBlockAllocatorFreeListEntry {
   boost::endian::big_uint16_buf_t unused;
@@ -189,11 +218,9 @@ struct InternalDirectoryTreeNode : DirectoryTreeNode {
 
  public:
   boost::endian::big_uint16_buf_t get_item(size_t index) {
-    size_t adjust_offset = 0;
-    if (choices()[0] == std::byte{0})
-      adjust_offset = 2;
-    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<std::byte*>(this) + size() -
-                                                              adjust_offset)[-static_cast<int>(index) - 1];
+    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(
+        reinterpret_cast<std::byte*>(this) + size() -
+        (choices()[0] == std::byte{0} ? 2 : 0))[-static_cast<int>(index) - 1];
   }
   boost::endian::big_uint32_buf_t get_next_allocator_block_number() {
     return reinterpret_cast<boost::endian::big_uint32_buf_t*>(reinterpret_cast<std::byte*>(this) + size())[-1];

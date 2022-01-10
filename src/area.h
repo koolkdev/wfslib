@@ -19,7 +19,7 @@ class MetadataBlock;
 class DeviceEncryption;
 class Directory;
 
-struct WfsArea;
+struct WfsAreaHeader;
 struct WfsHeader;
 
 class Area : public std::enable_shared_from_this<Area> {
@@ -57,7 +57,7 @@ class Area : public std::enable_shared_from_this<Area> {
   size_t GetDataBlockLog2Size();
 
  private:
-  WfsArea* Data();
+  WfsAreaHeader* Data();
   WfsHeader* WfsData();
 
   uint32_t ToBasicBlockNumber(uint32_t block_number);

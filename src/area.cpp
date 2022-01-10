@@ -14,11 +14,11 @@
 #include "structs.h"
 #include "wfs.h"
 
-WfsArea* Area::Data() {
+WfsAreaHeader* Area::Data() {
   if (header_block_->BlockNumber() == 0) {
-    return reinterpret_cast<WfsArea*>(&header_block_->Data()[sizeof(MetadataBlockHeader) + sizeof(WfsHeader)]);
+    return reinterpret_cast<WfsAreaHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader) + sizeof(WfsHeader)]);
   } else {
-    return reinterpret_cast<WfsArea*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
+    return reinterpret_cast<WfsAreaHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
   }
 }
 
@@ -61,8 +61,7 @@ std::shared_ptr<Directory> Area::GetDirectory(uint32_t block_number,
 }
 
 std::shared_ptr<Directory> Area::GetRootDirectory() {
-  return GetDirectory(Data()->header.root_directory_block_number.value(), root_directory_name_,
-                      root_directory_attributes_);
+  return GetDirectory(Data()->root_directory_block_number.value(), root_directory_name_, root_directory_attributes_);
 }
 
 std::shared_ptr<Area> Area::GetArea(uint32_t block_number,
@@ -74,11 +73,11 @@ std::shared_ptr<Area> Area::GetArea(uint32_t block_number,
 }
 
 std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number) {
-  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(Data()->header.log2_block_size.value()));
+  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(Data()->log2_block_size.value()));
 }
 
 uint32_t Area::IV(uint32_t block_number) {
-  return (Data()->header.iv.value() ^ (root_area_ ? root_area_.get() : this)->WfsData()->iv.value()) +
+  return (Data()->iv.value() ^ (root_area_ ? root_area_.get() : this)->WfsData()->iv.value()) +
          (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->GetDevice()->Log2SectorSize()));
 }
 
@@ -97,14 +96,14 @@ std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number,
 }
 
 uint32_t Area::ToBasicBlockNumber(uint32_t block_number) {
-  return block_number << (Data()->header.log2_block_size.value() - Block::BlockSize::Basic);
+  return block_number << (Data()->log2_block_size.value() - Block::BlockSize::Basic);
 }
 
 size_t Area::GetDataBlockLog2Size() {
-  return Data()->header.log2_block_size.value();
+  return Data()->log2_block_size.value();
 }
 
 uint32_t Area::BlockNumber(const std::shared_ptr<Block>& block) {
   return (block->BlockNumber() - header_block_->BlockNumber()) >>
-         (Data()->header.log2_block_size.value() - Block::BlockSize::Basic);
+         (Data()->log2_block_size.value() - Block::BlockSize::Basic);
 }

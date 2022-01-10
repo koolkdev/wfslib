@@ -72,8 +72,8 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   if (wfs_header->version.value() != 0x01010800)
     throw std::runtime_error("Unexpected WFS version (bad key?)");
   auto block_size = Block::BlockSize::Basic;
-  if (!(wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_BASIC) &&
-      (wfs_header->root_area_attributes.flags.value() & wfs_header->root_area_attributes.Flags::AREA_SIZE_REGULAR))
+  if (!(wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
+      (wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
     block_size = Block::BlockSize::Regular;
   // Now lets read it again, this time with the correct block size
   block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);

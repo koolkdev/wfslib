@@ -21,7 +21,7 @@ T* KeyFile::LoadFromFile(const std::string& path, size_t size) {
   }
 
   std::vector<std::byte> data(size);
-  file.read(reinterpret_cast<char*>(&*data.begin()), size);
+  file.read(reinterpret_cast<char*>(data.data()), size);
   if (file.gcount() != static_cast<std::streamsize>(size))
     throw std::runtime_error("KeyFile: KeyFile too small");
   return new T(data);
