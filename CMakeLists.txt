@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.18)
 
 project(wfslib)
 
-option(BUILD_STATIC_MSVC "Build static with MSVC" OFF)
+option(BUILD_STATIC "Build static" OFF)
 
 add_library(${PROJECT_NAME}
     src/area.cpp
@@ -21,7 +21,7 @@ add_library(${PROJECT_NAME}
     src/wfs_item.cpp
 )
 
-if (BUILD_STATIC_MSVC)
+if(BUILD_STATIC AND MSVC)
     set_property(TARGET ${PROJECT_NAME} PROPERTY
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
@@ -52,6 +52,7 @@ endif()
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
         Boost::boost
+        $<$<AND:$<BOOL:BUILD_STATIC>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-static-libstdc++ -static-libgcc $<$<CONFIG:Release>:-s>>
     PRIVATE
         cryptopp-static
 )
