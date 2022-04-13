@@ -52,7 +52,8 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
     auto block = directory_->area()->GetMetadataBlock(
         static_cast<InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
     auto current_node = SubBlockAllocator(block).GetRootNode<DirectoryTreeNode>();
-    node_state_ = std::make_shared<NodeState>(block, current_node, std::move(node_state_), 0, current_node->prefix());
+    node_state_ =
+        std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, current_node->prefix()});
     // -- because it will be advanced immedialty to 0 when we do ++
     --node_state_->current_index;
     // Go to the first node in this directory block
