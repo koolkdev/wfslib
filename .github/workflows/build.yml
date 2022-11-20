@@ -30,6 +30,9 @@ jobs:
 
     - name: Set clang
       run: |
+           brew update
+           brew install llvm
+           brew upgrade
            echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
            echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
       shell: bash
