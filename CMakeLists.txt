@@ -1,5 +1,22 @@
 cmake_minimum_required(VERSION 3.18)
 
+# Check compiler verions
+if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
+        message(FATAL_ERROR "GCC version must be at least 11.0!")
+    endif()
+elseif (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14.0)
+        message(FATAL_ERROR "Clang version must be at least 14.0!")
+    endif()
+elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.30)
+        message(FATAL_ERROR "Visual Studio must be at least VS2022!")
+    endif()
+else()
+    message(WARNING "You are using an unsupported compiler! Please use MSVC/GCC/Clang")
+endif()
+
 project(wfslib)
 
 option(BUILD_STATIC "Build static" OFF)
