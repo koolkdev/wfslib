@@ -42,7 +42,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 find_package(Boost 1.64.0 REQUIRED)
-find_package(cryptopp REQUIRED CONFIG)
+find_package(cryptopp REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
