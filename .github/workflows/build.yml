@@ -34,7 +34,6 @@ jobs:
            # Temporary fix, see https://github.com/orgs/Homebrew/discussions/3895
            brew install --overwrite python@3.11
            brew install llvm
-           brew upgrade
            echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
            echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
       shell: bash
