@@ -44,7 +44,7 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   std::filesystem::path path(filename);
   std::shared_ptr<Directory> current_directory = root_area_->GetRootDirectory();
 
-  for (auto& part : path) {
+  for (const auto& part : path) {
     // the first part is "/"
     if (part == "/")
       continue;
