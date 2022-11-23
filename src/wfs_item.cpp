@@ -7,7 +7,9 @@
 
 #include "wfs_item.h"
 
+#include <boost/dynamic_bitset.hpp>
 #include <cctype>
+#include <ranges>
 #include "metadata_block.h"
 #include "structs.h"
 
@@ -36,22 +38,15 @@ bool WfsItem::IsLink() {
 
 std::string WfsItem::GetRealName() {
   auto attributes = attributes_.Attributes();
-  auto& filename = name_;
   std::string real_filename = "";
-  if (attributes->filename_length.value() != filename.size()) {
+  if (attributes->filename_length.value() != name_.size()) {
     throw std::runtime_error("Unexepected filename length");
   }
-  std::byte* bitmap_pos = reinterpret_cast<std::byte*>(&attributes->case_bitmap);
-  std::byte cur = std::byte{0};
-  int i = 0;
-  for (char c : name_) {
-    if (i++ % 8 == 0) {
-      cur = *bitmap_pos++;
-    }
-    if ((cur & std::byte{1}) == std::byte{1})
-      c = static_cast<char>(std::toupper(c));
-    cur >>= 1;
-    real_filename += c;
-  }
-  return real_filename;
+  boost::dynamic_bitset<uint8_t> bits(name_.size());
+  boost::from_block_range(reinterpret_cast<uint8_t*>(&attributes->case_bitmap),
+                          reinterpret_cast<uint8_t*>(&attributes->case_bitmap) + (name_.size() / 8), bits);
+  std::string real_name;
+  std::ranges::transform(std::ranges::iota_view(0ull, name_.size()), std::back_inserter(real_name),
+                         [&](auto i) { return bits[i] ? std::toupper(name_[i]) : name_[i]; });
+  return real_name;
 }
