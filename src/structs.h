@@ -226,3 +226,81 @@ struct InternalDirectoryTreeNode : DirectoryTreeNode {
     return reinterpret_cast<boost::endian::big_uint32_buf_t*>(reinterpret_cast<std::byte*>(this) + size())[-1];
   }
 };
+
+struct FreeBlocksAllocatorHeader {
+  boost::endian::big_uint32_buf_t free_blocks_count;
+  boost::endian::big_uint32_buf_t unknown;  // initialized to 1
+  // When createa a new area, a fixed amount of blocks are allocated for metadata blocks for quick allocation. When
+  // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
+  // When no more availabe blocks are avaialbe, it will allocate them regulary.
+  boost::endian::big_uint32_buf_t free_metadata_block;
+  boost::endian::big_uint32_buf_t free_metadata_blocks_count;
+};
+static_assert(sizeof(FreeBlocksAllocatorHeader) == 0x10, "Incorrect sizeof FreeBLocksAllocatorHeader");
+
+// Header at the end of the block. Contains an array of entries of a constant size
+struct TreeSubBlockAllocatorHeader {
+  boost::endian::big_uint16_buf_t freelist;      // Index of the freelist head entry
+  boost::endian::big_uint16_buf_t allocated;     // How many entries are allocated
+  boost::endian::big_uint16_buf_t start_offset;  // Where the array start in the bock
+  boost::endian::big_uint16_buf_t total_bytse;   // The size of the array in bytes
+};
+static_assert(sizeof(TreeSubBlockAllocatorHeader) == 0x8, "Incorrect sizeof TreeSubBlockAllocatorHeader");
+
+struct NodesHeapHeader {
+  boost::endian::big_uint16_buf_t freelist_head_offset;
+  boost::endian::big_uint16_buf_t allocated_blocks;
+  boost::endian::big_uint16_buf_t start_offset;
+  boost::endian::big_uint16_buf_t total_bytes;
+};
+
+struct NodesHeapFreelistEntry {
+  boost::endian::big_uint32_buf_t init_zero;  // zero, never used
+  boost::endian::big_uint32_buf_t next;       // index in the heap entries list
+  boost::endian::big_uint16_buf_t count;      // freed entries count
+  boost::endian::big_uint16_buf_t padding1;
+  boost::endian::big_uint32_buf_t padding2;
+};
+
+// The nodes represent ranges. There may between 1 and 6 sub-nodes.
+// The key represent the split point. So there can be between 0-5 keys (they end with zero keys)
+// so x < keys[0] go to node[0], keys[0] <= x < keys[1] go to node[1] and etc..
+struct RTreeNode_details {
+  boost::endian::big_uint32_buf_t keys[5];
+  boost::endian::big_uint16_buf_t values[6];
+};
+static_assert(sizeof(RTreeNode_details) == 0x20);
+
+struct RTreeLeaf_details {
+  boost::endian::big_uint32_buf_t keys[4];
+  boost::endian::big_uint32_buf_t values[4];
+};
+static_assert(sizeof(RTreeLeaf_details) == 0x20);
+
+struct FTreeLeaf_details {
+  boost::endian::big_uint32_buf_t keys[7];
+  boost::endian::big_uint32_buf_t values;
+};
+static_assert(sizeof(FTreeLeaf_details) == 0x20);
+struct PTreeHeader {
+  boost::endian::big_uint16_buf_t tree_depth;
+  boost::endian::big_uint16_buf_t type;
+  boost::endian::big_uint16_buf_t root_offset;
+  boost::endian::big_uint16_buf_t items_count;
+};
+static_assert(sizeof(PTreeHeader) == 0x8);
+
+struct EPTreeBlockFooter {
+  PTreeHeader current_tree;
+  boost::endian::big_uint32_buf_t block_number;
+  boost::endian::big_uint8_buf_t depth;
+  boost::endian::big_uint8_buf_t padding[0xb];
+  NodesHeapHeader heap_hader;
+};
+static_assert(sizeof(EPTreeBlockFooter) == 0x20);
+
+struct FTreesBlockFooter {
+  PTreeHeader trees[7];  // tree per each size of block
+  NodesHeapHeader heap_hader;
+};
+static_assert(sizeof(FTreesBlockFooter) == 0x40);
