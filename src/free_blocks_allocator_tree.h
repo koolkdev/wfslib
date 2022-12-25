@@ -380,9 +380,9 @@ class PTree {
 
   PTree(PTreeHeader* header, std::span<std::byte> block_data) : header_(header), block_data_(block_data) {}
 
-  size_t size() { return header_->items_count; }
+  size_t size() const { return header_->items_count.value(); }
   iterator begin() const {
-    if (header_->items_count.value() == 0)
+    if (size() == 0)
       return iterator(block_data_, {}, std::nullopt);
     std::vector<node_iterator_info<ParentNodeDetails>> parents;
     uint16_t node_offset = header_->root_offset.value();
@@ -395,7 +395,7 @@ class PTree {
     return iterator(block_data_, std::move(parents), {{leaf, leaf.begin()}});
   }
   iterator end() const {
-    if (header_->items_count.value() == 0)
+    if (size() == 0)
       return iterator(block_data_, {}, std::nullopt);
     std::vector<node_iterator_info<ParentNodeDetails>> parents;
     uint16_t node_offset = header_->root_offset.value();
@@ -557,7 +557,7 @@ class EPTree {
   iterator begin() const {
     if (header_->current_tree.items_count.value() == 0)
       return iterator({}, blocks_retriever_);
-    std::vector<iterator::node_iterator_info> nodes;
+    std::vector<typename iterator::node_iterator_info> nodes;
     uint32_t node_block_number = 0;
     for (int i = 0; i < header_->depth.value(); i++) {
       RTree node_tree(i == 0 ? block_ : blocks_retriever_.get_block(node_block_number));
@@ -569,7 +569,7 @@ class EPTree {
   iterator end() const {
     if (header_->current_tree.items_count.value() == 0)
       return iterator({}, blocks_retriever_);
-    std::vector<iterator::node_iterator_info> nodes;
+    std::vector<typename iterator::node_iterator_info> nodes;
     uint32_t node_block_number = 0;
     for (int i = 0; i < header_->depth.value(); i++) {
       RTree node(i == 0 ? block_ : blocks_retriever_.get_block(node_block_number));
