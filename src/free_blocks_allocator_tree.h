@@ -103,7 +103,9 @@ struct node_access_value<T> {
 };
 template <has_nibble_values T>
 struct node_access_value<T> {
-  static node_value_type<T>::type get(const T& node, int i) { return nibble{(node.values.value() >> (4 * i)) & 0xf}; }
+  static node_value_type<T>::type get(const T& node, int i) {
+    return static_cast<nibble>((node.values.value() >> (4 * i)) & 0xf);
+  }
 };
 template <int index, has_values T>
   requires(0 <= index && index < node_values_capacity<T>::value)
@@ -121,7 +123,7 @@ struct node_keys_size_calc;
 template <has_keys T, int low, int high>
   requires(low > high)
 struct node_keys_size_calc<T, low, high> {
-  static size_t value(const T& [[maybe_unused]] node) { return size_t{low}; }
+  static size_t value([[maybe_unused]] const T& node) { return size_t{low}; }
 };
 template <has_keys T, int low, int high>
   requires(0 <= low && low <= high && high < node_keys_capacity<T>::value)
@@ -364,9 +366,9 @@ class PTreeIterator {
   }
   LeafNodeDetails* GetLeafNodeData(uint16_t offset) const { return GetStruct<LeafNodeDetails>(block_data_, offset); }
 
+  std::span<std::byte> block_data_;
   std::vector<node_iterator_info<ParentNodeDetails>> parents_;
   std::optional<node_iterator_info<LeafNodeDetails>> leaf_;
-  std::span<std::byte> block_data_;
 };
 
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
