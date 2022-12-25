@@ -228,7 +228,7 @@ class PTreeNodeIterator {
 template <is_node_details T>
 class PTreeNode {
  public:
-  using iterator = typename PTreeNodeIterator<T>;
+  using iterator = PTreeNodeIterator<T>;
 
   PTreeNode(T* node) : node_(node), size_(node_values_size(*node)) {}
 
@@ -285,7 +285,7 @@ class PTreeIterator {
   using value_type = std::pair<uint32_t, typename node_value_type<LeafNodeDetails>::type>;
 
   template <typename T>
-  using node_iterator_info = typename std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
+  using node_iterator_info = std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
 
   PTreeIterator(std::span<std::byte> block_data,
                 std::vector<node_iterator_info<ParentNodeDetails>> parents,
@@ -372,11 +372,11 @@ class PTreeIterator {
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
 class PTree {
  public:
-  using iterator = typename PTreeIterator<ParentNodeDetails, LeafNodeDetails>;
-  using const_iterator = typename const iterator;
+  using iterator = PTreeIterator<ParentNodeDetails, LeafNodeDetails>;
+  using const_iterator = const iterator;
 
   template <typename T>
-  using node_iterator_info = typename std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
+  using node_iterator_info = std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
 
   PTree(PTreeHeader* header, std::span<std::byte> block_data) : header_(header), block_data_(block_data) {}
 
@@ -468,7 +468,7 @@ class EPTreeIterator {
   using difference_type = std::ptrdiff_t;
   using value_type = std::pair<uint32_t, std::array<FTree<Block>, 7>>;
 
-  using node_iterator_info = typename std::pair<RTree<Block>, typename RTree<Block>::iterator>;
+  using node_iterator_info = std::pair<RTree<Block>, typename RTree<Block>::iterator>;
 
   EPTreeIterator(std::vector<node_iterator_info> nodes, BlocksRetriever blocks_retriever)
       : nodes_(std::move(nodes)), blocks_retriever_(std::move(blocks_retriever)) {}
@@ -543,8 +543,8 @@ class EPTreeIterator {
 template <is_blocks_retriever BlocksRetriever, is_block Block>
 class EPTree {
  public:
-  using iterator = typename EPTreeIterator<BlocksRetriever, Block>;
-  using const_iterator = typename const iterator;
+  using iterator = EPTreeIterator<BlocksRetriever, Block>;
+  using const_iterator = const iterator;
 
   EPTree(BlocksRetriever blocks_retriever, uint32_t root_block_number)
       : blocks_retriever_(std::move(blocks_retriever)),
