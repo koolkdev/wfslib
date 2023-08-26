@@ -19,15 +19,6 @@ jobs:
     - name: Run vcpkg
       uses: lukka/run-vcpkg@v10
 
-    - name: Update gcc
-      run: |
-           sudo apt update
-           sudo apt install gcc-11 g++-11
-           echo "CC=gcc-11" >> $GITHUB_ENV
-           echo "CXX=g++-11" >> $GITHUB_ENV
-      shell: bash
-      if: matrix.platform == 'ubuntu-latest'
-
     - name: Set clang
       run: |
            brew update
