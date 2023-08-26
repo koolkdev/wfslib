@@ -168,7 +168,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   std::shared_ptr<DataBlock> current_data_block;
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
-    if (current_data_block && file_->area()->BlockNumber(current_data_block) == block_number)
+    if (current_data_block && file_->area()->RelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
       return;
     current_data_block = file_->area()->GetDataBlock(
         block_number, GetDataBlockSize(), data_size, data_hash,
@@ -273,7 +273,8 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   std::shared_ptr<MetadataBlock> current_metadata_block;
 
   void LoadMetadataBlock(uint32_t block_number) {
-    if (current_metadata_block && file_->area()->BlockNumber(current_metadata_block) == block_number)
+    if (current_metadata_block &&
+        file_->area()->RelativeBlockNumber(current_metadata_block->BlockNumber()) == block_number)
       return;
     current_metadata_block = file_->area()->GetMetadataBlock(block_number);
   }

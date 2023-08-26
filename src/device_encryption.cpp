@@ -10,6 +10,7 @@
 #include <cryptopp/aes.h>
 #include <cryptopp/modes.h>
 #include <cryptopp/sha.h>
+#include <algorithm>
 #include <array>
 #include <boost/endian/buffers.hpp>
 #include <cassert>
