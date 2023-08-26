@@ -33,6 +33,8 @@ class Wfs {
   static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device,
                                              const std::span<std::byte>& key);
 
+  std::shared_ptr<Area> GetRootArea() { return root_area_; }
+
  private:
   std::shared_ptr<DeviceEncryption> device_;
   std::shared_ptr<Area> root_area_;

@@ -13,6 +13,8 @@
 
 #include "block.h"
 #include "data_block.h"
+#include "free_blocks_allocator_tree.h"
+#include "metadata_block.h"
 #include "wfs_item.h"
 
 class MetadataBlock;
@@ -24,6 +26,17 @@ struct WfsHeader;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
+  class Adapter {
+   public:
+    Adapter(std::shared_ptr<const Area> area) : area_(area) {}
+    MetadataBlock::Adapter get_block(int32_t block_number) const { return {area_->GetMetadataBlock(block_number)}; }
+
+   private:
+    std::shared_ptr<const Area> area_;
+  };
+
+  using FreeBlocksAllocatorTree = EPTree<Adapter, MetadataBlock::Adapter>;
+
   Area(const std::shared_ptr<DeviceEncryption>& device,
        const std::shared_ptr<Area>& root_area,
        const std::shared_ptr<MetadataBlock>& block,
@@ -43,25 +56,33 @@ class Area : public std::enable_shared_from_this<Area> {
                                           const std::string& name,
                                           const AttributesBlock& attributes);
 
-  std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number);
-  std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number, Block::BlockSize size);
+  std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number) const;
+  std::shared_ptr<MetadataBlock> GetMetadataBlock(uint32_t block_number, Block::BlockSize size) const;
 
   std::shared_ptr<DataBlock> GetDataBlock(uint32_t block_number,
                                           Block::BlockSize size,
                                           uint32_t data_size,
                                           const DataBlock::DataBlockHash& data_hash,
-                                          bool encrypted);
+                                          bool encrypted) const;
 
-  uint32_t BlockNumber(const std::shared_ptr<Block>& block);
+  uint32_t RelativeBlockNumber(uint32_t block_number) const;
+  uint32_t AbsoluteBlockNumber(uint32_t block_number) const;
 
-  size_t GetDataBlockLog2Size();
+  size_t GetDataBlockLog2Size() const;
+
+  uint32_t BlockNumber() const;
+  uint32_t BlocksCount() const;
+
+  FreeBlocksAllocatorTree GetFreeBlocksAllocatorTree() const;
 
  private:
-  WfsAreaHeader* Data();
-  WfsHeader* WfsData();
+  static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
 
-  uint32_t ToBasicBlockNumber(uint32_t block_number);
-  uint32_t IV(uint32_t block_number);
+  WfsAreaHeader* Data() const;
+  WfsHeader* WfsData() const;
+
+  uint32_t ToBasicBlockNumber(uint32_t block_number) const;
+  uint32_t IV(uint32_t block_number) const;
 
   std::shared_ptr<DeviceEncryption> device_;
   std::shared_ptr<Area> root_area_;  // Empty pointer for root area

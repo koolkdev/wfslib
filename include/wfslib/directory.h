@@ -34,9 +34,10 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   DirectoryItemsIterator begin();
   DirectoryItemsIterator end();
 
+  const std::shared_ptr<Area>& area() const { return area_; }
+
  private:
   friend DirectoryItemsIterator;
-  const std::shared_ptr<Area>& area() const { return area_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<Area> area_;
