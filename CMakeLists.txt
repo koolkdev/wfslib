@@ -1,5 +1,7 @@
 cmake_minimum_required(VERSION 3.18)
 
+project(wfslib)
+
 # Check compiler verions
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
     if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
@@ -16,8 +18,6 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 else()
     message(WARNING "You are using an unsupported compiler! Please use MSVC/GCC/Clang")
 endif()
-
-project(wfslib)
 
 option(BUILD_STATIC "Build static" OFF)
 
@@ -59,7 +59,7 @@ target_include_directories(${PROJECT_NAME}
 )
 
 find_package(Boost 1.64.0 REQUIRED)
-find_package(cryptopp REQUIRED CONFIG)
+find_package(cryptopp REQUIRED)
 
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
