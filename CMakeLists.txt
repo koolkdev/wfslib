@@ -68,6 +68,10 @@ target_link_libraries(${PROJECT_NAME}
         cryptopp::cryptopp
 )
 
+if(CONFIG STREQUAL "Release" AND NOT MSVC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC -s)
+endif()
+
 if(BUILD_STATIC AND NOT MSVC AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PUBLIC -static-libstdc++ -static-libgcc $<$<CONFIG:Release>:-s>)
 endif()
