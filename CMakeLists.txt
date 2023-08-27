@@ -64,7 +64,6 @@ find_package(cryptopp REQUIRED)
 target_link_libraries(${PROJECT_NAME}
     PUBLIC
         Boost::boost
-        $<$<AND:$<BOOL:BUILD_STATIC>,$<NOT:$<CXX_COMPILER_ID:MSVC>>>:-static-libstdc++ -static-libgcc $<$<CONFIG:Release>:-s>>
     PRIVATE
         cryptopp::cryptopp
 )
