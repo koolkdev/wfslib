@@ -73,5 +73,5 @@ if(CONFIG STREQUAL "Release" AND NOT MSVC)
 endif()
 
 if(BUILD_STATIC AND NOT MSVC AND NOT APPLE)
-    target_link_libraries(${PROJECT_NAME} PUBLIC -static-libstdc++ -static-libgcc $<$<CONFIG:Release>:-s>)
+    target_link_libraries(${PROJECT_NAME} PUBLIC -static-libstdc++ -static-libgcc)
 endif()
