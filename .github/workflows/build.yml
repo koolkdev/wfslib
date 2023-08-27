@@ -7,7 +7,6 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-latest]
-        compiler: [msvc, gcc, llvm]
         include:
           - platform: windows-latest
             compiler: msvc
@@ -37,7 +36,7 @@ jobs:
            echo "CC=clang" >> $GITHUB_ENV
            echo "CXX=clang++" >> $GITHUB_ENV
       shell: bash
-      if: matrix.platform == 'macos-latest'
+      if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
     - name: Set llvm (MacOS)
       run: |
