@@ -68,3 +68,10 @@ target_link_libraries(${PROJECT_NAME}
     PRIVATE
         cryptopp::cryptopp
 )
+
+if(BUILD_STATIC AND NOT MSVC)
+    target_link_libraries(${PROJECT_NAME} PUBLIC -static-libstdc++ -s)
+    if(NOT APPLE)
+        target_link_libraries(${PROJECT_NAME} PUBLIC -static-libgcc)
+    endif()
+endif()
