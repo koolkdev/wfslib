@@ -7,15 +7,9 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-latest]
-        compiler: []
+        compiler: [default]
         include:
-          - platform: windows-latest
-            compiler: msvc
           - platform: ubuntu-latest
-            compiler: gcc
-          - platform: ubuntu-latest
-            compiler: llvm
-          - platform: macos-latest
             compiler: llvm
     runs-on: ${{matrix.platform}}
 
