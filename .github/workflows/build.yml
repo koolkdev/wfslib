@@ -7,6 +7,16 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-latest]
+        compiler: [msvc, gcc, llvm]
+        include:
+          - platform: windows-latest
+            compiler: msvc
+          - platform: ubuntu-latest
+            compiler: gcc
+          - platform: ubuntu-latest
+            compiler: llvm
+          - platform: macos-latest
+            compiler: llvm
     runs-on: ${{matrix.platform}}
 
     steps:
@@ -19,7 +29,17 @@ jobs:
     - name: Run vcpkg
       uses: lukka/run-vcpkg@v10
 
-    - name: Set clang
+    - name: Set llvm (Ubuntu)
+      run: |
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          ./llvm.sh 16
+           echo "CC=clang" >> $GITHUB_ENV
+           echo "CXX=clang++" >> $GITHUB_ENV
+      shell: bash
+      if: matrix.platform == 'macos-latest'
+
+    - name: Set llvm (MacOS)
       run: |
            brew update
            # Temporary fix, see https://github.com/orgs/Homebrew/discussions/3895
