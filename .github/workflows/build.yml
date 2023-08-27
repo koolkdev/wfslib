@@ -7,6 +7,7 @@ jobs:
     strategy:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-latest]
+        compiler: []
         include:
           - platform: windows-latest
             compiler: msvc
@@ -32,9 +33,9 @@ jobs:
       run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          ./llvm.sh 16
-           echo "CC=clang" >> $GITHUB_ENV
-           echo "CXX=clang++" >> $GITHUB_ENV
+          sudo ./llvm.sh 16
+          echo "CC=clang" >> $GITHUB_ENV
+          echo "CXX=clang++" >> $GITHUB_ENV
       shell: bash
       if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
