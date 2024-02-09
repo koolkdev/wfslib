@@ -16,6 +16,10 @@ struct SubBlockAllocatorStruct;
 
 class SubBlockAllocator {
  public:
+  static const int MIN_BLOCK_SIZE = 3;  // 1 << 3
+  static constexpr int MAX_BLOCK_SIZE =
+      MIN_BLOCK_SIZE + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
+
   SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
 
   template <typename T>
@@ -35,10 +39,6 @@ class SubBlockAllocator {
 
  private:
   std::shared_ptr<MetadataBlock> block_;
-
-  static const int MIN_BLOCK_SIZE = 3;  // 1 << 3
-  static constexpr int MAX_BLOCK_SIZE =
-      MIN_BLOCK_SIZE + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
 
   SubBlockAllocatorStruct* Header();
 

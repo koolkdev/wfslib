@@ -9,6 +9,18 @@
 #include <bit>
 #include <cassert>
 
+namespace {
+
+int GetSizeGroup(uint16_t size) {
+  assert(size > 0);
+  int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
+  size_log2 = std::min(size_log2, SubBlockAllocator::MIN_BLOCK_SIZE);
+  assert(size_log2 <= MAX_BLOCK_SIZE);
+  return size_log2;
+}
+
+}  // namespace
+
 SubBlockAllocatorStruct* SubBlockAllocator::Header() {
   return GetNode<SubBlockAllocatorStruct>(sizeof(MetadataBlockHeader));
 }
@@ -32,10 +44,7 @@ void SubBlockAllocator::Init() {
 }
 
 uint16_t SubBlockAllocator::Alloc(uint16_t size) {
-  assert(size > 0);
-  int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
-  size_log2 = std::min(size_log2, MIN_BLOCK_SIZE);
-  assert(size_log2 <= MAX_BLOCK_SIZE);
+  int size_log2 = GetSizeGroup(size);
   uint16_t offset = PopFreeEntry(size_log2 - MIN_BLOCK_SIZE);
   if (offset) {
     // TODO: Dirty
@@ -64,9 +73,8 @@ uint16_t SubBlockAllocator::Alloc(uint16_t size) {
 }
 
 void SubBlockAllocator::Free(uint16_t offset, uint16_t size) {
-  assert(size > 0);
-  int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
-  size_log2 = std::min(size_log2, MIN_BLOCK_SIZE);
+  int size_log2 = GetSizeGroup(size);
+  assert(!(offset & ((1 << size_log2) - 1)));
   for (; size_log2 < MAX_BLOCK_SIZE; size_log2++) {
     // Try to coalesce if block not max size
     auto* other_free_block = GetNode<SubBlockAllocatorFreeListEntry>(offset ^ (1 << size_log2));
