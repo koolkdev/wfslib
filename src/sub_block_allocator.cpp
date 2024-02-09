@@ -32,7 +32,9 @@ void SubBlockAllocator::Init() {
 }
 
 uint16_t SubBlockAllocator::Alloc(uint16_t size) {
-  int size_log2 = std::min(std::bit_width((uint16_t)std::max(size - 1, 0)), MIN_BLOCK_SIZE);
+  assert(size > 0);
+  int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
+  size_log2 = std::min(size_log2, MIN_BLOCK_SIZE);
   assert(size_log2 <= MAX_BLOCK_SIZE);
   uint16_t offset = PopFreeEntry(size_log2 - MIN_BLOCK_SIZE);
   if (offset) {
@@ -57,11 +59,14 @@ uint16_t SubBlockAllocator::Alloc(uint16_t size) {
     Header()->free_list[base_size_log2 - MIN_BLOCK_SIZE].free_blocks_count = 1;
   }
 
+  // TODO: Dirty
   return offset;
 }
 
 void SubBlockAllocator::Free(uint16_t offset, uint16_t size) {
-  int size_log2 = std::min(std::bit_width((uint16_t)std::max(size - 1, 0)), MIN_BLOCK_SIZE);
+  assert(size > 0);
+  int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
+  size_log2 = std::min(size_log2, MIN_BLOCK_SIZE);
   for (; size_log2 < MAX_BLOCK_SIZE; size_log2++) {
     // Try to coalesce if block not max size
     auto* other_free_block = GetNode<SubBlockAllocatorFreeListEntry>(offset ^ (1 << size_log2));
@@ -96,6 +101,7 @@ void SubBlockAllocator::Free(uint16_t offset, uint16_t size) {
   }
   free_entry->log2_block_size = static_cast<uint16_t>(size_log2);
   free_entry->free_mark = free_entry->FREE_MARK_CONST;
+  // TODO: Dirty
 }
 
 void SubBlockAllocator::Unlink(SubBlockAllocatorFreeListEntry* entry, int size_index) {
@@ -115,6 +121,5 @@ uint16_t SubBlockAllocator::PopFreeEntry(int size_index) {
   auto* free_entry = GetNode<SubBlockAllocatorFreeListEntry>(entry_offset);
   free_entry->free_mark = 0;
   Unlink(free_entry, size_index);
-  // TODO: Dirty
   return entry_offset;
 }
