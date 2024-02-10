@@ -40,14 +40,12 @@ void SubBlockAllocator::Init() {
 
   // Reserve header
   Alloc(sizeof(MetadataBlockHeader) + sizeof(*header));
-  // TODO: Dirty
 }
 
 uint16_t SubBlockAllocator::Alloc(uint16_t size) {
   int size_log2 = GetSizeGroup(size);
   uint16_t offset = PopFreeEntry(size_log2 - MIN_BLOCK_SIZE);
   if (offset) {
-    // TODO: Dirty
     return offset;
   }
   int base_size_log2 = size_log2++;
@@ -68,7 +66,6 @@ uint16_t SubBlockAllocator::Alloc(uint16_t size) {
     Header()->free_list[base_size_log2 - MIN_BLOCK_SIZE].free_blocks_count = 1;
   }
 
-  // TODO: Dirty
   return offset;
 }
 
@@ -109,7 +106,6 @@ void SubBlockAllocator::Free(uint16_t offset, uint16_t size) {
   }
   free_entry->log2_block_size = static_cast<uint16_t>(size_log2);
   free_entry->free_mark = free_entry->FREE_MARK_CONST;
-  // TODO: Dirty
 }
 
 void SubBlockAllocator::Unlink(SubBlockAllocatorFreeListEntry* entry, int size_index) {
