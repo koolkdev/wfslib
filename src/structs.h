@@ -169,7 +169,9 @@ struct WfsTransactionsArea {
 static_assert(sizeof(WfsTransactionsArea) == 0x60 + 0x3B4, "Incorrect sizeof WfsTransactionsArea");
 
 struct SubBlockAllocatorFreeListEntry {
-  boost::endian::big_uint16_buf_t unused;
+  static const uint16_t FREE_MARK_CONST = 0xFEDC;
+
+  boost::endian::big_uint16_buf_t free_mark;
   boost::endian::big_uint16_buf_t next;
   boost::endian::big_uint16_buf_t prev;
   boost::endian::big_uint16_buf_t log2_block_size;
