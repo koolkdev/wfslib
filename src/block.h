@@ -36,6 +36,7 @@ class Block {
 
   void Resize(size_t new_size);
   uint32_t BlockNumber() { return block_number_; }
+  Block::BlockSize Size() { return size_category_; }
 
   class BadHash : public std::exception {
    public:
