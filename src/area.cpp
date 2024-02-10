@@ -78,7 +78,7 @@ std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number) con
 
 uint32_t Area::IV(uint32_t block_number) const {
   return (Data()->iv.value() ^ (root_area_ ? root_area_.get() : this)->WfsData()->iv.value()) +
-         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->GetDevice()->Log2SectorSize()));
+         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 
 std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Block::BlockSize size) const {

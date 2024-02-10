@@ -33,9 +33,16 @@ class MetadataBlock : public Block {
                                                   Block::BlockSize size_category,
                                                   uint32_t iv,
                                                   bool check_hash = true);
+  static std::shared_ptr<const MetadataBlock> LoadConstBlock(const std::shared_ptr<DeviceEncryption>& device,
+                                                             uint32_t block_number,
+                                                             Block::BlockSize size_category,
+                                                             uint32_t iv,
+                                                             bool check_hash = true);
 
   MetadataBlockHeader* Header();
+  const MetadataBlockHeader* Header() const;
 
  protected:
   std::span<std::byte> Hash() override;
+  std::span<const std::byte> Hash() const override;
 };

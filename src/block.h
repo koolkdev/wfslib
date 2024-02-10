@@ -24,10 +24,16 @@ class Block {
     MegaRegular = 16,
   };
 
-  virtual void Fetch(bool check_hash = true);
-  virtual void Flush();
+  void Fetch(bool check_hash = true);
+  void Flush();
 
-  std::span<std::byte> Data() { return data_; }
+  std::span<const std::byte> Data() const { return data_; }
+  // Accessing the non-const variant of data will mark the block as dirty.
+  std::span<std::byte> Data() {
+    dirty_ = true;
+    return data_;
+  }
+
   void Resize(size_t new_size);
   uint32_t BlockNumber() { return block_number_; }
 
@@ -51,9 +57,10 @@ class Block {
         uint32_t iv,
         bool encrypted,
         std::vector<std::byte>&& data);
-  virtual ~Block() = default;
+  virtual ~Block();
 
   virtual std::span<std::byte> Hash() = 0;
+  virtual std::span<const std::byte> Hash() const = 0;
 
   std::shared_ptr<DeviceEncryption> device_;
 
@@ -61,6 +68,8 @@ class Block {
   Block::BlockSize size_category_;
   uint32_t iv_;
   bool encrypted_;
+
+  bool dirty_{false};
 
   // this vector will be rounded to sector after read
   std::vector<std::byte> data_;
