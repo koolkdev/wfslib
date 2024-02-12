@@ -9,6 +9,7 @@
 
 #include <memory>
 #include "block.h"
+#include "utils.h"
 
 struct MetadataBlockHeader;
 
@@ -18,6 +19,7 @@ class MetadataBlock : public Block {
    public:
     Adapter(std::shared_ptr<MetadataBlock> block) : block_(std::move(block)) {}
     std::span<std::byte> data() { return block_->Data(); }
+    std::span<const std::byte> data() const { return as_const(block_.get())->Data(); }
 
    private:
     std::shared_ptr<MetadataBlock> block_;
@@ -27,6 +29,7 @@ class MetadataBlock : public Block {
                 uint32_t block_number,
                 Block::BlockSize size_category,
                 uint32_t iv);
+  ~MetadataBlock() override;
 
   static std::shared_ptr<MetadataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                                   uint32_t block_number,

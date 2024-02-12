@@ -14,7 +14,9 @@
 #include "structs.h"
 #include "sub_block_allocator.h"
 
-DirectoryItemsIterator::DirectoryItemsIterator(const std::shared_ptr<Directory>& directory,
+using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
+
+DirectoryItemsIterator::DirectoryItemsIterator(const std::shared_ptr<const Directory>& directory,
                                                const std::shared_ptr<NodeState>& node_state)
     : directory_(directory), node_state_(std::move(node_state)) {}
 
@@ -34,13 +36,15 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
     uint16_t node_offset = 0;
     if (node_state_->block->Header()->block_flags.value() &
         node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
-      node_offset =
-          static_cast<ExternalDirectoryTreeNode*>(node_state_->node)->get_item(node_state_->current_index).value();
+      node_offset = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node)
+                        ->get_item(node_state_->current_index)
+                        .value();
     } else {
-      node_offset =
-          static_cast<InternalDirectoryTreeNode*>(node_state_->node)->get_item(node_state_->current_index).value();
+      node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state_->node)
+                        ->get_item(node_state_->current_index)
+                        .value();
     }
-    auto current_node = SubBlockAllocator(block).GetNode<DirectoryTreeNode>(node_offset);
+    auto current_node = as_const(block.get())->GetStruct<DirectoryTreeNode>(node_offset);
     std::string path = node_state_->path +
                        std::string(1, std::to_integer<char>(node_state_->node->choices()[node_state_->current_index])) +
                        current_node->prefix();
@@ -50,8 +54,10 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
         node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE)) {
     // This is just internal node (in the directories trees tree), it just point to another tree
     auto block = directory_->area()->GetMetadataBlock(
-        static_cast<InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
-    auto current_node = SubBlockAllocator(block).GetRootNode<DirectoryTreeNode>();
+        static_cast<const InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
+    DirectoryTree dir_tree{block};
+    auto current_node =
+        as_const(block.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
     node_state_ =
         std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, current_node->prefix()});
     // -- because it will be advanced immedialty to 0 when we do ++
@@ -87,7 +93,7 @@ std::shared_ptr<WfsItem> DirectoryItemsIterator::operator*() {
   if (node_state_->block->Header()->block_flags.value() &
       node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto block = node_state_->block;
-    auto external_node = static_cast<ExternalDirectoryTreeNode*>(node_state_->node);
+    auto external_node = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node);
     return directory_->Create(node_state_->path,
                               AttributesBlock{block, external_node->get_item(node_state_->current_index).value()});
   } else {

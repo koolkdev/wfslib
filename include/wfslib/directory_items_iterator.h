@@ -25,13 +25,14 @@ class DirectoryItemsIterator {
 
   struct NodeState {
     std::shared_ptr<MetadataBlock> block;
-    DirectoryTreeNode* node;
+    const DirectoryTreeNode* node;
     std::shared_ptr<NodeState> parent;
     size_t current_index;
     std::string path;
   };
 
-  DirectoryItemsIterator(const std::shared_ptr<Directory>& directory, const std::shared_ptr<NodeState>& node_state);
+  DirectoryItemsIterator(const std::shared_ptr<const Directory>& directory,
+                         const std::shared_ptr<NodeState>& node_state);
   DirectoryItemsIterator(const DirectoryItemsIterator& mit);
 
   DirectoryItemsIterator& operator++();
@@ -41,6 +42,6 @@ class DirectoryItemsIterator {
   std::shared_ptr<WfsItem> operator*();
 
  private:
-  std::shared_ptr<Directory> directory_;
+  std::shared_ptr<const Directory> directory_;
   std::shared_ptr<NodeState> node_state_;
 };

@@ -26,7 +26,6 @@ DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const 
 
 void DeviceEncryption::HashData(const std::list<std::span<const std::byte>>& data,
                                 const std::span<std::byte>& hash) const {
-  assert(data.size() % device_->SectorSize() == 0);
   // Pad and hash
   CryptoPP::SHA1 sha1;
   for (auto& data_part : data) {

@@ -33,10 +33,6 @@ Block::Block(const std::shared_ptr<DeviceEncryption>& device,
   Resize(data_.size());
 }
 
-Block::~Block() {
-  Flush();
-}
-
 void Block::Resize(size_t new_size) {
   // Ensure that block data is aligned to device sectors
   new_size = div_ceil(new_size, device_->device()->SectorSize()) * device_->device()->SectorSize();

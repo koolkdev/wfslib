@@ -15,14 +15,11 @@
 #include "data_block.h"
 #include "free_blocks_allocator_tree.h"
 #include "metadata_block.h"
+#include "structs.h"
 #include "wfs_item.h"
 
-class MetadataBlock;
 class DeviceEncryption;
 class Directory;
-
-struct WfsAreaHeader;
-struct WfsHeader;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
@@ -78,8 +75,20 @@ class Area : public std::enable_shared_from_this<Area> {
  private:
   static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
 
-  WfsAreaHeader* Data() const;
-  WfsHeader* WfsData() const;
+  MetadataBlock* block() { return header_block_.get(); }
+  const MetadataBlock* block() const { return header_block_.get(); }
+
+  bool has_wfs_header() const { return BlockNumber() == 0; }
+  uint16_t wfs_header_offset() const { return sizeof(MetadataBlockHeader); }
+  uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (has_wfs_header() ? sizeof(WfsHeader) : 0); }
+
+  WfsAreaHeader* header() { return block()->GetStruct<WfsAreaHeader>(header_offset()); }
+  const WfsAreaHeader* header() const { return block()->GetStruct<WfsAreaHeader>(header_offset()); }
+
+  WfsHeader* wfs_header() { return has_wfs_header() ? block()->GetStruct<WfsHeader>(wfs_header_offset()) : NULL; }
+  const WfsHeader* wfs_header() const {
+    return has_wfs_header() ? block()->GetStruct<WfsHeader>(wfs_header_offset()) : NULL;
+  }
 
   uint32_t ToBasicBlockNumber(uint32_t block_number) const;
   uint32_t IV(uint32_t block_number) const;

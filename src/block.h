@@ -27,6 +27,9 @@ class Block {
   void Fetch(bool check_hash = true);
   void Flush();
 
+  // The actual size of the data, may be smaller than the allocated size.
+  size_t data_size() const { return data_.size(); }
+
   std::span<const std::byte> Data() const { return data_; }
   // Accessing the non-const variant of data will mark the block as dirty.
   std::span<std::byte> Data() {
@@ -34,9 +37,19 @@ class Block {
     return data_;
   }
 
+  template <typename T>
+  const T* GetStruct(size_t offset) const {
+    return reinterpret_cast<const T*>(Data().data() + offset);
+  }
+
+  template <typename T>
+  T* GetStruct(size_t offset) {
+    return reinterpret_cast<T*>(Data().data() + offset);
+  }
+
   void Resize(size_t new_size);
-  uint32_t BlockNumber() { return block_number_; }
-  Block::BlockSize Size() { return size_category_; }
+  uint32_t BlockNumber() const { return block_number_; }
+  Block::BlockSize log2_size() const { return size_category_; }
 
   class BadHash : public std::exception {
    public:
@@ -58,7 +71,7 @@ class Block {
         uint32_t iv,
         bool encrypted,
         std::vector<std::byte>&& data);
-  virtual ~Block();
+  virtual ~Block() = default;
 
   virtual std::span<std::byte> Hash() = 0;
   virtual std::span<const std::byte> Hash() const = 0;

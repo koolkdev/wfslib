@@ -26,6 +26,7 @@ class DataBlock : public Block {
             uint32_t iv,
             const DataBlockHash& data_hash,
             bool encrypted);
+  ~DataBlock() override;
 
   static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
                                               uint32_t block_number,
