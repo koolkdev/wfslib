@@ -50,8 +50,10 @@ class SubBlockAllocator : SubBlockAllocatorBase {
 
   void Init() { Init(sizeof(ExtraHeaderType)); }
 
-  ExtraHeaderType* extra_header() { return block()->GetStruct<ExtraHeaderType>(header_offset()); }
-  const ExtraHeaderType* extra_header() const { return block()->GetStruct<ExtraHeaderType>(extra_header_offset()); }
+  ExtraHeaderType* extra_header() { return block()->template GetStruct<ExtraHeaderType>(header_offset()); }
+  const ExtraHeaderType* extra_header() const {
+    return block()->template GetStruct<ExtraHeaderType>(extra_header_offset());
+  }
 
  private:
   uint16_t extra_header_offset() const { return header_offset() + sizeof(SubBlockAllocatorStruct); }
