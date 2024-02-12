@@ -23,7 +23,7 @@ class FreeBlocksAllocator {
 
   using Tree = EPTree<FreeBlocksAllocator::Adapter, MetadataBlock::Adapter>;
 
-  FreeBlocksAllocator(std::shared_ptr<const Area> area, int block_number);
+  FreeBlocksAllocator(std::shared_ptr<const Area> area, uint32_t block_number);
 
   FreeBlocksAllocatorHeader* header() { return root_block()->get_object<FreeBlocksAllocatorHeader>(header_offset()); }
   const FreeBlocksAllocatorHeader* header() const {

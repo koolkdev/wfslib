@@ -7,7 +7,7 @@
 
 #include "free_blocks_allocator.h"
 
-FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<const Area> area, int block_number)
+FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<const Area> area, uint32_t block_number)
     : area_(area), tree_{Adapter{area}, block_number} {
   root_block_ = area_->GetMetadataBlock(block_number);
 }
