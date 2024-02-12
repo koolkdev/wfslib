@@ -13,27 +13,16 @@
 
 #include "block.h"
 #include "data_block.h"
-#include "free_blocks_allocator_tree.h"
 #include "metadata_block.h"
 #include "structs.h"
 #include "wfs_item.h"
 
+class FreeBlocksAllocator;
 class DeviceEncryption;
 class Directory;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
-  class Adapter {
-   public:
-    Adapter(std::shared_ptr<const Area> area) : area_(area) {}
-    MetadataBlock::Adapter get_block(int32_t block_number) const { return {area_->GetMetadataBlock(block_number)}; }
-
-   private:
-    std::shared_ptr<const Area> area_;
-  };
-
-  using FreeBlocksAllocatorTree = EPTree<Adapter, MetadataBlock::Adapter>;
-
   Area(const std::shared_ptr<DeviceEncryption>& device,
        const std::shared_ptr<Area>& root_area,
        const std::shared_ptr<MetadataBlock>& block,
@@ -70,7 +59,8 @@ class Area : public std::enable_shared_from_this<Area> {
   uint32_t BlockNumber() const;
   uint32_t BlocksCount() const;
 
-  FreeBlocksAllocatorTree GetFreeBlocksAllocatorTree() const;
+  std::shared_ptr<const FreeBlocksAllocator> GetFreeBlocksAllocator() const;
+  std::shared_ptr<FreeBlocksAllocator> GetFreeBlocksAllocator();
 
  private:
   static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;

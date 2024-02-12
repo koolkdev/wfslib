@@ -10,6 +10,7 @@
 #include "device.h"
 #include "device_encryption.h"
 #include "directory.h"
+#include "free_blocks_allocator.h"
 #include "metadata_block.h"
 #include "structs.h"
 #include "utils.h"
@@ -105,6 +106,10 @@ uint32_t Area::BlocksCount() const {
   return root_directory_attributes_.Attributes()->blocks_count.value();
 }
 
-Area::FreeBlocksAllocatorTree Area::GetFreeBlocksAllocatorTree() const {
-  return {Adapter(shared_from_this()), FreeBlocksAllocatorBlockNumber};
+std::shared_ptr<const FreeBlocksAllocator> Area::GetFreeBlocksAllocator() const {
+  return std::make_unique<FreeBlocksAllocator>(shared_from_this(), FreeBlocksAllocatorBlockNumber);
+}
+
+std::shared_ptr<FreeBlocksAllocator> Area::GetFreeBlocksAllocator() {
+  return std::make_unique<FreeBlocksAllocator>(shared_from_this(), FreeBlocksAllocatorBlockNumber);
 }
