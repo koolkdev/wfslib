@@ -17,11 +17,11 @@
 WfsItem::WfsItem(const std::string& name, const AttributesBlock& attributes) : name_(name), attributes_(attributes) {}
 
 Attributes* AttributesBlock::Attributes() {
-  return block->GetStruct<::Attributes>(attributes_offset);
+  return block->get_object<::Attributes>(attributes_offset);
 }
 
 const Attributes* AttributesBlock::Attributes() const {
-  return as_const(block.get())->GetStruct<::Attributes>(attributes_offset);
+  return as_const(block.get())->get_object<::Attributes>(attributes_offset);
 }
 
 bool WfsItem::IsDirectory() const {

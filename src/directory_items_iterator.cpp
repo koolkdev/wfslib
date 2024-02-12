@@ -44,7 +44,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
                         ->get_item(node_state_->current_index)
                         .value();
     }
-    auto current_node = as_const(block.get())->GetStruct<DirectoryTreeNode>(node_offset);
+    auto current_node = as_const(block.get())->get_object<DirectoryTreeNode>(node_offset);
     std::string path = node_state_->path +
                        std::string(1, std::to_integer<char>(node_state_->node->choices()[node_state_->current_index])) +
                        current_node->prefix();
@@ -57,7 +57,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
         static_cast<const InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
     DirectoryTree dir_tree{block};
     auto current_node =
-        as_const(block.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+        as_const(block.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
     node_state_ =
         std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, current_node->prefix()});
     // -- because it will be advanced immedialty to 0 when we do ++

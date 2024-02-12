@@ -34,8 +34,10 @@ class SubBlockAllocatorBase {
   const MetadataBlock* block() const { return block_.get(); }
 
  private:
-  SubBlockAllocatorStruct* header() { return block()->GetStruct<SubBlockAllocatorStruct>(header_offset()); }
-  const SubBlockAllocatorStruct* header() const { return block()->GetStruct<SubBlockAllocatorStruct>(header_offset()); }
+  SubBlockAllocatorStruct* header() { return block()->get_object<SubBlockAllocatorStruct>(header_offset()); }
+  const SubBlockAllocatorStruct* header() const {
+    return block()->get_object<SubBlockAllocatorStruct>(header_offset());
+  }
 
   std::shared_ptr<MetadataBlock> block_;
 
@@ -50,9 +52,9 @@ class SubBlockAllocator : SubBlockAllocatorBase {
 
   void Init() { Init(sizeof(ExtraHeaderType)); }
 
-  ExtraHeaderType* extra_header() { return block()->template GetStruct<ExtraHeaderType>(header_offset()); }
+  ExtraHeaderType* extra_header() { return block()->template get_object<ExtraHeaderType>(header_offset()); }
   const ExtraHeaderType* extra_header() const {
-    return block()->template GetStruct<ExtraHeaderType>(extra_header_offset());
+    return block()->template get_object<ExtraHeaderType>(extra_header_offset());
   }
 
  private:

@@ -79,7 +79,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
                                                const std::string& name) const {
   DirectoryTree dir_tree{block};
   auto current_node =
-      as_const(block.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+      as_const(block.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
   if (block->Header()->block_flags.value() & block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto pos_in_path = name.begin();
     while (true) {
@@ -111,7 +111,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
       }
       pos_in_path++;
       // Go to next node
-      current_node = block->GetStruct<DirectoryTreeNode>(value_offset);
+      current_node = block->get_object<DirectoryTreeNode>(value_offset);
     }
   } else {
     // Arghh, trees over trees
@@ -134,7 +134,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
         node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
                           ->get_item(node_state->current_index)
                           .value();
-        current_node = block->GetStruct<DirectoryTreeNode>(node_offset);
+        current_node = block->get_object<DirectoryTreeNode>(node_offset);
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
@@ -165,7 +165,7 @@ size_t Directory::Size() const {
 DirectoryItemsIterator Directory::begin() const {
   DirectoryTree dir_tree{block_};
   auto current_node =
-      as_const(block_.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+      as_const(block_.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
   if (!current_node->choices_count.value())
     return end();
   auto node_state = std::make_shared<NodeState>(NodeState{block_, current_node, nullptr, 0, current_node->prefix()});

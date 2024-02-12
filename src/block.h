@@ -27,24 +27,26 @@ class Block {
   void Fetch(bool check_hash = true);
   void Flush();
 
-  // The actual size of the data, may be smaller than the allocated size.
-  size_t data_size() const { return data_.size(); }
+  // Actual used size, always equal to capacity in metadata blocks.
+  uint32_t size() const { return data_size_; }
 
-  std::span<const std::byte> Data() const { return data_; }
+  // Allocated size for the block
+  uint32_t capacity() const { return 1 << log2_size(); }
+
+  std::span<const std::byte> data() const { return {data_.data(), data_.data() + size()}; }
   // Accessing the non-const variant of data will mark the block as dirty.
-  std::span<std::byte> Data() { return GetDataForWriting(); }
+  std::span<std::byte> data() { return GetDataForWriting(); }
 
   template <typename T>
-  const T* GetStruct(size_t offset) const {
-    return reinterpret_cast<const T*>(Data().data() + offset);
+  const T* get_object(size_t offset) const {
+    return reinterpret_cast<const T*>(data().data() + offset);
   }
 
   template <typename T>
-  T* GetStruct(size_t offset) {
-    return reinterpret_cast<T*>(Data().data() + offset);
+  T* get_object(size_t offset) {
+    return reinterpret_cast<T*>(data().data() + offset);
   }
 
-  void Resize(size_t new_size);
   uint32_t BlockNumber() const { return block_number_; }
   Block::BlockSize log2_size() const { return size_category_; }
 
@@ -58,8 +60,11 @@ class Block {
     std::string msg_;
   };
 
+  virtual void Resize(uint32_t data_size);
+
  private:
-  uint32_t ToDeviceSector(uint32_t block_number);
+  uint32_t ToDeviceSector(uint32_t block_number) const;
+  uint32_t GetAlignedSize(uint32_t size) const;
 
   std::span<std::byte> GetDataForWriting();
 
@@ -67,9 +72,9 @@ class Block {
   Block(const std::shared_ptr<DeviceEncryption>& device,
         uint32_t block_number,
         Block::BlockSize size_category,
+        uint32_t data_size,
         uint32_t iv,
-        bool encrypted,
-        std::vector<std::byte>&& data);
+        bool encrypted);
   virtual ~Block() = default;
 
   virtual std::span<std::byte> Hash() = 0;
@@ -79,11 +84,12 @@ class Block {
 
   uint32_t block_number_;
   Block::BlockSize size_category_;
+  uint32_t data_size_;
   uint32_t iv_;
   bool encrypted_;
 
   bool dirty_{false};
 
-  // this vector will be rounded to sector after read
+  // data buffer of at least size_, rounded to sector.
   std::vector<std::byte> data_;
 };

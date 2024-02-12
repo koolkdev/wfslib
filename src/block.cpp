@@ -21,23 +21,27 @@ char const* Block::BadHash::what() const noexcept {
 Block::Block(const std::shared_ptr<DeviceEncryption>& device,
              uint32_t block_number,
              Block::BlockSize size_category,
+             uint32_t data_size,
              uint32_t iv,
-             bool encrypted,
-             std::vector<std::byte>&& data)
+             bool encrypted)
     : device_(device),
       block_number_(block_number),
       size_category_(size_category),
+      data_size_(data_size),
       iv_(iv),
       encrypted_(encrypted),
-      data_(data) {
-  Resize(data_.size());
-}
+      data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
-void Block::Resize(size_t new_size) {
+void Block::Resize(uint32_t data_size) {
   // Ensure that block data is aligned to device sectors
-  new_size = div_ceil(new_size, device_->device()->SectorSize()) * device_->device()->SectorSize();
-  if (new_size != data_.size())
+  if (data_size_ == data_size)
+    return;
+
+  auto new_size = GetAlignedSize(data_size);
+  if (new_size != data_.size()) {
     data_.resize(new_size, std::byte{0});
+    dirty_ = true;
+  }
 }
 
 void Block::Fetch(bool check_hash) {
@@ -54,12 +58,17 @@ void Block::Flush() {
   dirty_ = false;
 }
 
-uint32_t Block::ToDeviceSector(uint32_t block_number) {
+uint32_t Block::ToDeviceSector(uint32_t block_number) const {
   return block_number << (BlockSize::Basic - device_->device()->Log2SectorSize());
+}
+
+uint32_t Block::GetAlignedSize(uint32_t size) const {
+  assert(size > 0 && size <= capacity());
+  return static_cast<uint32_t>(div_ceil(size, device_->device()->SectorSize()) * device_->device()->SectorSize());
 }
 
 std::span<std::byte> Block::GetDataForWriting() {
   assert(!device_->device()->IsReadOnly());
   dirty_ = true;
-  return data_;
+  return {data_.data(), data_.data() + size()};
 }

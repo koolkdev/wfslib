@@ -268,12 +268,12 @@ class NodesAllocator {
 };*/
 
 template <typename T>
-T* GetStruct(const std::span<std::byte> block_data, uint16_t offset) {
+T* get_object(const std::span<std::byte> block_data, uint16_t offset) {
   return reinterpret_cast<T*>(block_data.data() + offset);
 }
 
 template <typename T>
-const T* GetStruct(const std::span<const std::byte> block_data, uint16_t offset) {
+const T* get_object(const std::span<const std::byte> block_data, uint16_t offset) {
   return reinterpret_cast<const T*>(block_data.data() + offset);
 }
 
@@ -367,10 +367,10 @@ class PTreeIterator {
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return GetStruct<ParentNodeDetails>(block_data_, offset);
+    return get_object<ParentNodeDetails>(block_data_, offset);
   }
   const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
-    return GetStruct<LeafNodeDetails>(block_data_, offset);
+    return get_object<LeafNodeDetails>(block_data_, offset);
   }
 
   std::span<const std::byte> block_data_;
@@ -422,10 +422,10 @@ class PTree {
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return GetStruct<ParentNodeDetails>(block_data_, offset);
+    return get_object<ParentNodeDetails>(block_data_, offset);
   }
   const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
-    return GetStruct<LeafNodeDetails>(block_data_, offset);
+    return get_object<LeafNodeDetails>(block_data_, offset);
   }
 
   const PTreeHeader* header_;
@@ -455,8 +455,8 @@ class RTree : public PTree<RTreeNode_details, RTreeLeaf_details> {
  public:
   RTree(const Block block)
       : PTree<RTreeNode_details, RTreeLeaf_details>(
-            &GetStruct<EPTreeBlockFooter>(block.data(),
-                                          static_cast<uint16_t>(block.data().size() - sizeof(EPTreeBlockFooter)))
+            &get_object<EPTreeBlockFooter>(block.data(),
+                                           static_cast<uint16_t>(block.data().size() - sizeof(EPTreeBlockFooter)))
                  ->current_tree,
             block.data()),
         block_(std::move(block)) {}
@@ -470,8 +470,8 @@ class FTree : public PTree<RTreeNode_details, FTreeLeaf_details> {
  public:
   FTree(const Block block, int block_size)
       : PTree<RTreeNode_details, FTreeLeaf_details>(
-            &GetStruct<FTreesBlockFooter>(block.data(),
-                                          static_cast<uint16_t>(block.data().size() - sizeof(FTreesBlockFooter)))
+            &get_object<FTreesBlockFooter>(block.data(),
+                                           static_cast<uint16_t>(block.data().size() - sizeof(FTreesBlockFooter)))
                  ->trees[block_size],
             block.data()),
         block_(std::move(block)) {}
@@ -568,9 +568,9 @@ class EPTree {
   EPTree(BlocksRetriever blocks_retriever, uint32_t root_block_number)
       : blocks_retriever_(std::move(blocks_retriever)),
         block_(blocks_retriever_.get_block(root_block_number)),
-        header_(GetStruct<EPTreeBlockFooter>(block_.data(),
-                                             static_cast<uint16_t>(block_.data().size() - sizeof(EPTreeBlockFooter)))) {
-  }
+        header_(
+            get_object<EPTreeBlockFooter>(block_.data(),
+                                          static_cast<uint16_t>(block_.data().size() - sizeof(EPTreeBlockFooter)))) {}
 
   // size_t size() { return header_->block_number; }
   iterator begin() const {

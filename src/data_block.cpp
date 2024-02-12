@@ -18,7 +18,7 @@ DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device,
                      uint32_t iv,
                      const DataBlockHash& data_hash,
                      bool encrypted)
-    : Block(device, block_number, size_category, iv, encrypted, {data_size, std::byte{0}}), data_hash_(data_hash) {}
+    : Block(device, block_number, size_category, data_size, iv, encrypted), data_hash_(data_hash) {}
 
 DataBlock::~DataBlock() {
   Flush();
@@ -40,9 +40,9 @@ std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncr
 }
 
 std::span<std::byte> DataBlock::Hash() {
-  return {hash_metadata_block()->Data().data() + hash_offset(), device_->DIGEST_SIZE};
+  return {hash_metadata_block()->data().data() + hash_offset(), device_->DIGEST_SIZE};
 }
 
 std::span<const std::byte> DataBlock::Hash() const {
-  return {hash_metadata_block()->Data().data() + hash_offset(), device_->DIGEST_SIZE};
+  return {hash_metadata_block()->data().data() + hash_offset(), device_->DIGEST_SIZE};
 }
