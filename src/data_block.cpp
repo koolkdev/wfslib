@@ -20,10 +20,8 @@ DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device,
                      bool encrypted)
     : Block(device, block_number, size_category, iv, encrypted, {data_size, std::byte{0}}), data_hash_(data_hash) {}
 
-void DataBlock::Flush() {
-  Block::Flush();
-  // TODO: Write now we write two blocks for each block written, we need some caching with option to commit changes
-  data_hash_.block->Flush();
+DataBlock::~DataBlock() {
+  Flush();
 }
 
 std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
@@ -42,5 +40,9 @@ std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncr
 }
 
 std::span<std::byte> DataBlock::Hash() {
-  return {&data_hash_.block->Data()[data_hash_.hash_offset], device_->DIGEST_SIZE};
+  return {hash_metadata_block()->Data().data() + hash_offset(), device_->DIGEST_SIZE};
+}
+
+std::span<const std::byte> DataBlock::Hash() const {
+  return {hash_metadata_block()->Data().data() + hash_offset(), device_->DIGEST_SIZE};
 }

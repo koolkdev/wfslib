@@ -35,22 +35,31 @@ Block::Block(const std::shared_ptr<DeviceEncryption>& device,
 
 void Block::Resize(size_t new_size) {
   // Ensure that block data is aligned to device sectors
-  new_size = div_ceil(new_size, device_->GetDevice()->SectorSize()) * device_->GetDevice()->SectorSize();
+  new_size = div_ceil(new_size, device_->device()->SectorSize()) * device_->device()->SectorSize();
   if (new_size != data_.size())
     data_.resize(new_size, std::byte{0});
 }
 
 void Block::Fetch(bool check_hash) {
   device_->ReadBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
-  if (check_hash && !device_->CheckHash(data_, Hash()))
+  if (check_hash && !device_->CheckHash(data_, as_const(this)->Hash()))
     throw Block::BadHash(block_number_);
 }
 
 void Block::Flush() {
+  if (!dirty_)
+    return;
   device_->CalculateHash(data_, Hash());
   device_->WriteBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
+  dirty_ = false;
 }
 
 uint32_t Block::ToDeviceSector(uint32_t block_number) {
-  return block_number << (BlockSize::Basic - device_->GetDevice()->Log2SectorSize());
+  return block_number << (BlockSize::Basic - device_->device()->Log2SectorSize());
+}
+
+std::span<std::byte> Block::GetDataForWriting() {
+  assert(!device_->device()->IsReadOnly());
+  dirty_ = true;
+  return data_;
 }

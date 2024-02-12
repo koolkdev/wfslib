@@ -18,3 +18,8 @@ inline size_t align_to_power_of_2(size_t size) {
 inline size_t div_ceil(size_t n, size_t div) {
   return (n + div - 1) / div;
 }
+
+template <typename T>
+constexpr const T* as_const(T* obj) {
+  return obj;
+}

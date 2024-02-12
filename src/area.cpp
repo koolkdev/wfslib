@@ -12,23 +12,8 @@
 #include "directory.h"
 #include "metadata_block.h"
 #include "structs.h"
+#include "utils.h"
 #include "wfs.h"
-
-WfsAreaHeader* Area::Data() const {
-  if (header_block_->BlockNumber() == 0) {
-    return reinterpret_cast<WfsAreaHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader) + sizeof(WfsHeader)]);
-  } else {
-    return reinterpret_cast<WfsAreaHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
-  }
-}
-
-WfsHeader* Area::WfsData() const {
-  if (header_block_->BlockNumber() == 0) {
-    return reinterpret_cast<WfsHeader*>(&header_block_->Data()[sizeof(MetadataBlockHeader)]);
-  } else {
-    return NULL;
-  }
-}
 
 Area::Area(const std::shared_ptr<DeviceEncryption>& device,
            const std::shared_ptr<Area>& root_area,
@@ -61,7 +46,8 @@ std::shared_ptr<Directory> Area::GetDirectory(uint32_t block_number,
 }
 
 std::shared_ptr<Directory> Area::GetRootDirectory() {
-  return GetDirectory(Data()->root_directory_block_number.value(), root_directory_name_, root_directory_attributes_);
+  return GetDirectory(as_const(this)->header()->root_directory_block_number.value(), root_directory_name_,
+                      root_directory_attributes_);
 }
 
 std::shared_ptr<Area> Area::GetArea(uint32_t block_number,
@@ -73,12 +59,12 @@ std::shared_ptr<Area> Area::GetArea(uint32_t block_number,
 }
 
 std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number) const {
-  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(Data()->log2_block_size.value()));
+  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(header()->log2_block_size.value()));
 }
 
 uint32_t Area::IV(uint32_t block_number) const {
-  return (Data()->iv.value() ^ (root_area_ ? root_area_.get() : this)->WfsData()->iv.value()) +
-         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->GetDevice()->Log2SectorSize()));
+  return (header()->iv.value() ^ (root_area_ ? as_const(root_area_.get()) : this)->wfs_header()->iv.value()) +
+         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 
 std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Block::BlockSize size) const {
@@ -96,19 +82,19 @@ std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number,
 }
 
 uint32_t Area::ToBasicBlockNumber(uint32_t block_number) const {
-  return block_number << (Data()->log2_block_size.value() - Block::BlockSize::Basic);
+  return block_number << (header()->log2_block_size.value() - Block::BlockSize::Basic);
 }
 
 size_t Area::GetDataBlockLog2Size() const {
-  return Data()->log2_block_size.value();
+  return header()->log2_block_size.value();
 }
 
 uint32_t Area::RelativeBlockNumber(uint32_t block_number) const {
-  return (block_number - header_block_->BlockNumber()) >> (Data()->log2_block_size.value() - Block::BlockSize::Basic);
+  return (block_number - header_block_->BlockNumber()) >> (header()->log2_block_size.value() - Block::BlockSize::Basic);
 }
 
 uint32_t Area::AbsoluteBlockNumber(uint32_t block_number) const {
-  return (block_number << (Data()->log2_block_size.value() - Block::BlockSize::Basic)) + header_block_->BlockNumber();
+  return (block_number << (header()->log2_block_size.value() - Block::BlockSize::Basic)) + header_block_->BlockNumber();
 }
 
 uint32_t Area::BlockNumber() const {

@@ -24,13 +24,29 @@ class Block {
     MegaRegular = 16,
   };
 
-  virtual void Fetch(bool check_hash = true);
-  virtual void Flush();
+  void Fetch(bool check_hash = true);
+  void Flush();
 
-  std::span<std::byte> Data() { return data_; }
+  // The actual size of the data, may be smaller than the allocated size.
+  size_t data_size() const { return data_.size(); }
+
+  std::span<const std::byte> Data() const { return data_; }
+  // Accessing the non-const variant of data will mark the block as dirty.
+  std::span<std::byte> Data() { return GetDataForWriting(); }
+
+  template <typename T>
+  const T* GetStruct(size_t offset) const {
+    return reinterpret_cast<const T*>(Data().data() + offset);
+  }
+
+  template <typename T>
+  T* GetStruct(size_t offset) {
+    return reinterpret_cast<T*>(Data().data() + offset);
+  }
+
   void Resize(size_t new_size);
-  uint32_t BlockNumber() { return block_number_; }
-  Block::BlockSize Size() { return size_category_; }
+  uint32_t BlockNumber() const { return block_number_; }
+  Block::BlockSize log2_size() const { return size_category_; }
 
   class BadHash : public std::exception {
    public:
@@ -45,6 +61,8 @@ class Block {
  private:
   uint32_t ToDeviceSector(uint32_t block_number);
 
+  std::span<std::byte> GetDataForWriting();
+
  protected:
   Block(const std::shared_ptr<DeviceEncryption>& device,
         uint32_t block_number,
@@ -55,6 +73,7 @@ class Block {
   virtual ~Block() = default;
 
   virtual std::span<std::byte> Hash() = 0;
+  virtual std::span<const std::byte> Hash() const = 0;
 
   std::shared_ptr<DeviceEncryption> device_;
 
@@ -62,6 +81,8 @@ class Block {
   Block::BlockSize size_category_;
   uint32_t iv_;
   bool encrypted_;
+
+  bool dirty_{false};
 
   // this vector will be rounded to sector after read
   std::vector<std::byte> data_;

@@ -15,35 +15,44 @@
 #include "sub_block_allocator.h"
 
 using NodeState = DirectoryItemsIterator::NodeState;
+using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
-std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) {
+std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) const {
   AttributesBlock attributes_block = GetObjectAttributes(block_, name);
-  if (!attributes_block.block)
+  if (!attributes_block)
     return nullptr;
   return Create(name, attributes_block);
 }
 
-std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) {
+std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) const {
   AttributesBlock attributes_block = GetObjectAttributes(block_, name);
+  if (!attributes_block) {
+    // Not found
+    return nullptr;
+  }
   auto attributes = attributes_block.Attributes();
-  if (!attributes || attributes->IsLink() || !attributes->IsDirectory()) {
-    // Not found / Not a directory
+  if (attributes->IsLink() || !attributes->IsDirectory()) {
+    // Not a directory
     return nullptr;
   }
   return std::dynamic_pointer_cast<Directory>(Create(name, attributes_block));
 }
 
-std::shared_ptr<File> Directory::GetFile(const std::string& name) {
+std::shared_ptr<File> Directory::GetFile(const std::string& name) const {
   AttributesBlock attributes_block = GetObjectAttributes(block_, name);
   auto attributes = attributes_block.Attributes();
-  if (!attributes || attributes->IsLink() || attributes->IsDirectory()) {
-    // Not found / Not a file
+  if (!attributes_block) {
+    // Not found
+    return nullptr;
+  }
+  if (attributes->IsLink() || attributes->IsDirectory()) {
+    // Not a file
     return nullptr;
   }
   return std::dynamic_pointer_cast<File>(Create(name, attributes_block));
 }
 
-std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const AttributesBlock& attributes_block) {
+std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const AttributesBlock& attributes_block) const {
   auto attributes = attributes_block.Attributes();
   if (attributes->IsLink()) {
     // TODO, I think that the link info is in the attributes metadata
@@ -66,13 +75,15 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const Attrib
   }
 }
 
-AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name) {
-  SubBlockAllocator allocator(block);
-  auto current_node = allocator.GetRootNode<DirectoryTreeNode>();
+AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
+                                               const std::string& name) const {
+  DirectoryTree dir_tree{block};
+  auto current_node =
+      as_const(block.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
   if (block->Header()->block_flags.value() & block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto pos_in_path = name.begin();
     while (true) {
-      auto external_node = static_cast<ExternalDirectoryTreeNode*>(current_node);
+      auto external_node = static_cast<const ExternalDirectoryTreeNode*>(current_node);
       if (current_node->prefix_length.value() > static_cast<size_t>(std::distance(pos_in_path, name.end()))) {
         // not equal.. path too long
         return {};
@@ -100,7 +111,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
       }
       pos_in_path++;
       // Go to next node
-      current_node = allocator.GetNode<DirectoryTreeNode>(value_offset);
+      current_node = block->GetStruct<DirectoryTreeNode>(value_offset);
     }
   } else {
     // Arghh, trees over trees
@@ -120,9 +131,10 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
       while (node_state->node->choices()[node_state->current_index] != std::byte{0}) {
         auto node_block = node_state->block;
         uint16_t node_offset = 0;
-        node_offset =
-            static_cast<InternalDirectoryTreeNode*>(node_state->node)->get_item(node_state->current_index).value();
-        current_node = allocator.GetNode<DirectoryTreeNode>(node_offset);
+        node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
+                          ->get_item(node_state->current_index)
+                          .value();
+        current_node = block->GetStruct<DirectoryTreeNode>(node_offset);
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
@@ -134,7 +146,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
           std::strncmp(&*name.begin(), &*node_state->path.begin(), std::min(name.size(), node_state->path.size())) < 0)
         break;
       last_block_number =
-          static_cast<InternalDirectoryTreeNode*>(node_state->node)->get_next_allocator_block_number().value();
+          static_cast<const InternalDirectoryTreeNode*>(node_state->node)->get_next_allocator_block_number().value();
       if (node_state->path == name)
         break;  // No need to continue with the search
     }
@@ -146,12 +158,14 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
   }
 }
 
-size_t Directory::Size() {
+size_t Directory::Size() const {
   return std::distance(begin(), end());
 }
 
-DirectoryItemsIterator Directory::begin() {
-  auto current_node = SubBlockAllocator(block_).GetRootNode<DirectoryTreeNode>();
+DirectoryItemsIterator Directory::begin() const {
+  DirectoryTree dir_tree{block_};
+  auto current_node =
+      as_const(block_.get())->GetStruct<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
   if (!current_node->choices_count.value())
     return end();
   auto node_state = std::make_shared<NodeState>(NodeState{block_, current_node, nullptr, 0, current_node->prefix()});
@@ -162,6 +176,6 @@ DirectoryItemsIterator Directory::begin() {
   return res;
 }
 
-DirectoryItemsIterator Directory::end() {
+DirectoryItemsIterator Directory::end() const {
   return DirectoryItemsIterator(shared_from_this(), nullptr);
 }

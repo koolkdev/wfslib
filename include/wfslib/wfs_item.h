@@ -17,20 +17,25 @@ class MetadataBlock;
 struct AttributesBlock {
   std::shared_ptr<MetadataBlock> block;
   size_t attributes_offset;
-  ::Attributes* Attributes() const;
+
+  operator bool() const { return !!block; }
+
+  ::Attributes* Attributes();
+  const ::Attributes* Attributes() const;
 };
 
 class WfsItem {
  public:
   WfsItem(const std::string& name, const AttributesBlock& block);
   virtual ~WfsItem() {}
-  const std::string& GetName() { return name_; }
-  std::string GetRealName();
-  virtual bool IsDirectory();
-  virtual bool IsFile();
-  virtual bool IsLink();
+  const std::string& GetName() const { return name_; }
+  std::string GetRealName() const;
+  virtual bool IsDirectory() const;
+  virtual bool IsFile() const;
+  virtual bool IsLink() const;
 
  protected:
+  AttributesBlock& attributes_data() { return attributes_; }
   const AttributesBlock& attributes_data() const { return attributes_; }
 
   std::string name_;

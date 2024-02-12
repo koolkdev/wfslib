@@ -26,13 +26,13 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
             const std::shared_ptr<MetadataBlock>& block)
       : WfsItem(name, attributes), area_(area), block_(block) {}
 
-  std::shared_ptr<WfsItem> GetObject(const std::string& name);
-  std::shared_ptr<Directory> GetDirectory(const std::string& name);
-  std::shared_ptr<File> GetFile(const std::string& name);
+  std::shared_ptr<WfsItem> GetObject(const std::string& name) const;
+  std::shared_ptr<Directory> GetDirectory(const std::string& name) const;
+  std::shared_ptr<File> GetFile(const std::string& name) const;
 
-  size_t Size();
-  DirectoryItemsIterator begin();
-  DirectoryItemsIterator end();
+  size_t Size() const;
+  DirectoryItemsIterator begin() const;
+  DirectoryItemsIterator end() const;
 
   const std::shared_ptr<Area>& area() const { return area_; }
 
@@ -44,6 +44,6 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   std::shared_ptr<MetadataBlock> block_;
 
-  std::shared_ptr<WfsItem> Create(const std::string& name, const AttributesBlock& attributes);
-  AttributesBlock GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name);
+  std::shared_ptr<WfsItem> Create(const std::string& name, const AttributesBlock& attributes) const;
+  AttributesBlock GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name) const;
 };

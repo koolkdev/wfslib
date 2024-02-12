@@ -29,8 +29,8 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area)
       : WfsItem(name, attributes), area_(area) {}
 
-  uint32_t Size();
-  uint32_t SizeOnDisk();
+  uint32_t Size() const;
+  uint32_t SizeOnDisk() const;
   void Resize(size_t new_size);
 
   class file_device {
@@ -45,7 +45,7 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
     std::streamsize optimal_buffer_size() const;
 
    private:
-    size_t size();
+    size_t size() const;
     std::shared_ptr<File> file_;
     std::shared_ptr<DataCategoryReader> reader_;
     boost::iostreams::stream_offset pos_;

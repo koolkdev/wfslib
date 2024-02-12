@@ -80,11 +80,11 @@ struct Attributes {
   boost::endian::big_uint8_buf_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
                                                // byte, it is a bitmap of filename_length
 
-  bool IsDirectory() { return !!(flags.value() & Flags::DIRECTORY); }
-  bool IsFile() { return !IsDirectory(); }
-  bool IsLink() { return !!(flags.value() & Flags::LINK); }
+  bool IsDirectory() const { return !!(flags.value() & Flags::DIRECTORY); }
+  bool IsFile() const { return !IsDirectory(); }
+  bool IsLink() const { return !!(flags.value() & Flags::LINK); }
 
-  size_t DataOffset();
+  size_t DataOffset() const;
 };
 static_assert(sizeof(Attributes) == 0x2C, "Incorrect sizeof Attributes");
 
@@ -186,46 +186,51 @@ static_assert(sizeof(SubBlockAllocatorFreeList) == 0x4, "Incorrect sizeof SubBlo
 
 struct SubBlockAllocatorStruct {
   SubBlockAllocatorFreeList free_list[8];  // for sizes 1<<3-10
+};
+static_assert(sizeof(SubBlockAllocatorStruct) == 0x20, "Incorrect sizeof SubBlockAllocatorStruct");
+
+struct DirectoryTreeHeader {
   boost::endian::big_uint16_buf_t root;
   boost::endian::big_uint16_buf_t records_count;
 };
-static_assert(sizeof(SubBlockAllocatorStruct) == 0x24, "Incorrect sizeof SubBlockAllocatorStruct");
+static_assert(sizeof(DirectoryTreeHeader) == 0x4, "Incorrect sizeofDirectoryTreeHeader");
 
 struct DirectoryTreeNode {
   boost::endian::big_uint8_buf_t prefix_length;
   boost::endian::big_uint8_buf_t choices_count;
 
  public:
-  std::string prefix() { return {&reinterpret_cast<char*>(this)[sizeof(*this)], prefix_length.value()}; }
-  std::span<std::byte> choices() {
-    return {&reinterpret_cast<std::byte*>(this)[sizeof(*this) + prefix_length.value()], choices_count.value()};
+  std::string prefix() const { return {reinterpret_cast<const char*>(this + 1), prefix_length.value()}; }
+  std::span<const std::byte> choices() const {
+    return {reinterpret_cast<const std::byte*>(this + 1) + prefix_length.value(), choices_count.value()};
   }
 };
 static_assert(sizeof(DirectoryTreeNode) == 0x2, "Incorrect sizeof DirectoryTreeNode");
 
 struct ExternalDirectoryTreeNode : DirectoryTreeNode {
  private:
-  size_t size();
+  size_t size() const;
 
  public:
-  boost::endian::big_uint16_buf_t get_item(size_t index) {
-    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(reinterpret_cast<std::byte*>(this) +
-                                                              size())[-static_cast<int>(index) - 1];
+  boost::endian::big_uint16_buf_t get_item(size_t index) const {
+    return reinterpret_cast<const boost::endian::big_uint16_buf_t*>(reinterpret_cast<const std::byte*>(this) +
+                                                                    size())[-static_cast<int>(index) - 1];
   }
 };
 
 struct InternalDirectoryTreeNode : DirectoryTreeNode {
  private:
-  size_t size();
+  size_t size() const;
 
  public:
-  boost::endian::big_uint16_buf_t get_item(size_t index) {
-    return reinterpret_cast<boost::endian::big_uint16_buf_t*>(
-        reinterpret_cast<std::byte*>(this) + size() -
+  boost::endian::big_uint16_buf_t get_item(size_t index) const {
+    return reinterpret_cast<const boost::endian::big_uint16_buf_t*>(
+        reinterpret_cast<const std::byte*>(this) + size() -
         (choices()[0] == std::byte{0} ? 2 : 0))[-static_cast<int>(index) - 1];
   }
-  boost::endian::big_uint32_buf_t get_next_allocator_block_number() {
-    return reinterpret_cast<boost::endian::big_uint32_buf_t*>(reinterpret_cast<std::byte*>(this) + size())[-1];
+  boost::endian::big_uint32_buf_t get_next_allocator_block_number() const {
+    return reinterpret_cast<const boost::endian::big_uint32_buf_t*>(reinterpret_cast<const std::byte*>(this) +
+                                                                    size())[-1];
   }
 };
 

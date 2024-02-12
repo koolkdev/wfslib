@@ -19,8 +19,9 @@ class FileDevice : public Device {
   FileDevice(const std::string& path, uint32_t log2_sector_size = 9 /* 512 */, bool read_only = true);
   void ReadSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) override;
   void WriteSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) override;
-  uint32_t SectorsCount() override { return sectors_count_; }
-  uint32_t Log2SectorSize() override { return log2_sector_size_; }
+  uint32_t SectorsCount() const override { return sectors_count_; }
+  uint32_t Log2SectorSize() const override { return log2_sector_size_; }
+  bool IsReadOnly() const override { return read_only_; }
 
  private:
   friend Wfs;

@@ -24,21 +24,24 @@ struct WfsBlockIV {
 DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
     : device_(device), key_(key.begin(), key.end()) {}
 
-void DeviceEncryption::HashData(const std::span<std::byte>& data, const std::span<std::byte>& hash) {
-  assert(data.size() % device_->SectorSize() == 0);
+void DeviceEncryption::HashData(const std::list<std::span<const std::byte>>& data,
+                                const std::span<std::byte>& hash) const {
   // Pad and hash
-  CryptoPP::SHA1().CalculateDigest(reinterpret_cast<uint8_t*>(hash.data()), reinterpret_cast<uint8_t*>(data.data()),
-                                   data.size());
+  CryptoPP::SHA1 sha1;
+  for (auto& data_part : data) {
+    sha1.Update(reinterpret_cast<const uint8_t*>(data_part.data()), data_part.size());
+  }
+  sha1.Final(reinterpret_cast<uint8_t*>(hash.data()));
 }
 
-void DeviceEncryption::CalculateHash(const std::span<std::byte>& data, const std::span<std::byte>& hash) {
+void DeviceEncryption::CalculateHash(const std::span<const std::byte>& data, const std::span<std::byte>& hash) const {
   bool hash_in_block = data.size() >= hash.size() && data.data() <= hash.data() &&
                        hash.data() + hash.size() <= data.data() + data.size();
   // Fill hash space with 0xFF
   if (hash_in_block)
     std::ranges::fill(hash, std::byte{0xFF});
 
-  HashData(data, hash);
+  HashData({data}, hash);
 }
 
 void DeviceEncryption::WriteBlock(uint32_t sector_address,
@@ -62,7 +65,10 @@ void DeviceEncryption::WriteBlock(uint32_t sector_address,
   device_->WriteSectors(enc_data, sector_address, sectors_count);
 }
 
-void DeviceEncryption::ReadBlock(uint32_t sector_address, const std::span<std::byte>& data, uint32_t iv, bool encrypt) {
+void DeviceEncryption::ReadBlock(uint32_t sector_address,
+                                 const std::span<std::byte>& data,
+                                 uint32_t iv,
+                                 bool encrypt) const {
   assert(data.size() % device_->SectorSize() == 0);
   auto const sectors_count = static_cast<uint32_t>(data.size() / device_->SectorSize());
 
@@ -77,27 +83,24 @@ void DeviceEncryption::ReadBlock(uint32_t sector_address, const std::span<std::b
   }
 }
 
-bool DeviceEncryption::CheckHash(const std::span<std::byte>& data, const std::span<std::byte>& hash) {
-  std::array<std::byte, DIGEST_SIZE> placeholder_hash;
-
+bool DeviceEncryption::CheckHash(const std::span<const std::byte>& data, const std::span<const std::byte>& hash) const {
   bool hash_in_block = data.size() >= hash.size() && data.data() <= hash.data() &&
                        hash.data() + hash.size() <= data.data() + data.size();
 
-  if (hash_in_block) {
-    placeholder_hash.fill(std::byte{0xFF});
-    std::ranges::swap_ranges(placeholder_hash, hash);
-  }
-
   std::array<std::byte, DIGEST_SIZE> calculated_hash;
-  HashData(data, calculated_hash);
-
-  if (hash_in_block)
-    std::ranges::swap_ranges(placeholder_hash, hash);
+  if (hash_in_block) {
+    std::array<std::byte, DIGEST_SIZE> placeholder_hash;
+    placeholder_hash.fill(std::byte{0xFF});
+    HashData({{data.data(), hash.data()}, placeholder_hash, {hash.data() + hash.size(), data.data() + data.size()}},
+             calculated_hash);
+  } else {
+    HashData({data}, calculated_hash);
+  }
 
   return std::ranges::equal(calculated_hash, hash);
 }
 
-WfsBlockIV DeviceEncryption::GetIV(uint32_t sectors_count, uint32_t iv) {
+WfsBlockIV DeviceEncryption::GetIV(uint32_t sectors_count, uint32_t iv) const {
   WfsBlockIV aes_iv;
   aes_iv.iv[0] = sectors_count * device_->SectorSize();
   aes_iv.iv[1] = iv;
