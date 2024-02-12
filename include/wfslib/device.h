@@ -18,5 +18,6 @@ class Device {
   virtual void WriteSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) = 0;
   virtual uint32_t SectorsCount() const = 0;
   virtual uint32_t Log2SectorSize() const = 0;
+  virtual bool IsReadOnly() const = 0;
   uint32_t SectorSize() const { return 1 << Log2SectorSize(); }
 };

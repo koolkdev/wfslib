@@ -57,3 +57,11 @@ void Block::Flush() {
 uint32_t Block::ToDeviceSector(uint32_t block_number) {
   return block_number << (BlockSize::Basic - device_->device()->Log2SectorSize());
 }
+
+std::span<std::byte> Block::GetData(bool read_only = false) {
+  if (!read_only) {
+    assert(!device_->device()->IsReadOnly());
+    dirty_ = true;
+  }
+  return data_;
+}

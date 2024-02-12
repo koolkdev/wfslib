@@ -30,12 +30,9 @@ class Block {
   // The actual size of the data, may be smaller than the allocated size.
   size_t data_size() const { return data_.size(); }
 
-  std::span<const std::byte> Data() const { return data_; }
+  std::span<const std::byte> Data() const { return GetData(true); }
   // Accessing the non-const variant of data will mark the block as dirty.
-  std::span<std::byte> Data() {
-    dirty_ = true;
-    return data_;
-  }
+  std::span<std::byte> Data() { return GetData(); }
 
   template <typename T>
   const T* GetStruct(size_t offset) const {
@@ -63,6 +60,8 @@ class Block {
 
  private:
   uint32_t ToDeviceSector(uint32_t block_number);
+
+  std::span<std::byte> GetData(bool read_only = false);
 
  protected:
   Block(const std::shared_ptr<DeviceEncryption>& device,
