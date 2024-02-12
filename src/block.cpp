@@ -42,8 +42,7 @@ void Block::Resize(size_t new_size) {
 
 void Block::Fetch(bool check_hash) {
   device_->ReadBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
-  const auto* const_this = this;
-  if (check_hash && !device_->CheckHash(data_, const_this->Hash()))
+  if (check_hash && !device_->CheckHash(data_, as_const(this)->Hash()))
     throw Block::BadHash(block_number_);
 }
 
