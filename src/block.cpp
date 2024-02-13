@@ -32,6 +32,10 @@ Block::Block(const std::shared_ptr<DeviceEncryption>& device,
       encrypted_(encrypted),
       data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
+Block::~Block() {
+  device_->RemoveFromCache(block_number_);
+}
+
 void Block::Resize(uint32_t data_size) {
   assert(!device_->device()->IsReadOnly());
   // Ensure that block data is aligned to device sectors

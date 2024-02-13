@@ -23,6 +23,7 @@ class Directory;
 class Wfs {
  public:
   Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
+  ~Wfs();
 
   const std::shared_ptr<DeviceEncryption>& GetDevice() { return device_; }
 
@@ -34,6 +35,8 @@ class Wfs {
                                              const std::span<std::byte>& key);
 
   std::shared_ptr<Area> GetRootArea() { return root_area_; }
+
+  void Flush();
 
  private:
   std::shared_ptr<DeviceEncryption> device_;

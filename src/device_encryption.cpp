@@ -14,6 +14,7 @@
 #include <array>
 #include <boost/endian/buffers.hpp>
 #include <cassert>
+#include "block.h"
 #include "device.h"
 #include "utils.h"
 
@@ -107,4 +108,27 @@ WfsBlockIV DeviceEncryption::GetIV(uint32_t sectors_count, uint32_t iv) const {
   aes_iv.iv[2] = device_->SectorsCount();
   aes_iv.iv[3] = device_->SectorSize();
   return aes_iv;
+}
+
+std::shared_ptr<Block> DeviceEncryption::GetFromCache(uint32_t block_number) {
+  auto res = blocks_cache_.find(block_number);
+  if (res == blocks_cache_.end())
+    return nullptr;
+  return std::shared_ptr<Block>(res->second);
+}
+
+void DeviceEncryption::AddToCache(uint32_t block_number, std::weak_ptr<Block> block) {
+  blocks_cache_[block_number] = block;
+}
+
+void DeviceEncryption::RemoveFromCache(uint32_t block_number) {
+  auto res = blocks_cache_.find(block_number);
+  assert(res != blocks_cache_.end());
+  blocks_cache_.erase(res);
+}
+
+void DeviceEncryption::FlushAll() {
+  for (auto& [block_number, block_weak] : blocks_cache_) {
+    std::shared_ptr<Block>(block_weak)->Flush();
+  }
 }

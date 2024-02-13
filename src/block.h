@@ -50,6 +50,8 @@ class Block {
   uint32_t BlockNumber() const { return block_number_; }
   Block::BlockSize log2_size() const { return size_category_; }
 
+  bool encrypted() const { return encrypted_; }
+
   class BadHash : public std::exception {
    public:
     BadHash(uint32_t block_number);
@@ -75,7 +77,7 @@ class Block {
         uint32_t data_size,
         uint32_t iv,
         bool encrypted);
-  virtual ~Block() = default;
+  virtual ~Block();
 
   virtual std::span<std::byte> Hash() = 0;
   virtual std::span<const std::byte> Hash() const = 0;

@@ -31,7 +31,18 @@ std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncr
                                                 uint32_t iv,
                                                 const DataBlockHash& data_hash,
                                                 bool encrypted) {
+  auto cached_block = device->GetFromCache(block_number);
+  if (cached_block) {
+    assert(cached_block->BlockNumber() == block_number);
+    assert(cached_block->log2_size() == size_category);
+    assert(cached_block->size() == data_size);
+    assert(cached_block->encrypted() == encrypted);
+    auto block = std::dynamic_pointer_cast<DataBlock>(cached_block);
+    assert(block);
+    return block;
+  }
   auto block = std::make_shared<DataBlock>(device, block_number, size_category, data_size, iv, data_hash, encrypted);
+  device->AddToCache(block_number, block);
   if (data_size) {
     // Fetch block only if have data
     block->Fetch();

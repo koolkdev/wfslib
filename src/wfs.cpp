@@ -22,6 +22,10 @@ Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
   root_area_ = Area::LoadRootArea(device_);
 }
 
+Wfs::~Wfs() {
+  Flush();
+}
+
 std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
   if (filename == "/")
     return GetDirectory("/");
@@ -55,6 +59,10 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   return current_directory;
 }
 
+void Wfs::Flush() {
+  device_->FlushAll();
+}
+
 void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::span<std::byte>& key) {
   // The encryption of the blocks depends on the device sector size and count, which builds the IV
   // We are going to find out the correct first 0x10 bytes, and than xor it with what we read to find out the correct IV
@@ -76,6 +84,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   if (!(wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
       (wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
     block_size = Block::BlockSize::Regular;
+  block.reset();
   // Now lets read it again, this time with the correct block size
   block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
   uint32_t xored_sectors_count, xored_sector_size;
@@ -99,6 +108,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   }
   device->SetLog2SectorSize(std::bit_width(xored_sector_size) - 1);
   device->SetSectorsCount(xored_sectors_count);
+  block.reset();
   // Now try to fetch block again, this time check the hash, it will raise exception
   try {
     block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true);

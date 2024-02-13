@@ -25,7 +25,16 @@ std::shared_ptr<MetadataBlock> MetadataBlock::LoadBlock(const std::shared_ptr<De
                                                         Block::BlockSize size_category,
                                                         uint32_t iv,
                                                         bool check_hash) {
+  auto cached_block = device->GetFromCache(block_number);
+  if (cached_block) {
+    assert(cached_block->BlockNumber() == block_number);
+    assert(cached_block->log2_size() == size_category);
+    auto block = std::dynamic_pointer_cast<MetadataBlock>(cached_block);
+    assert(block);
+    return block;
+  }
   auto block = std::make_shared<MetadataBlock>(device, block_number, size_category, iv);
+  device->AddToCache(block_number, block);
   block->Fetch(check_hash);
   return block;
 }
