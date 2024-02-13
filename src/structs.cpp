@@ -18,6 +18,7 @@ size_t Attributes::DataOffset() const {
 std::string Attributes::GetCaseSensitiveName(const std::string& name) const {
   std::string real_filename = "";
   if (filename_length.value() != name.size()) {
+    // TODO: return WfsError
     throw std::runtime_error("Unexepected filename length");
   }
   boost::dynamic_bitset<uint8_t> bits(name.size());

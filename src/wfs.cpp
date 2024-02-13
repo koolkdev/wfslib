@@ -32,7 +32,7 @@ std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
-    throw nullptr;
+    return nullptr;
   auto obj = dir->GetObject(path.filename().string());
   if (!obj.has_value()) {
     if (obj.error() == WfsError::kItemNotFound)
@@ -47,7 +47,7 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
-    throw nullptr;
+    return nullptr;
   auto file = dir->GetFile(path.filename().string());
   if (!file.has_value()) {
     if (file.error() == WfsError::kItemNotFound)

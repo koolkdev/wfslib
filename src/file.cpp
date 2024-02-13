@@ -313,7 +313,7 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_p
     case 4:
       return std::make_shared<DataCategory4Reader>(file);
     default:
-      throw std::runtime_error("Unexpected file category");
+      throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
   }
 }
 
