@@ -172,9 +172,12 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
     if (current_data_block && file_->area()->RelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
       return;
-    current_data_block = file_->area()->GetDataBlock(
+    auto block = file_->area()->GetDataBlock(
         block_number, GetDataBlockSize(), data_size, data_hash,
         !(as_const(file_.get())->attributes_data().Attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
+    if (!block.has_value())
+      throw WfsException(WfsError::kFileDataCorrupted);
+    current_data_block = std::move(*block);
   }
 };
 
@@ -283,7 +286,10 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
     if (current_metadata_block &&
         file_->area()->RelativeBlockNumber(current_metadata_block->BlockNumber()) == block_number)
       return;
-    current_metadata_block = file_->area()->GetMetadataBlock(block_number);
+    auto metadata_block = file_->area()->GetMetadataBlock(block_number);
+    if (!metadata_block.has_value())
+      throw WfsException(WfsError::kFileMetadataCorrupted);
+    current_metadata_block = std::move(*metadata_block);
   }
 
   size_t ClustersInBlock() const {

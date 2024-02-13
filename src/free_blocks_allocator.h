@@ -15,7 +15,12 @@ class FreeBlocksAllocator {
   class Adapter {
    public:
     Adapter(std::shared_ptr<const Area> area) : area_(area) {}
-    MetadataBlock::Adapter get_block(int32_t block_number) const { return {area_->GetMetadataBlock(block_number)}; }
+    MetadataBlock::Adapter get_block(int32_t block_number) const {
+      auto block = area_->GetMetadataBlock(block_number);
+      if (!block.has_value())
+        throw WfsException(WfsError::kFreeBlocksAllocatorCorrupted);
+      return {std::move(*block)};
+    }
 
    private:
     std::shared_ptr<const Area> area_;
@@ -23,7 +28,7 @@ class FreeBlocksAllocator {
 
   using Tree = EPTree<FreeBlocksAllocator::Adapter, MetadataBlock::Adapter>;
 
-  FreeBlocksAllocator(std::shared_ptr<const Area> area, uint32_t block_number);
+  FreeBlocksAllocator(std::shared_ptr<const Area> area, std::shared_ptr<MetadataBlock> root_block);
 
   FreeBlocksAllocatorHeader* header() { return root_block()->get_object<FreeBlocksAllocatorHeader>(header_offset()); }
   const FreeBlocksAllocatorHeader* header() const {

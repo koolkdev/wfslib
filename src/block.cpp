@@ -49,10 +49,9 @@ void Block::Resize(uint32_t data_size) {
   }
 }
 
-void Block::Fetch(bool check_hash) {
+bool Block::Fetch(bool check_hash) {
   device_->ReadBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
-  if (check_hash && !device_->CheckHash(data_, as_const(this)->Hash()))
-    throw Block::BadHash(block_number_);
+  return !check_hash || device_->CheckHash(data_, as_const(this)->Hash());
 }
 
 void Block::Flush() {

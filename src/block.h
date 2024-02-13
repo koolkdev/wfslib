@@ -24,7 +24,7 @@ class Block {
     MegaRegular = 16,
   };
 
-  void Fetch(bool check_hash = true);
+  bool Fetch(bool check_hash = true);
   void Flush();
 
   // Actual used size, always equal to capacity in metadata blocks.

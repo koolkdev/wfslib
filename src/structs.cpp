@@ -5,11 +5,28 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+#include <boost/dynamic_bitset.hpp>
+#include <ranges>
+
 #include "structs.h"
 #include "utils.h"
 
 size_t Attributes::DataOffset() const {
   return offsetof(Attributes, case_bitmap) + div_ceil(filename_length.value(), 8);
+}
+
+std::string Attributes::GetCaseSensitiveName(const std::string& name) const {
+  std::string real_filename = "";
+  if (filename_length.value() != name.size()) {
+    throw std::runtime_error("Unexepected filename length");
+  }
+  boost::dynamic_bitset<uint8_t> bits(name.size());
+  boost::from_block_range(reinterpret_cast<const uint8_t*>(&case_bitmap),
+                          reinterpret_cast<const uint8_t*>(&case_bitmap) + (name.size() / 8), bits);
+  std::string final_name;
+  std::ranges::transform(std::ranges::iota_view(0ull, name.size()), std::back_inserter(final_name),
+                         [&](auto i) { return bits[i] ? std::toupper(name[i]) : std::tolower(name[i]); });
+  return final_name;
 }
 
 size_t ExternalDirectoryTreeNode::size() const {

@@ -7,8 +7,11 @@
 
 #pragma once
 
+#include <expected>
 #include <memory>
+
 #include "block.h"
+#include "errors.h"
 
 class MetadataBlock;
 
@@ -28,13 +31,13 @@ class DataBlock : public Block {
             bool encrypted);
   ~DataBlock() override;
 
-  static std::shared_ptr<DataBlock> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
-                                              uint32_t block_number,
-                                              Block::BlockSize size_category,
-                                              uint32_t data_size,
-                                              uint32_t iv,
-                                              const DataBlockHash& data_hash,
-                                              bool encrypted);
+  static std::expected<std::shared_ptr<DataBlock>, WfsError> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
+                                                                       uint32_t block_number,
+                                                                       Block::BlockSize size_category,
+                                                                       uint32_t data_size,
+                                                                       uint32_t iv,
+                                                                       const DataBlockHash& data_hash,
+                                                                       bool encrypted);
 
  protected:
   std::span<std::byte> Hash() override;

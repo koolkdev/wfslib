@@ -7,9 +7,12 @@
 
 #pragma once
 
+#include <expected>
 #include <iterator>
 #include <memory>
 #include <string>
+
+#include "errors.h"
 
 class Directory;
 class WfsItem;
@@ -21,7 +24,7 @@ class DirectoryItemsIterator {
  public:
   using iterator_category = std::input_iterator_tag;
   using difference_type = std::ptrdiff_t;
-  using value_type = std::shared_ptr<WfsItem>;
+  using value_type = std::tuple<std::string, std::expected<std::shared_ptr<WfsItem>, WfsError>>;
 
   struct NodeState {
     std::shared_ptr<MetadataBlock> block;
@@ -39,7 +42,7 @@ class DirectoryItemsIterator {
   DirectoryItemsIterator operator++(int);
   bool operator==(const DirectoryItemsIterator& rhs) const;
   bool operator!=(const DirectoryItemsIterator& rhs) const;
-  std::shared_ptr<WfsItem> operator*();
+  value_type operator*();
 
  private:
   std::shared_ptr<const Directory> directory_;

@@ -27,39 +27,44 @@ Area::Area(const std::shared_ptr<DeviceEncryption>& device,
       root_directory_name_(root_directory_name),
       root_directory_attributes_(root_directory_attributes) {}
 
-std::shared_ptr<Area> Area::LoadRootArea(const std::shared_ptr<DeviceEncryption>& device) {
-  std::shared_ptr<MetadataBlock> block;
-  try {
-    block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
-  } catch (const Block::BadHash&) {
+std::expected<std::shared_ptr<Area>, WfsError> Area::LoadRootArea(const std::shared_ptr<DeviceEncryption>& device) {
+  auto block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
+  if (!block.has_value()) {
     block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Regular, 0);
+    if (!block.has_value())
+      return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
   return std::make_shared<Area>(
-      device, nullptr, block, "",
-      AttributesBlock{block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)});
+      device, nullptr, *block, "",
+      AttributesBlock{*block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)});
 }
 
-std::shared_ptr<Directory> Area::GetDirectory(uint32_t block_number,
-                                              const std::string& name,
-                                              const AttributesBlock& attributes) {
-  // TODO: Cache
-  return std::make_shared<Directory>(name, attributes, shared_from_this(), GetMetadataBlock(block_number));
+std::expected<std::shared_ptr<Directory>, WfsError> Area::GetDirectory(uint32_t block_number,
+                                                                       const std::string& name,
+                                                                       const AttributesBlock& attributes) {
+  auto block = GetMetadataBlock(block_number);
+  if (!block.has_value())
+    return std::unexpected(WfsError::kDirectoryCorrupted);
+  return std::make_shared<Directory>(name, attributes, shared_from_this(), std::move(*block));
 }
 
-std::shared_ptr<Directory> Area::GetRootDirectory() {
+std::expected<std::shared_ptr<Directory>, WfsError> Area::GetRootDirectory() {
   return GetDirectory(as_const(this)->header()->root_directory_block_number.value(), root_directory_name_,
                       root_directory_attributes_);
 }
 
-std::shared_ptr<Area> Area::GetArea(uint32_t block_number,
-                                    const std::string& root_directory_name,
-                                    const AttributesBlock& root_directory_attributes,
-                                    Block::BlockSize size) {
-  return std::make_shared<Area>(device_, root_area_ ? root_area_ : shared_from_this(),
-                                GetMetadataBlock(block_number, size), root_directory_name, root_directory_attributes);
+std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_number,
+                                                             const std::string& root_directory_name,
+                                                             const AttributesBlock& root_directory_attributes,
+                                                             Block::BlockSize size) {
+  auto area_metadata_block = GetMetadataBlock(block_number, size);
+  if (!area_metadata_block.has_value())
+    return std::unexpected(WfsError::kAreaHeaderCorrupted);
+  return std::make_shared<Area>(device_, root_area_ ? root_area_ : shared_from_this(), std::move(*area_metadata_block),
+                                root_directory_name, root_directory_attributes);
 }
 
-std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number) const {
+std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number) const {
   return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(header()->log2_block_size.value()));
 }
 
@@ -68,16 +73,17 @@ uint32_t Area::IV(uint32_t block_number) const {
          (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 
-std::shared_ptr<MetadataBlock> Area::GetMetadataBlock(uint32_t block_number, Block::BlockSize size) const {
+std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
+                                                                               Block::BlockSize size) const {
   return MetadataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size,
                                   IV(block_number));
 }
 
-std::shared_ptr<DataBlock> Area::GetDataBlock(uint32_t block_number,
-                                              Block::BlockSize size,
-                                              uint32_t data_size,
-                                              const DataBlock::DataBlockHash& data_hash,
-                                              bool encrypted) const {
+std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t block_number,
+                                                                       Block::BlockSize size,
+                                                                       uint32_t data_size,
+                                                                       const DataBlock::DataBlockHash& data_hash,
+                                                                       bool encrypted) const {
   return DataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size, data_size,
                               IV(block_number), data_hash, encrypted);
 }
@@ -106,10 +112,16 @@ uint32_t Area::BlocksCount() const {
   return root_directory_attributes_.Attributes()->blocks_count.value();
 }
 
-std::shared_ptr<const FreeBlocksAllocator> Area::GetFreeBlocksAllocator() const {
-  return std::make_unique<FreeBlocksAllocator>(shared_from_this(), FreeBlocksAllocatorBlockNumber);
+std::expected<std::shared_ptr<const FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() const {
+  auto metadata_block = GetMetadataBlock(FreeBlocksAllocatorBlockNumber);
+  if (!metadata_block.has_value())
+    return std::unexpected(WfsError::kFreeBlocksAllocatorCorrupted);
+  return std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(*metadata_block));
 }
 
-std::shared_ptr<FreeBlocksAllocator> Area::GetFreeBlocksAllocator() {
-  return std::make_unique<FreeBlocksAllocator>(shared_from_this(), FreeBlocksAllocatorBlockNumber);
+std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() {
+  auto res = as_const(this)->GetFreeBlocksAllocator();
+  if (!res.has_value())
+    return std::unexpected(res.error());
+  return std::const_pointer_cast<FreeBlocksAllocator>(*res);
 }

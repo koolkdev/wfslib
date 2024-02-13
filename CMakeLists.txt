@@ -28,6 +28,7 @@ add_library(${PROJECT_NAME}
     src/device_encryption.cpp
     src/directory.cpp
     src/directory_items_iterator.cpp
+    src/errors.cpp
     src/file.cpp
     src/file_device.cpp
     src/free_blocks_allocator.cpp
@@ -44,7 +45,7 @@ if(BUILD_STATIC AND MSVC)
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
+target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>

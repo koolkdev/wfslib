@@ -17,42 +17,48 @@
 using NodeState = DirectoryItemsIterator::NodeState;
 using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
-std::shared_ptr<WfsItem> Directory::GetObject(const std::string& name) const {
-  AttributesBlock attributes_block = GetObjectAttributes(block_, name);
-  if (!attributes_block)
-    return nullptr;
-  return Create(name, attributes_block);
+std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
+  auto attributes_block = GetObjectAttributes(block_, name);
+  if (!attributes_block.has_value())
+    return std::unexpected(attributes_block.error());
+  return GetObjectInternal(name, *attributes_block);
 }
 
-std::shared_ptr<Directory> Directory::GetDirectory(const std::string& name) const {
-  AttributesBlock attributes_block = GetObjectAttributes(block_, name);
-  if (!attributes_block) {
-    // Not found
-    return nullptr;
+std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
+  auto attributes_block = GetObjectAttributes(block_, name);
+  if (!attributes_block.has_value()) {
+    return std::unexpected(attributes_block.error());
   }
-  auto attributes = attributes_block.Attributes();
+  auto attributes = attributes_block->Attributes();
   if (attributes->IsLink() || !attributes->IsDirectory()) {
     // Not a directory
-    return nullptr;
+    return std::unexpected(kNotDirectory);
   }
-  return std::dynamic_pointer_cast<Directory>(Create(name, attributes_block));
+  auto obj = GetObjectInternal(attributes->GetCaseSensitiveName(name), *attributes_block);
+  if (!obj.has_value())
+    return std::unexpected(obj.error());
+  return std::dynamic_pointer_cast<Directory>(*obj);
 }
 
-std::shared_ptr<File> Directory::GetFile(const std::string& name) const {
-  AttributesBlock attributes_block = GetObjectAttributes(block_, name);
-  auto attributes = attributes_block.Attributes();
-  if (!attributes_block) {
-    // Not found
-    return nullptr;
+std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::string& name) const {
+  auto attributes_block = GetObjectAttributes(block_, name);
+  if (!attributes_block.has_value()) {
+    return std::unexpected(attributes_block.error());
   }
+  auto attributes = attributes_block->Attributes();
   if (attributes->IsLink() || attributes->IsDirectory()) {
     // Not a file
-    return nullptr;
+    return std::unexpected(kNotFile);
   }
-  return std::dynamic_pointer_cast<File>(Create(name, attributes_block));
+  auto obj = GetObjectInternal(name, *attributes_block);
+  if (!obj.has_value())
+    return std::unexpected(obj.error());
+  return std::dynamic_pointer_cast<File>(*obj);
 }
 
-std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const AttributesBlock& attributes_block) const {
+std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
+    const std::string& name,
+    const AttributesBlock& attributes_block) const {
   auto attributes = attributes_block.Attributes();
   if (attributes->IsLink()) {
     // TODO, I think that the link info is in the attributes metadata
@@ -65,7 +71,9 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const Attrib
           (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
         block_size = Block::BlockSize::Regular;
       auto new_area = area_->GetArea(attributes->directory_block_number.value(), name, attributes_block, block_size);
-      return new_area->GetRootDirectory();
+      if (!new_area.has_value())
+        return std::unexpected(new_area.error());
+      return (*new_area)->GetRootDirectory();
     } else {
       return area_->GetDirectory(attributes->directory_block_number.value(), name, attributes_block);
     }
@@ -75,8 +83,8 @@ std::shared_ptr<WfsItem> Directory::Create(const std::string& name, const Attrib
   }
 }
 
-AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
-                                               const std::string& name) const {
+std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
+                                                                        const std::string& name) const {
   DirectoryTree dir_tree{block};
   auto current_node =
       as_const(block.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
@@ -84,19 +92,23 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
     auto pos_in_path = name.begin();
     while (true) {
       auto external_node = static_cast<const ExternalDirectoryTreeNode*>(current_node);
-      if (current_node->prefix_length.value() > static_cast<size_t>(std::distance(pos_in_path, name.end()))) {
+      auto prefix_length = current_node->prefix_length.value();
+      if (prefix_length > static_cast<size_t>(std::distance(pos_in_path, name.end()))) {
         // not equal.. path too long
-        return {};
+        return std::unexpected(kItemNotFound);
       }
-      if (current_node->prefix_length.value() &&
-          std::strncmp(&*pos_in_path, current_node->prefix().data(), current_node->prefix_length.value())) {
+      if (prefix_length &&
+          !std::equal(pos_in_path, pos_in_path + prefix_length, current_node->prefix().begin(),
+                      current_node->prefix().begin() + prefix_length, [](char expected_char, char prefix_char) {
+                        return std::tolower(expected_char) == prefix_char;
+                      })) {
         // not equal.. not found
-        return {};
+        return std::unexpected(kItemNotFound);
       }
       pos_in_path += current_node->prefix_length.value();
       char next_expected_char = 0;
       if (pos_in_path < name.end())
-        next_expected_char = *pos_in_path;
+        next_expected_char = static_cast<char>(std::tolower(*pos_in_path));
       auto choices = current_node->choices();
       // This is sorted list, so we can find it with lower_bound
       auto res = std::lower_bound(choices.begin(), choices.end(), std::byte{(uint8_t)next_expected_char});
@@ -107,7 +119,7 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
       auto value_offset = external_node->get_item(res - choices.begin()).value();
       if (pos_in_path == name.end()) {
         // We found the attribute!
-        return {block, value_offset};
+        return AttributesBlock{block, value_offset};
       }
       pos_in_path++;
       // Go to next node
@@ -154,7 +166,10 @@ AttributesBlock Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlo
       // Not found
       return {};
     }
-    return GetObjectAttributes(area_->GetMetadataBlock(last_block_number), name);
+    auto next_block = area_->GetMetadataBlock(last_block_number);
+    if (!next_block.has_value())
+      return std::unexpected(kDirectoryCorrupted);
+    return GetObjectAttributes(std::move(*next_block), name);
   }
 }
 
