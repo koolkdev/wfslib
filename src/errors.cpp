@@ -21,6 +21,12 @@ char const* WfsException::what() const noexcept {
       return "Area header corrupted";
     case WfsError::kDirectoryCorrupted:
       return "Directory corrupted";
+    case WfsError::kFreeBlocksAllocatorCorrupted:
+      return "Free blocks allocator corrupted";
+    case WfsError::kFileDataCorrupted:
+      return "File data corrupted";
+    case WfsError::kFileMetadataCorrupted:
+      return "File metadata corrupted";
   }
   return "";
 }
