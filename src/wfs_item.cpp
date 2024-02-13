@@ -7,7 +7,6 @@
 
 #include "wfs_item.h"
 
-#include <cctype>
 #include "metadata_block.h"
 #include "structs.h"
 #include "utils.h"
