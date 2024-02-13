@@ -5,6 +5,8 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
+#pragma once
+
 #include "area.h"
 #include "free_blocks_allocator_tree.h"
 
