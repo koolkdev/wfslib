@@ -93,7 +93,7 @@ bool DirectoryItemsIterator::operator!=(const DirectoryItemsIterator& rhs) const
 
 DirectoryItemsIterator::value_type DirectoryItemsIterator::operator*() {
   if (!node_state_)
-    return {{}, nullptr};
+    throw std::runtime_error("Out of bounds");
   if (node_state_->block->Header()->block_flags.value() &
       node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto block = node_state_->block;
