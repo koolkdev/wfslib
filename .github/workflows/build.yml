@@ -48,6 +48,8 @@ jobs:
           sudo apt install libc++-17-dev
           echo "CC=clang-17" >> $GITHUB_ENV
           echo "CXX=clang++-17" >> $GITHUB_ENV
+          clang-17 -v
+          clang++-17 -v
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
