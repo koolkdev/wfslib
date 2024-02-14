@@ -51,10 +51,6 @@ target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
 )
 
-target_compile_options(${PROJECT_NAME} PUBLIC
-  $<$<CXX_COMPILER_ID:Clang>:-stdlib=libc++>
-)
-
 target_include_directories(${PROJECT_NAME}
     PUBLIC 
         $<INSTALL_INTERFACE:include>    
