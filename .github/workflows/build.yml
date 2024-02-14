@@ -15,6 +15,9 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
+          # llvm doesn't work with libstd++ until P2493R0 is done
+          - platform: ubuntu-latest
+            compiler: llvm
           - platform: macos-latest
             compiler: msvc
           - platform: macos-latest
@@ -33,8 +36,6 @@ jobs:
 
       - name: Set gcc
         run: |
-          sudo apt update
-          sudo apt install gcc-13 g++-13
           echo "CC=gcc-13" >> $GITHUB_ENV
           echo "CXX=g++-13" >> $GITHUB_ENV
         shell: bash
@@ -48,8 +49,6 @@ jobs:
           sudo apt install libc++-17-dev
           echo "CC=clang-17" >> $GITHUB_ENV
           echo "CXX=clang++-17" >> $GITHUB_ENV
-          clang-17 -v
-          clang++-17 -v
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
