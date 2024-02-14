@@ -494,7 +494,8 @@ class EPTreeIterator {
 
   template <std::size_t N, std::size_t... Is>
   std::array<FTree<Block>, N> CreateFTreeArray(uint32_t block_number, std::index_sequence<Is...>) {
-    return {{FTree(blocks_retriever_.get_block(block_number), Is)...}};
+    auto block = blocks_retriever_.get_block(block_number);
+    return {{FTree(block, Is)...}};
   }
 
   value_type operator*() {
