@@ -85,6 +85,8 @@ struct Attributes {
   bool IsLink() const { return !!(flags.value() & Flags::LINK); }
 
   size_t DataOffset() const;
+
+  std::string GetCaseSensitiveName(const std::string& name) const;
 };
 static_assert(sizeof(Attributes) == 0x2C, "Incorrect sizeof Attributes");
 

@@ -7,9 +7,12 @@
 
 #pragma once
 
+#include <expected>
 #include <memory>
 #include <string>
+
 #include "directory_items_iterator.h"
+#include "errors.h"
 #include "wfs_item.h"
 
 class Area;
@@ -26,9 +29,9 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
             const std::shared_ptr<MetadataBlock>& block)
       : WfsItem(name, attributes), area_(area), block_(block) {}
 
-  std::shared_ptr<WfsItem> GetObject(const std::string& name) const;
-  std::shared_ptr<Directory> GetDirectory(const std::string& name) const;
-  std::shared_ptr<File> GetFile(const std::string& name) const;
+  std::expected<std::shared_ptr<WfsItem>, WfsError> GetObject(const std::string& name) const;
+  std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(const std::string& name) const;
+  std::expected<std::shared_ptr<File>, WfsError> GetFile(const std::string& name) const;
 
   size_t Size() const;
   DirectoryItemsIterator begin() const;
@@ -44,6 +47,8 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   std::shared_ptr<MetadataBlock> block_;
 
-  std::shared_ptr<WfsItem> Create(const std::string& name, const AttributesBlock& attributes) const;
-  AttributesBlock GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block, const std::string& name) const;
+  std::expected<std::shared_ptr<WfsItem>, WfsError> GetObjectInternal(const std::string& name,
+                                                                      const AttributesBlock& attributes) const;
+  std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
+                                                               const std::string& name) const;
 };

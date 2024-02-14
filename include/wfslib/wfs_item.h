@@ -18,8 +18,6 @@ struct AttributesBlock {
   std::shared_ptr<MetadataBlock> block;
   size_t attributes_offset;
 
-  operator bool() const { return !!block; }
-
   ::Attributes* Attributes();
   const ::Attributes* Attributes() const;
 };
@@ -29,7 +27,6 @@ class WfsItem {
   WfsItem(const std::string& name, const AttributesBlock& block);
   virtual ~WfsItem() {}
   const std::string& GetName() const { return name_; }
-  std::string GetRealName() const;
   virtual bool IsDirectory() const;
   virtual bool IsFile() const;
   virtual bool IsLink() const;

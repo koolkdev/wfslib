@@ -24,13 +24,14 @@ DataBlock::~DataBlock() {
   Flush();
 }
 
-std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
-                                                uint32_t block_number,
-                                                Block::BlockSize size_category,
-                                                uint32_t data_size,
-                                                uint32_t iv,
-                                                const DataBlockHash& data_hash,
-                                                bool encrypted) {
+std::expected<std::shared_ptr<DataBlock>, WfsError> DataBlock::LoadBlock(
+    const std::shared_ptr<DeviceEncryption>& device,
+    uint32_t block_number,
+    Block::BlockSize size_category,
+    uint32_t data_size,
+    uint32_t iv,
+    const DataBlockHash& data_hash,
+    bool encrypted) {
   auto cached_block = device->GetFromCache(block_number);
   if (cached_block) {
     assert(cached_block->BlockNumber() == block_number);
@@ -45,7 +46,8 @@ std::shared_ptr<DataBlock> DataBlock::LoadBlock(const std::shared_ptr<DeviceEncr
   device->AddToCache(block_number, block);
   if (data_size) {
     // Fetch block only if have data
-    block->Fetch();
+    if (!block->Fetch())
+      return std::unexpected(WfsError::kBlockBadHash);
   }
   return block;
 }

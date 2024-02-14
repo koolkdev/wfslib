@@ -7,16 +7,9 @@
 
 #include "block.h"
 
-#include <boost/format.hpp>
 #include "device.h"
 #include "device_encryption.h"
 #include "utils.h"
-
-Block::BadHash::BadHash(uint32_t block_number)
-    : block_number_(block_number), msg_((boost::format("Bad hash for block 0x%08X") % block_number_).str()) {}
-char const* Block::BadHash::what() const noexcept {
-  return msg_.c_str();
-}
 
 Block::Block(const std::shared_ptr<DeviceEncryption>& device,
              uint32_t block_number,
@@ -49,10 +42,9 @@ void Block::Resize(uint32_t data_size) {
   }
 }
 
-void Block::Fetch(bool check_hash) {
+bool Block::Fetch(bool check_hash) {
   device_->ReadBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
-  if (check_hash && !device_->CheckHash(data_, as_const(this)->Hash()))
-    throw Block::BadHash(block_number_);
+  return !check_hash || device_->CheckHash(data_, as_const(this)->Hash());
 }
 
 void Block::Flush() {

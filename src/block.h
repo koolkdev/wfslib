@@ -9,7 +9,6 @@
 
 #include <memory>
 #include <span>
-#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -24,7 +23,7 @@ class Block {
     MegaRegular = 16,
   };
 
-  void Fetch(bool check_hash = true);
+  bool Fetch(bool check_hash = true);
   void Flush();
 
   // Actual used size, always equal to capacity in metadata blocks.
@@ -51,16 +50,6 @@ class Block {
   Block::BlockSize log2_size() const { return size_category_; }
 
   bool encrypted() const { return encrypted_; }
-
-  class BadHash : public std::exception {
-   public:
-    BadHash(uint32_t block_number);
-    virtual char const* what() const noexcept override;
-
-   private:
-    uint32_t block_number_;
-    std::string msg_;
-  };
 
   virtual void Resize(uint32_t data_size);
 

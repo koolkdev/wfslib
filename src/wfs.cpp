@@ -19,7 +19,7 @@
 Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
     : device_(std::make_shared<DeviceEncryption>(device, key)) {
   // Read first area
-  root_area_ = Area::LoadRootArea(device_);
+  root_area_ = throw_if_error(Area::LoadRootArea(device_));
 }
 
 Wfs::~Wfs() {
@@ -33,7 +33,14 @@ std::shared_ptr<WfsItem> Wfs::GetObject(const std::string& filename) {
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
-  return dir->GetObject(path.filename().string());
+  auto obj = dir->GetObject(path.filename().string());
+  if (!obj.has_value()) {
+    if (obj.error() == WfsError::kItemNotFound)
+      return nullptr;
+    else
+      throw WfsException(obj.error());
+  }
+  return *obj;
 }
 
 std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
@@ -41,22 +48,39 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
-  return dir->GetFile(path.filename().string());
+  auto file = dir->GetFile(path.filename().string());
+  if (!file.has_value()) {
+    if (file.error() == WfsError::kItemNotFound)
+      return nullptr;
+    else
+      throw WfsException(file.error());
+  }
+  return *file;
 }
 
 std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   std::filesystem::path path(filename);
-  std::shared_ptr<Directory> current_directory = root_area_->GetRootDirectory();
+  auto current_directory = root_area_->GetRootDirectory();
+  if (!current_directory.has_value()) {
+    if (current_directory.error() == WfsError::kItemNotFound)
+      return nullptr;
+    else
+      throw WfsException(current_directory.error());
+  }
 
   for (const auto& part : path) {
     // the first part is "/"
     if (part == "/")
       continue;
-    current_directory = current_directory->GetDirectory(part.string());
-    if (!current_directory)
-      return current_directory;
+    current_directory = (*current_directory)->GetDirectory(part.string());
+    if (!current_directory.has_value()) {
+      if (current_directory.error() == WfsError::kItemNotFound)
+        return nullptr;
+      else
+        throw WfsException(current_directory.error());
+    }
   }
-  return current_directory;
+  return *current_directory;
 }
 
 void Wfs::Flush() {
@@ -76,7 +100,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   device->SetLog2SectorSize(9);
   auto enc_device = std::make_shared<DeviceEncryption>(device, key);
   std::shared_ptr<const MetadataBlock> block =
-      MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, false);
+      *MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, false);
   auto wfs_header = reinterpret_cast<const WfsHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
   if (wfs_header->version.value() != 0x01010800)
     throw std::runtime_error("Unexpected WFS version (bad key?)");
@@ -86,7 +110,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
     block_size = Block::BlockSize::Regular;
   block.reset();
   // Now lets read it again, this time with the correct block size
-  block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
+  block = *MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
   uint32_t xored_sectors_count, xored_sector_size;
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
@@ -110,9 +134,6 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   device->SetSectorsCount(xored_sectors_count);
   block.reset();
   // Now try to fetch block again, this time check the hash, it will raise exception
-  try {
-    block = MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true);
-  } catch (const Block::BadHash&) {
+  if (!MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true).has_value())
     throw std::runtime_error("Wfs: Failed to detect sector size and sectors count");
-  }
 }
