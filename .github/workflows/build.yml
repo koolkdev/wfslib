@@ -22,44 +22,45 @@ jobs:
     runs-on: ${{matrix.platform}}
 
     steps:
-    - uses: actions/checkout@v2
-      with:
-        submodules: 'true'
+      - uses: actions/checkout@v2
+        with:
+          submodules: "true"
 
-    - uses: lukka/get-cmake@latest
+      - uses: lukka/get-cmake@latest
 
-    - name: Run vcpkg
-      uses: lukka/run-vcpkg@v10
+      - name: Run vcpkg
+        uses: lukka/run-vcpkg@v10
 
-    - name: Set llvm (Ubuntu)
-      run: |
+      - name: Set llvm (Ubuntu)
+        run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
           sudo ./llvm.sh 16
+          sudo apt install libc++-16-dev
           echo "CC=clang-16" >> $GITHUB_ENV
           echo "CXX=clang++-16" >> $GITHUB_ENV
-      shell: bash
-      if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
+        shell: bash
+        if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
-    - name: Set llvm (MacOS)
-      run: |
-           brew update
-           # Temporary fix, see https://github.com/actions/setup-python/issues/577
-           rm /usr/local/bin/2to3 || true
-           rm /usr/local/bin/idle3 || true
-           rm /usr/local/bin/pydoc3 || true
-           rm /usr/local/bin/python3 || true
-           rm /usr/local/bin/python3-config || true
-           brew install llvm
-           echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
-           echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
-           echo "LDFLAGS=-L/usr/local/opt/llvm/lib" >> $GITHUB_ENV
-           echo "CXXFLAGS=-isystem /usr/local/opt/llvm/include" >> $GITHUB_ENV
-      shell: bash
-      if: matrix.platform == 'macos-latest'
+      - name: Set llvm (MacOS)
+        run: |
+          brew update
+          # Temporary fix, see https://github.com/actions/setup-python/issues/577
+          rm /usr/local/bin/2to3 || true
+          rm /usr/local/bin/idle3 || true
+          rm /usr/local/bin/pydoc3 || true
+          rm /usr/local/bin/python3 || true
+          rm /usr/local/bin/python3-config || true
+          brew install llvm
+          echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
+          echo "LDFLAGS=-L/usr/local/opt/llvm/lib" >> $GITHUB_ENV
+          echo "CXXFLAGS=-isystem /usr/local/opt/llvm/include" >> $GITHUB_ENV
+        shell: bash
+        if: matrix.platform == 'macos-latest'
 
-    - name: Run cmake
-      uses: lukka/run-cmake@v10
-      with:
-        configurePreset: 'default'
-        buildPreset: 'release'
+      - name: Run cmake
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "default"
+          buildPreset: "release"

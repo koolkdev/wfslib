@@ -49,6 +49,7 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
+  $<$<CXX_COMPILER_ID:Clang>:-stdlib=libc++>
 )
 
 target_include_directories(${PROJECT_NAME}
