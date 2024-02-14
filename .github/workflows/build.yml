@@ -33,8 +33,10 @@ jobs:
 
       - name: Set gcc
         run: |
-          echo "CC=gcc-12" >> $GITHUB_ENV
-          echo "CXX=g++-12" >> $GITHUB_ENV
+          sudo apt update
+          sudo apt install gcc-13 g++-13
+          echo "CC=gcc-13" >> $GITHUB_ENV
+          echo "CXX=g++-13" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
 
@@ -42,10 +44,10 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 16
-          sudo apt install libc++-16-dev
-          echo "CC=clang-16" >> $GITHUB_ENV
-          echo "CXX=clang++-16" >> $GITHUB_ENV
+          sudo ./llvm.sh 17
+          sudo apt install libc++-17-dev
+          echo "CC=clang-17" >> $GITHUB_ENV
+          echo "CXX=clang++-17" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
