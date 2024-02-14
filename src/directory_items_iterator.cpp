@@ -8,6 +8,8 @@
 #include "directory_items_iterator.h"
 
 #include <stdexcept>
+#include <utility>
+
 #include "area.h"
 #include "directory.h"
 #include "metadata_block.h"

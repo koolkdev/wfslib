@@ -7,6 +7,8 @@
 
 #include "directory.h"
 
+#include <utility>
+
 #include "area.h"
 #include "file.h"
 #include "link.h"
