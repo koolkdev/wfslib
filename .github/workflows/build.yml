@@ -6,7 +6,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-latest]
+        platform: [ubuntu-latest, windows-latest, macos-13]
         compiler: [msvc, gcc, llvm]
         exclude:
           - platform: windows-latest
@@ -18,9 +18,9 @@ jobs:
           # llvm doesn't work with libstd++ until P2493R0 is done
           - platform: ubuntu-latest
             compiler: llvm
-          - platform: macos-latest
+          - platform: macos-13
             compiler: msvc
-          - platform: macos-latest
+          - platform: macos-13
             compiler: gcc
     runs-on: ${{matrix.platform}}
 
@@ -67,7 +67,7 @@ jobs:
           echo "LDFLAGS=-L/usr/local/opt/llvm/lib" >> $GITHUB_ENV
           echo "CXXFLAGS=-isystem /usr/local/opt/llvm/include" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'macos-latest'
+        if: matrix.platform == 'macos-13'
 
       - name: Run cmake
         uses: lukka/run-cmake@v10
