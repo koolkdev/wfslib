@@ -9,7 +9,9 @@
 
 #include <bit>
 #include <filesystem>
+
 #include "area.h"
+#include "blocks_device.h"
 #include "device_encryption.h"
 #include "directory.h"
 #include "file_device.h"
@@ -17,7 +19,7 @@
 #include "structs.h"
 
 Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
-    : device_(std::make_shared<DeviceEncryption>(device, key)) {
+    : device_(std::make_shared<BlocksDevice>(device, key)) {
   // Read first area
   root_area_ = throw_if_error(Area::LoadRootArea(device_));
 }
@@ -99,8 +101,9 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   device->SetSectorsCount(0x10);
   device->SetLog2SectorSize(9);
   auto enc_device = std::make_shared<DeviceEncryption>(device, key);
+  auto blocks_device = std::make_shared<BlocksDevice>(device, key);
   std::shared_ptr<const MetadataBlock> block =
-      *MetadataBlock::LoadBlock(enc_device, 0, Block::BlockSize::Basic, 0, false);
+      *MetadataBlock::LoadBlock(blocks_device, 0, Block::BlockSize::Basic, 0, false);
   auto wfs_header = reinterpret_cast<const WfsHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
   if (wfs_header->version.value() != 0x01010800)
     throw std::runtime_error("Unexpected WFS version (bad key?)");
@@ -110,7 +113,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
     block_size = Block::BlockSize::Regular;
   block.reset();
   // Now lets read it again, this time with the correct block size
-  block = *MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, false);
+  block = *MetadataBlock::LoadBlock(blocks_device, 0, block_size, 0, false);
   uint32_t xored_sectors_count, xored_sector_size;
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
@@ -134,6 +137,6 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   device->SetSectorsCount(xored_sectors_count);
   block.reset();
   // Now try to fetch block again, this time check the hash, it will raise exception
-  if (!MetadataBlock::LoadBlock(enc_device, 0, block_size, 0, true).has_value())
+  if (!MetadataBlock::LoadBlock(blocks_device, 0, block_size, 0, true).has_value())
     throw std::runtime_error("Wfs: Failed to detect sector size and sectors count");
 }

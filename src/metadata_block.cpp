@@ -7,10 +7,11 @@
 
 #include "metadata_block.h"
 
+#include "blocks_device.h"
 #include "device_encryption.h"
 #include "structs.h"
 
-MetadataBlock::MetadataBlock(const std::shared_ptr<DeviceEncryption>& device,
+MetadataBlock::MetadataBlock(const std::shared_ptr<BlocksDevice>& device,
                              uint32_t block_number,
                              Block::BlockSize size_category,
                              uint32_t iv)
@@ -21,7 +22,7 @@ MetadataBlock::~MetadataBlock() {
 }
 
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> MetadataBlock::LoadBlock(
-    const std::shared_ptr<DeviceEncryption>& device,
+    const std::shared_ptr<BlocksDevice>& device,
     uint32_t block_number,
     Block::BlockSize size_category,
     uint32_t iv,
@@ -56,9 +57,9 @@ void MetadataBlock::Resize(uint32_t data_size) {
 }
 
 std::span<std::byte> MetadataBlock::Hash() {
-  return {data().data() + offsetof(MetadataBlockHeader, hash), device_->DIGEST_SIZE};
+  return {data().data() + offsetof(MetadataBlockHeader, hash), DeviceEncryption::DIGEST_SIZE};
 }
 
 std::span<const std::byte> MetadataBlock::Hash() const {
-  return {data().data() + offsetof(MetadataBlockHeader, hash), device_->DIGEST_SIZE};
+  return {data().data() + offsetof(MetadataBlockHeader, hash), DeviceEncryption::DIGEST_SIZE};
 }

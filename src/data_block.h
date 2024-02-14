@@ -22,7 +22,7 @@ class DataBlock : public Block {
     size_t hash_offset;
   };
 
-  DataBlock(const std::shared_ptr<DeviceEncryption>& device,
+  DataBlock(const std::shared_ptr<BlocksDevice>& device,
             uint32_t block_number,
             Block::BlockSize size_category,
             uint32_t data_size,
@@ -31,7 +31,7 @@ class DataBlock : public Block {
             bool encrypted);
   ~DataBlock() override;
 
-  static std::expected<std::shared_ptr<DataBlock>, WfsError> LoadBlock(const std::shared_ptr<DeviceEncryption>& device,
+  static std::expected<std::shared_ptr<DataBlock>, WfsError> LoadBlock(const std::shared_ptr<BlocksDevice>& device,
                                                                        uint32_t block_number,
                                                                        Block::BlockSize size_category,
                                                                        uint32_t data_size,

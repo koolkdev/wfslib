@@ -7,8 +7,8 @@
 
 #include "area.h"
 
+#include "blocks_device.h"
 #include "device.h"
-#include "device_encryption.h"
 #include "directory.h"
 #include "free_blocks_allocator.h"
 #include "metadata_block.h"
@@ -16,7 +16,8 @@
 #include "utils.h"
 #include "wfs.h"
 
-Area::Area(const std::shared_ptr<DeviceEncryption>& device,
+
+Area::Area(const std::shared_ptr<BlocksDevice>& device,
            const std::shared_ptr<Area>& root_area,
            const std::shared_ptr<MetadataBlock>& block,
            const std::string& root_directory_name,
@@ -27,7 +28,7 @@ Area::Area(const std::shared_ptr<DeviceEncryption>& device,
       root_directory_name_(root_directory_name),
       root_directory_attributes_(root_directory_attributes) {}
 
-std::expected<std::shared_ptr<Area>, WfsError> Area::LoadRootArea(const std::shared_ptr<DeviceEncryption>& device) {
+std::expected<std::shared_ptr<Area>, WfsError> Area::LoadRootArea(const std::shared_ptr<BlocksDevice>& device) {
   auto block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
   if (!block.has_value()) {
     block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Regular, 0);

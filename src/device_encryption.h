@@ -10,12 +10,10 @@
 #include <cryptopp/sha.h>
 #include <memory>
 #include <span>
-#include <unordered_map>
 #include <vector>
 
 class Device;
 struct WfsBlockIV;
-class Block;
 
 class DeviceEncryption {
  public:
@@ -31,12 +29,6 @@ class DeviceEncryption {
 
   static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
 
-  // TODO: Move to another class
-  std::shared_ptr<Block> GetFromCache(uint32_t block_number);
-  void AddToCache(uint32_t block_number, std::weak_ptr<Block> block);
-  void RemoveFromCache(uint32_t block_number);
-  void FlushAll();
-
  private:
   void HashData(const std::list<std::span<const std::byte>>& data, const std::span<std::byte>& hash) const;
   WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv) const;
@@ -44,6 +36,4 @@ class DeviceEncryption {
   std::shared_ptr<Device> device_;
 
   const std::vector<std::byte> key_;
-
-  std::unordered_map<uint32_t, std::weak_ptr<Block>> blocks_cache_;
 };
