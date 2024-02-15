@@ -28,18 +28,17 @@ class MetadataBlock : public Block {
     std::shared_ptr<MetadataBlock> block_;
   };
 
-  MetadataBlock(const std::shared_ptr<DeviceEncryption>& device,
+  MetadataBlock(const std::shared_ptr<BlocksDevice>& device,
                 uint32_t block_number,
                 Block::BlockSize size_category,
                 uint32_t iv);
   ~MetadataBlock() override;
 
-  static std::expected<std::shared_ptr<MetadataBlock>, WfsError> LoadBlock(
-      const std::shared_ptr<DeviceEncryption>& device,
-      uint32_t block_number,
-      Block::BlockSize size_category,
-      uint32_t iv,
-      bool check_hash = true);
+  static std::expected<std::shared_ptr<MetadataBlock>, WfsError> LoadBlock(const std::shared_ptr<BlocksDevice>& device,
+                                                                           uint32_t block_number,
+                                                                           Block::BlockSize size_category,
+                                                                           uint32_t iv,
+                                                                           bool check_hash = true);
 
   MetadataBlockHeader* Header();
   const MetadataBlockHeader* Header() const;

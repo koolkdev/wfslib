@@ -7,11 +7,12 @@
 
 #include "data_block.h"
 
+#include "blocks_device.h"
 #include "device_encryption.h"
 #include "metadata_block.h"
 #include "structs.h"
 
-DataBlock::DataBlock(const std::shared_ptr<DeviceEncryption>& device,
+DataBlock::DataBlock(const std::shared_ptr<BlocksDevice>& device,
                      uint32_t block_number,
                      Block::BlockSize size_category,
                      uint32_t data_size,
@@ -24,14 +25,13 @@ DataBlock::~DataBlock() {
   Flush();
 }
 
-std::expected<std::shared_ptr<DataBlock>, WfsError> DataBlock::LoadBlock(
-    const std::shared_ptr<DeviceEncryption>& device,
-    uint32_t block_number,
-    Block::BlockSize size_category,
-    uint32_t data_size,
-    uint32_t iv,
-    const DataBlockHash& data_hash,
-    bool encrypted) {
+std::expected<std::shared_ptr<DataBlock>, WfsError> DataBlock::LoadBlock(const std::shared_ptr<BlocksDevice>& device,
+                                                                         uint32_t block_number,
+                                                                         Block::BlockSize size_category,
+                                                                         uint32_t data_size,
+                                                                         uint32_t iv,
+                                                                         const DataBlockHash& data_hash,
+                                                                         bool encrypted) {
   auto cached_block = device->GetFromCache(block_number);
   if (cached_block) {
     assert(cached_block->BlockNumber() == block_number);
@@ -53,9 +53,9 @@ std::expected<std::shared_ptr<DataBlock>, WfsError> DataBlock::LoadBlock(
 }
 
 std::span<std::byte> DataBlock::Hash() {
-  return {hash_metadata_block()->data().data() + hash_offset(), device_->DIGEST_SIZE};
+  return {hash_metadata_block()->data().data() + hash_offset(), DeviceEncryption::DIGEST_SIZE};
 }
 
 std::span<const std::byte> DataBlock::Hash() const {
-  return {hash_metadata_block()->data().data() + hash_offset(), device_->DIGEST_SIZE};
+  return {hash_metadata_block()->data().data() + hash_offset(), DeviceEncryption::DIGEST_SIZE};
 }

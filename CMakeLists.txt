@@ -24,6 +24,7 @@ option(BUILD_STATIC "Build static" OFF)
 add_library(${PROJECT_NAME}
     src/area.cpp
     src/block.cpp
+    src/blocks_device.cpp
     src/data_block.cpp
     src/device_encryption.cpp
     src/directory.cpp

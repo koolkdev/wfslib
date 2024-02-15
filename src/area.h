@@ -18,18 +18,18 @@
 #include "wfs_item.h"
 
 class FreeBlocksAllocator;
-class DeviceEncryption;
+class BlocksDevice;
 class Directory;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
-  Area(const std::shared_ptr<DeviceEncryption>& device,
+  Area(const std::shared_ptr<BlocksDevice>& device,
        const std::shared_ptr<Area>& root_area,
        const std::shared_ptr<MetadataBlock>& block,
        const std::string& root_directory_name,
        const AttributesBlock& root_directory_attributes);
 
-  static std::expected<std::shared_ptr<Area>, WfsError> LoadRootArea(const std::shared_ptr<DeviceEncryption>& device);
+  static std::expected<std::shared_ptr<Area>, WfsError> LoadRootArea(const std::shared_ptr<BlocksDevice>& device);
 
   std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t block_number,
                                                          const std::string& root_directory_name,
@@ -37,6 +37,9 @@ class Area : public std::enable_shared_from_this<Area> {
                                                          Block::BlockSize size);
 
   std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();
+
+  std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
+  std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
 
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(uint32_t block_number,
                                                                    const std::string& name,
@@ -84,7 +87,7 @@ class Area : public std::enable_shared_from_this<Area> {
   uint32_t ToBasicBlockNumber(uint32_t block_number) const;
   uint32_t IV(uint32_t block_number) const;
 
-  std::shared_ptr<DeviceEncryption> device_;
+  std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Area> root_area_;  // Empty pointer for root area
 
   std::shared_ptr<MetadataBlock> header_block_;

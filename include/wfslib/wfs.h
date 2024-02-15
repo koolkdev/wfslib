@@ -14,18 +14,20 @@
 
 class Device;
 class FileDevice;
-class DeviceEncryption;
+class BlocksDevice;
 class Area;
 class WfsItem;
 class File;
 class Directory;
+class BlocksDevice;
 
 class Wfs {
  public:
   Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
+  Wfs(const std::shared_ptr<BlocksDevice>& device);
   ~Wfs();
 
-  const std::shared_ptr<DeviceEncryption>& GetDevice() { return device_; }
+  const std::shared_ptr<BlocksDevice>& GetDevice() { return device_; }
 
   std::shared_ptr<WfsItem> GetObject(const std::string& filename);
   std::shared_ptr<File> GetFile(const std::string& filename);
@@ -39,7 +41,7 @@ class Wfs {
   void Flush();
 
  private:
-  std::shared_ptr<DeviceEncryption> device_;
+  std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Area> root_area_;
 
   static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::span<std::byte>& key);

@@ -30,6 +30,7 @@ class WfsItem {
   virtual bool IsDirectory() const;
   virtual bool IsFile() const;
   virtual bool IsLink() const;
+  virtual bool IsQuota() const;
 
  protected:
   AttributesBlock& attributes_data() { return attributes_; }

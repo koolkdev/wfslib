@@ -7,11 +7,11 @@
 
 #include "block.h"
 
+#include "blocks_device.h"
 #include "device.h"
-#include "device_encryption.h"
 #include "utils.h"
 
-Block::Block(const std::shared_ptr<DeviceEncryption>& device,
+Block::Block(const std::shared_ptr<BlocksDevice>& device,
              uint32_t block_number,
              Block::BlockSize size_category,
              uint32_t data_size,
@@ -43,20 +43,16 @@ void Block::Resize(uint32_t data_size) {
 }
 
 bool Block::Fetch(bool check_hash) {
-  device_->ReadBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
-  return !check_hash || device_->CheckHash(data_, as_const(this)->Hash());
+  return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, as_const(this)->Hash(), iv_,
+                            encrypted_, check_hash);
 }
 
 void Block::Flush() {
   if (!dirty_)
     return;
-  device_->CalculateHash(data_, Hash());
-  device_->WriteBlock(ToDeviceSector(block_number_), data_, iv_, encrypted_);
+  device_->WriteBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
+                      /*recalculate_hash=*/true);
   dirty_ = false;
-}
-
-uint32_t Block::ToDeviceSector(uint32_t block_number) const {
-  return block_number << (BlockSize::Basic - device_->device()->Log2SectorSize());
 }
 
 uint32_t Block::GetAlignedSize(uint32_t size) const {

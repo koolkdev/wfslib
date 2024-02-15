@@ -12,7 +12,7 @@
 #include <string>
 #include <vector>
 
-class DeviceEncryption;
+class BlocksDevice;
 
 class Block {
  public:
@@ -54,13 +54,12 @@ class Block {
   virtual void Resize(uint32_t data_size);
 
  private:
-  uint32_t ToDeviceSector(uint32_t block_number) const;
   uint32_t GetAlignedSize(uint32_t size) const;
 
   std::span<std::byte> GetDataForWriting();
 
  protected:
-  Block(const std::shared_ptr<DeviceEncryption>& device,
+  Block(const std::shared_ptr<BlocksDevice>& device,
         uint32_t block_number,
         Block::BlockSize size_category,
         uint32_t data_size,
@@ -71,7 +70,7 @@ class Block {
   virtual std::span<std::byte> Hash() = 0;
   virtual std::span<const std::byte> Hash() const = 0;
 
-  std::shared_ptr<DeviceEncryption> device_;
+  std::shared_ptr<BlocksDevice> device_;
 
   uint32_t block_number_;
   Block::BlockSize size_category_;

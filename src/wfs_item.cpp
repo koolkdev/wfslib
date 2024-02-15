@@ -32,6 +32,10 @@ bool WfsItem::IsFile() const {
 }
 
 bool WfsItem::IsLink() const {
+  return attributes_data().Attributes()->IsLink();
+}
+
+bool WfsItem::IsQuota() const {
   auto attributes = attributes_data().Attributes();
-  return attributes->IsLink();
+  return attributes->IsDirectory() && attributes->IsQuota();
 }
