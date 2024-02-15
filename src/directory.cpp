@@ -20,14 +20,14 @@ using NodeState = DirectoryItemsIterator::NodeState;
 using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
-  auto attributes_block = GetObjectAttributes(block_, name);
+  const auto attributes_block = GetObjectAttributes(block_, name);
   if (!attributes_block.has_value())
     return std::unexpected(attributes_block.error());
   return GetObjectInternal(name, *attributes_block);
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
-  auto attributes_block = GetObjectAttributes(block_, name);
+  const auto attributes_block = GetObjectAttributes(block_, name);
   if (!attributes_block.has_value()) {
     return std::unexpected(attributes_block.error());
   }
@@ -43,7 +43,7 @@ std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(cons
 }
 
 std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::string& name) const {
-  auto attributes_block = GetObjectAttributes(block_, name);
+  const auto attributes_block = GetObjectAttributes(block_, name);
   if (!attributes_block.has_value()) {
     return std::unexpected(attributes_block.error());
   }
@@ -99,11 +99,10 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
         // not equal.. path too long
         return std::unexpected(kItemNotFound);
       }
-      if (prefix_length &&
-          !std::equal(pos_in_path, pos_in_path + prefix_length, current_node->prefix().begin(),
-                      current_node->prefix().begin() + prefix_length, [](char expected_char, char prefix_char) {
-                        return std::tolower(expected_char) == prefix_char;
-                      })) {
+      if (prefix_length && !std::equal(pos_in_path, pos_in_path + prefix_length, current_node->prefix_view().begin(),
+                                       current_node->prefix_view().end(), [](char expected_char, char prefix_char) {
+                                         return std::tolower(expected_char) == prefix_char;
+                                       })) {
         // not equal.. not found
         return std::unexpected(kItemNotFound);
       }
@@ -125,7 +124,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
       }
       pos_in_path++;
       // Go to next node
-      current_node = block->get_object<DirectoryTreeNode>(value_offset);
+      current_node = as_const(block.get())->get_object<DirectoryTreeNode>(value_offset);
     }
   } else {
     // Arghh, trees over trees
@@ -148,7 +147,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
         node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
                           ->get_item(node_state->current_index)
                           .value();
-        current_node = block->get_object<DirectoryTreeNode>(node_offset);
+        current_node = (block.get())->get_object<DirectoryTreeNode>(node_offset);
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
