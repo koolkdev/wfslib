@@ -120,7 +120,7 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
   std::vector<std::byte> data{block->data().begin(), block->data().end()};
-  auto first_4_dwords = reinterpret_cast<boost::endian::big_uint32_buf_t*>(data.data());
+  auto first_4_dwords = reinterpret_cast<uint32_be_t*>(data.data());
   xored_sectors_count = first_4_dwords[2].value();
   xored_sector_size = first_4_dwords[3].value();
   // Lets calculate the hash of the block

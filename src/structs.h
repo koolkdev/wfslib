@@ -7,10 +7,11 @@
 
 #pragma once
 
-#include <boost/endian/buffers.hpp>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "utils.h"
 
 // sizeof 0x18
 struct MetadataBlockHeader {
@@ -26,30 +27,30 @@ struct MetadataBlockHeader {
     EXTERNAL_DIRECTORY_TREE = 0x20000000,
     DIRECTORY = 0x80000000,
   };
-  boost::endian::big_uint32_buf_t block_flags;  // 20 least bits ignored
-  boost::endian::big_uint8_buf_t hash[20];
+  uint32_be_t block_flags;  // 20 least bits ignored
+  uint8_be_t hash[20];
 };
 static_assert(sizeof(MetadataBlockHeader) == 0x18, "Incorrect sizeof MetadataBlockHeader");
 
 // sizeof 0x18
 struct DataBlockMetadata {
-  boost::endian::big_uint32_buf_t block_number;
-  boost::endian::big_uint8_buf_t hash[20];
+  uint32_be_t block_number;
+  uint8_be_t hash[20];
 };
 static_assert(sizeof(DataBlockMetadata) == 0x18, "Incorrect sizeof DataBlockMetadata");
 
 // sizeof 0xa4
 struct DataBlocksClusterMetadata {
-  boost::endian::big_uint32_buf_t block_number;
-  boost::endian::big_uint8_buf_t hash[8][20];
+  uint32_be_t block_number;
+  uint8_be_t hash[8][20];
 };
 static_assert(sizeof(DataBlocksClusterMetadata) == 0xa4, "Incorrect sizeof DataBlocksClusterMetadata");
 
 // sizeof 0xc
 struct Permissions {
-  boost::endian::big_uint32_buf_t owner;
-  boost::endian::big_uint32_buf_t group;
-  boost::endian::big_uint32_buf_t mode;
+  uint32_be_t owner;
+  uint32_be_t group;
+  uint32_be_t mode;
 };
 static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 
@@ -63,22 +64,22 @@ struct Attributes {
     QUOTA = 0x40000000,
     DIRECTORY = 0x80000000,
   };
-  boost::endian::big_uint32_buf_t flags;
-  boost::endian::big_uint32_buf_t size_on_disk;
-  boost::endian::big_uint32_buf_t ctime;
-  boost::endian::big_uint32_buf_t mtime;
-  boost::endian::big_uint32_buf_t unknown;  // TODO: ????
+  uint32_be_t flags;
+  uint32_be_t size_on_disk;
+  uint32_be_t ctime;
+  uint32_be_t mtime;
+  uint32_be_t unknown;  // TODO: ????
   union {
-    boost::endian::big_uint32_buf_t size;          // for file
-    boost::endian::big_uint32_buf_t blocks_count;  // for quota
+    uint32_be_t size;          // for file
+    uint32_be_t blocks_count;  // for quota
   };
-  boost::endian::big_uint32_buf_t directory_block_number;  // in case of directory
+  uint32_be_t directory_block_number;  // in case of directory
   Permissions permissions;
-  boost::endian::big_uint8_buf_t entry_log2_size;  // log2 size of the whole entry, including this attributes
-  boost::endian::big_uint8_buf_t size_category;    // 0-4, see File.c
-  boost::endian::big_uint8_buf_t filename_length;
-  boost::endian::big_uint8_buf_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
-                                               // byte, it is a bitmap of filename_length
+  uint8_be_t entry_log2_size;  // log2 size of the whole entry, including this attributes
+  uint8_be_t size_category;    // 0-4, see File.c
+  uint8_be_t filename_length;
+  uint8_be_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
+                           // byte, it is a bitmap of filename_length
 
   bool IsDirectory() const { return !!(flags.value() & Flags::DIRECTORY); }
   bool IsFile() const { return !IsDirectory(); }
@@ -93,22 +94,21 @@ static_assert(sizeof(Attributes) == 0x2C, "Incorrect sizeof Attributes");
 
 // sizeof 0x48
 struct WfsHeader {
-  boost::endian::big_uint32_buf_t iv;           // most 2 bits are device type. 1-mlc/3-usb
-  boost::endian::big_uint32_buf_t version;      // should be 0x01010800
-  boost::endian::big_uint16_buf_t device_type;  // usb - 0x16a2. mlc - 0x136a?
-  boost::endian::big_uint16_buf_t _pad;
+  uint32_be_t iv;           // most 2 bits are device type. 1-mlc/3-usb
+  uint32_be_t version;      // should be 0x01010800
+  uint16_be_t device_type;  // usb - 0x16a2. mlc - 0x136a?
+  uint16_be_t _pad;
   Attributes root_area_attributes;
-  boost::endian::big_uint32_buf_t
-      transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
-  boost::endian::big_uint32_buf_t root_area_blocks_count;
-  boost::endian::big_uint32_buf_t unknown[2];  // not used??
+  uint32_be_t transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
+  uint32_be_t root_area_blocks_count;
+  uint32_be_t unknown[2];  // not used??
 };
 static_assert(sizeof(WfsHeader) == 0x48, "Incorrect sizeof WfsHeader");
 
 // sizof 0x8
 struct WfsAreaFragmentInfo {
-  boost::endian::big_uint32_buf_t block_number;
-  boost::endian::big_uint32_buf_t blocks_count;
+  uint32_be_t block_number;
+  uint32_be_t blocks_count;
 };
 static_assert(sizeof(WfsAreaFragmentInfo) == 0x8, "Incorrect sizeof WfsAreaFragmentInfo");
 
@@ -118,35 +118,33 @@ struct WfsAreaHeader {
     RootArea = 0,
     QuotaArea = 1,
   };
-  boost::endian::big_uint32_buf_t iv;  // used for blocks  encryption
-  boost::endian::big_uint32_buf_t blocks_count;
-  boost::endian::big_uint32_buf_t root_directory_block_number;  // is 6
+  uint32_be_t iv;  // used for blocks  encryption
+  uint32_be_t blocks_count;
+  uint32_be_t root_directory_block_number;  // is 6
   // Those two directories are not used. It was supposed to be some kind of refcount mechansism. not really sure.
   // But nothing uses it in the WiiU
-  boost::endian::big_uint32_buf_t shadow_directory_block_number_1;  // is 4
-  boost::endian::big_uint32_buf_t shadow_directory_block_number_2;  // is 5
-  boost::endian::big_uint8_buf_t depth;                             // how many total parents area this area has
-  boost::endian::big_uint8_buf_t log2_block_size;                   // 12/13
-  boost::endian::big_uint8_buf_t log2_mega_block_size;              // mega block - 8 blocks. so 15/16
-  boost::endian::big_uint8_buf_t log2_mega_blocks_cluster_size;     // mega blocks cluster - 8 mega blocks. so 18/19
-  boost::endian::big_uint8_buf_t area_type;          // 0 - root area, 1 - data (not relavent for transactions area)
-  boost::endian::big_uint8_buf_t maybe_always_zero;  // init to zero. doesn't seem to be changed by anything
-  boost::endian::big_uint16_buf_t
-      spare_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota. (parent area
-                           // blocks, so in parent area block size)
+  uint32_be_t shadow_directory_block_number_1;  // is 4
+  uint32_be_t shadow_directory_block_number_2;  // is 5
+  uint8_be_t depth;                             // how many total parents area this area has
+  uint8_be_t log2_block_size;                   // 12/13
+  uint8_be_t log2_mega_block_size;              // mega block - 8 blocks. so 15/16
+  uint8_be_t log2_mega_blocks_cluster_size;     // mega blocks cluster - 8 mega blocks. so 18/19
+  uint8_be_t area_type;                         // 0 - root area, 1 - data (not relavent for transactions area)
+  uint8_be_t maybe_always_zero;                 // init to zero. doesn't seem to be changed by anything
+  uint16_be_t spare_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota.
+                                   // (parent area blocks, so in parent area block size)
   WfsAreaFragmentInfo first_fragments[8];  // On which blocks this area is spread on (if there aren't enough free
                                            // sequentials blocks it will framgnet the area). parent area blocks, so in
                                            // parent area block size. This list contains only the first 8 fragments
-  boost::endian::big_uint32_buf_t fragments_log2_block_size;  // block size of parent area
+  uint32_be_t fragments_log2_block_size;   // block size of parent area
 };
 static_assert(sizeof(WfsAreaHeader) == 0x60, "Incorrect sizeof WfsAreaHeader");
 
 // sizof 0x8
 struct WfsAreaFragmentsInfo {
-  boost::endian::big_uint16_buf_t max_fragments_count;  // 480
-  boost::endian::big_uint16_buf_t
-      fragments_log2_block_size;  // block size of parent area. In root area it is the minimum block size (12)
-  boost::endian::big_uint32_buf_t fragments_count;
+  uint16_be_t max_fragments_count;        // 480
+  uint16_be_t fragments_log2_block_size;  // block size of parent area. In root area it is the minimum block size (12)
+  uint32_be_t fragments_count;
   WfsAreaFragmentInfo fragments[480];  // On which blocks this area is spread on (if there aren't enough free
                                        // sequentials blocks it will framgnet the area). parent area blocks, so in
                                        // parent area block size.
@@ -167,23 +165,23 @@ struct WfsTransactionsArea {
   // is flushed to the disk).
   // Most of the structures of this area are known, but it isn't interesting since it is cleared every time the WiiU
   // mount the file system. (transactions from previous boot that weren't flushed to the disk are lost)
-  boost::endian::big_uint8_buf_t unknown[0x3B4];
+  uint8_be_t unknown[0x3B4];
 };
 static_assert(sizeof(WfsTransactionsArea) == 0x60 + 0x3B4, "Incorrect sizeof WfsTransactionsArea");
 
 struct SubBlockAllocatorFreeListEntry {
   static const uint16_t FREE_MARK_CONST = 0xFEDC;
 
-  boost::endian::big_uint16_buf_t free_mark;
-  boost::endian::big_uint16_buf_t next;
-  boost::endian::big_uint16_buf_t prev;
-  boost::endian::big_uint16_buf_t log2_block_size;
+  uint16_be_t free_mark;
+  uint16_be_t next;
+  uint16_be_t prev;
+  uint16_be_t log2_block_size;
 };
 static_assert(sizeof(SubBlockAllocatorFreeListEntry) == 0x8, "Incorrect sizeof SubBlockAllocatorFreeListEntry");
 
 struct SubBlockAllocatorFreeList {
-  boost::endian::big_uint16_buf_t free_blocks_count;
-  boost::endian::big_uint16_buf_t head;  // head free block
+  uint16_be_t free_blocks_count;
+  uint16_be_t head;  // head free block
 };
 static_assert(sizeof(SubBlockAllocatorFreeList) == 0x4, "Incorrect sizeof SubBlockAllocatorFreeList");
 
@@ -193,14 +191,14 @@ struct SubBlockAllocatorStruct {
 static_assert(sizeof(SubBlockAllocatorStruct) == 0x20, "Incorrect sizeof SubBlockAllocatorStruct");
 
 struct DirectoryTreeHeader {
-  boost::endian::big_uint16_buf_t root;
-  boost::endian::big_uint16_buf_t records_count;
+  uint16_be_t root;
+  uint16_be_t records_count;
 };
 static_assert(sizeof(DirectoryTreeHeader) == 0x4, "Incorrect sizeofDirectoryTreeHeader");
 
 struct DirectoryTreeNode {
-  boost::endian::big_uint8_buf_t prefix_length;
-  boost::endian::big_uint8_buf_t choices_count;
+  uint8_be_t prefix_length;
+  uint8_be_t choices_count;
 
  public:
   std::string prefix() const { return {prefix_view().begin(), prefix_view().end()}; }
@@ -216,9 +214,9 @@ struct ExternalDirectoryTreeNode : DirectoryTreeNode {
   size_t size() const;
 
  public:
-  boost::endian::big_uint16_buf_t get_item(size_t index) const {
-    return reinterpret_cast<const boost::endian::big_uint16_buf_t*>(reinterpret_cast<const std::byte*>(this) +
-                                                                    size())[-static_cast<int>(index) - 1];
+  uint16_be_t get_item(size_t index) const {
+    return reinterpret_cast<const uint16_be_t*>(reinterpret_cast<const std::byte*>(this) +
+                                                size())[-static_cast<int>(index) - 1];
   }
 };
 
@@ -227,85 +225,83 @@ struct InternalDirectoryTreeNode : DirectoryTreeNode {
   size_t size() const;
 
  public:
-  boost::endian::big_uint16_buf_t get_item(size_t index) const {
-    return reinterpret_cast<const boost::endian::big_uint16_buf_t*>(
-        reinterpret_cast<const std::byte*>(this) + size() -
-        (choices()[0] == std::byte{0} ? 2 : 0))[-static_cast<int>(index) - 1];
+  uint16_be_t get_item(size_t index) const {
+    return reinterpret_cast<const uint16_be_t*>(reinterpret_cast<const std::byte*>(this) + size() -
+                                                (choices()[0] == std::byte{0} ? 2 : 0))[-static_cast<int>(index) - 1];
   }
-  boost::endian::big_uint32_buf_t get_next_allocator_block_number() const {
-    return reinterpret_cast<const boost::endian::big_uint32_buf_t*>(reinterpret_cast<const std::byte*>(this) +
-                                                                    size())[-1];
+  uint32_be_t get_next_allocator_block_number() const {
+    return reinterpret_cast<const uint32_be_t*>(reinterpret_cast<const std::byte*>(this) + size())[-1];
   }
 };
 
 struct FreeBlocksAllocatorHeader {
-  boost::endian::big_uint32_buf_t free_blocks_count;
-  boost::endian::big_uint32_buf_t unknown;  // initialized to 1
+  uint32_be_t free_blocks_count;
+  uint32_be_t unknown;  // initialized to 1
   // When createa a new area, a fixed amount of blocks are allocated for metadata blocks for quick allocation. When
   // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
   // When no more availabe blocks are avaialbe, it will allocate them regulary.
-  boost::endian::big_uint32_buf_t free_metadata_block;
-  boost::endian::big_uint32_buf_t free_metadata_blocks_count;
+  uint32_be_t free_metadata_block;
+  uint32_be_t free_metadata_blocks_count;
 };
 static_assert(sizeof(FreeBlocksAllocatorHeader) == 0x10, "Incorrect sizeof FreeBLocksAllocatorHeader");
 
 // Header at the end of the block. Contains an array of entries of a constant size
 struct TreeSubBlockAllocatorHeader {
-  boost::endian::big_uint16_buf_t freelist;      // Index of the freelist head entry
-  boost::endian::big_uint16_buf_t allocated;     // How many entries are allocated
-  boost::endian::big_uint16_buf_t start_offset;  // Where the array start in the bock
-  boost::endian::big_uint16_buf_t total_bytse;   // The size of the array in bytes
+  uint16_be_t freelist;      // Index of the freelist head entry
+  uint16_be_t allocated;     // How many entries are allocated
+  uint16_be_t start_offset;  // Where the array start in the bock
+  uint16_be_t total_bytse;   // The size of the array in bytes
 };
 static_assert(sizeof(TreeSubBlockAllocatorHeader) == 0x8, "Incorrect sizeof TreeSubBlockAllocatorHeader");
 
 struct NodesHeapHeader {
-  boost::endian::big_uint16_buf_t freelist_head_offset;
-  boost::endian::big_uint16_buf_t allocated_blocks;
-  boost::endian::big_uint16_buf_t start_offset;
-  boost::endian::big_uint16_buf_t total_bytes;
+  uint16_be_t freelist_head_offset;
+  uint16_be_t allocated_blocks;
+  uint16_be_t start_offset;
+  uint16_be_t total_bytes;
 };
+static_assert(sizeof(NodesHeapHeader) == 0x8, "Incorrect sizeof NodesHeapHeader");
 
 struct NodesHeapFreelistEntry {
-  boost::endian::big_uint32_buf_t init_zero;  // zero, never used
-  boost::endian::big_uint32_buf_t next;       // index in the heap entries list
-  boost::endian::big_uint16_buf_t count;      // freed entries count
-  boost::endian::big_uint16_buf_t padding1;
-  boost::endian::big_uint32_buf_t padding2;
+  uint32_be_t init_zero;  // zero, never used
+  uint32_be_t next;       // index in the heap entries list
+  uint16_be_t count;      // freed entries count
 };
+static_assert(sizeof(NodesHeapFreelistEntry) == 0xA, "Incorrect sizeof NodesHeapFreelistEntry");
 
 // The nodes represent ranges. There may between 1 and 6 sub-nodes.
 // The key represent the split point. So there can be between 0-5 keys (they end with zero keys)
 // so x < keys[0] go to node[0], keys[0] <= x < keys[1] go to node[1] and etc..
 struct RTreeNode_details {
-  boost::endian::big_uint32_buf_t keys[5];
-  boost::endian::big_uint16_buf_t values[6];
+  uint32_be_t keys[5];
+  uint16_be_t values[6];
 };
 static_assert(sizeof(RTreeNode_details) == 0x20);
 
 struct RTreeLeaf_details {
-  boost::endian::big_uint32_buf_t keys[4];
-  boost::endian::big_uint32_buf_t values[4];
+  uint32_be_t keys[4];
+  uint32_be_t values[4];
 };
 static_assert(sizeof(RTreeLeaf_details) == 0x20);
 
 struct FTreeLeaf_details {
-  boost::endian::big_uint32_buf_t keys[7];
-  boost::endian::big_uint32_buf_t values;
+  uint32_be_t keys[7];
+  uint32_be_t values;
 };
 static_assert(sizeof(FTreeLeaf_details) == 0x20);
 struct PTreeHeader {
-  boost::endian::big_uint16_buf_t tree_depth;
-  boost::endian::big_uint16_buf_t type;
-  boost::endian::big_uint16_buf_t root_offset;
-  boost::endian::big_uint16_buf_t items_count;
+  uint16_be_t tree_depth;
+  uint16_be_t type;
+  uint16_be_t root_offset;
+  uint16_be_t items_count;
 };
 static_assert(sizeof(PTreeHeader) == 0x8);
 
 struct EPTreeBlockFooter {
   PTreeHeader current_tree;
-  boost::endian::big_uint32_buf_t block_number;
-  boost::endian::big_uint8_buf_t depth;
-  boost::endian::big_uint8_buf_t padding[0xb];
+  uint32_be_t block_number;
+  uint8_be_t depth;
+  uint8_be_t padding[0xb];
   NodesHeapHeader heap_hader;
 };
 static_assert(sizeof(EPTreeBlockFooter) == 0x20);
