@@ -19,7 +19,9 @@
 #include "structs.h"
 
 Wfs::Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
-    : device_(std::make_shared<BlocksDevice>(device, key)) {
+    : Wfs(std::make_shared<BlocksDevice>(device, key)) {}
+
+Wfs::Wfs(const std::shared_ptr<BlocksDevice>& device) : device_(device) {
   // Read first area
   root_area_ = throw_if_error(Area::LoadRootArea(device_));
 }

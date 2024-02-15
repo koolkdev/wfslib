@@ -22,16 +22,19 @@ class BlocksDevice {
   BlocksDevice(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
 
   virtual void WriteBlock(uint32_t block_number,
+                          uint32_t size_in_blocks,
                           const std::span<std::byte>& data,
                           const std::span<std::byte>& hash,
                           uint32_t iv,
-                          bool encrypt);
+                          bool encrypt,
+                          bool recalculate_hash);
   virtual bool ReadBlock(uint32_t block_number,
+                         uint32_t size_in_blocks,
                          const std::span<std::byte>& data,
                          const std::span<const std::byte>& hash,
                          uint32_t iv,
                          bool encrypt,
-                         bool check_hash) const;
+                         bool check_hash);
 
   const Device* device() const { return device_.get(); }
 

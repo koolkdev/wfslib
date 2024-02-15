@@ -83,6 +83,7 @@ struct Attributes {
   bool IsDirectory() const { return !!(flags.value() & Flags::DIRECTORY); }
   bool IsFile() const { return !IsDirectory(); }
   bool IsLink() const { return !!(flags.value() & Flags::LINK); }
+  bool IsQuota() const { return !!(flags.value() & Flags::QUOTA); }
 
   size_t DataOffset() const;
 

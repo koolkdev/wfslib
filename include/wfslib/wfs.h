@@ -19,10 +19,12 @@ class Area;
 class WfsItem;
 class File;
 class Directory;
+class BlocksDevice;
 
 class Wfs {
  public:
   Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
+  Wfs(const std::shared_ptr<BlocksDevice>& device);
   ~Wfs();
 
   const std::shared_ptr<BlocksDevice>& GetDevice() { return device_; }

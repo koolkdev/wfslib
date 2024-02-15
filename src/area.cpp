@@ -16,7 +16,6 @@
 #include "utils.h"
 #include "wfs.h"
 
-
 Area::Area(const std::shared_ptr<BlocksDevice>& device,
            const std::shared_ptr<Area>& root_area,
            const std::shared_ptr<MetadataBlock>& block,
@@ -52,6 +51,14 @@ std::expected<std::shared_ptr<Directory>, WfsError> Area::GetDirectory(uint32_t 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetRootDirectory() {
   return GetDirectory(as_const(this)->header()->root_directory_block_number.value(), root_directory_name_,
                       root_directory_attributes_);
+}
+
+std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory1() {
+  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
+}
+
+std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory2() {
+  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_2.value(), ".shadow_dir_1", {});
 }
 
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_number,

@@ -16,20 +16,24 @@ BlocksDevice::BlocksDevice(const std::shared_ptr<Device>& device, const std::spa
     : device_(device), device_encryption_(std::make_unique<DeviceEncryption>(device, key)) {}
 
 void BlocksDevice::WriteBlock(uint32_t block_number,
+                              uint32_t /*size_in_blocks*/,
                               const std::span<std::byte>& data,
                               const std::span<std::byte>& hash,
                               uint32_t iv,
-                              bool encrypt) {
-  device_encryption_->CalculateHash(data, hash);
+                              bool encrypt,
+                              bool recalculate_hash) {
+  if (recalculate_hash)
+    device_encryption_->CalculateHash(data, hash);
   device_encryption_->WriteBlock(ToDeviceSector(block_number), data, iv, encrypt);
 }
 
 bool BlocksDevice::ReadBlock(uint32_t block_number,
+                             uint32_t /*size_in_blocks*/,
                              const std::span<std::byte>& data,
                              const std::span<const std::byte>& hash,
                              uint32_t iv,
                              bool encrypt,
-                             bool check_hash) const {
+                             bool check_hash) {
   device_encryption_->ReadBlock(ToDeviceSector(block_number), data, iv, encrypt);
   return !check_hash || device_encryption_->CheckHash(data, hash);
 }

@@ -10,9 +10,16 @@
 #include <cassert>
 #include <fstream>
 
-FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool read_only)
-    : file_(new std::fstream(path, std::ios::binary | (!read_only ? (std::ios::out | std::ios::in) : std::ios::in))),
+FileDevice::FileDevice(const std::string& path,
+                       uint32_t log2_sector_size,
+                       uint32_t sectors_count,
+                       bool read_only,
+                       bool create)
+    : file_(new std::fstream(
+          path,
+          std::ios::binary | (!create ? std::ios::in : 0) | ((create || !read_only) ? std::ios::out : 0))),
       log2_sector_size_(log2_sector_size),
+      sectors_count_(sectors_count),
       read_only_(read_only) {
   if (file_->fail()) {
     throw std::runtime_error("FileDevice: Failed to open file");
@@ -29,8 +36,9 @@ FileDevice::FileDevice(const std::string& path, uint32_t log2_sector_size, bool 
   sector size)");
   }
   sectors_count_ = static_cast<uint32_t>(file->tellg() >> log2_sector_size);*/
-  sectors_count_ = 0x10;  // we will find the exact sectors count later with
-                          // Wfs::DetectSectorsCount
+  if (sectors_count_ == 0)
+    sectors_count_ = 0x10;  // we will find the exact sectors count later with
+                            // Wfs::DetectSectorsCount
 }
 
 void FileDevice::ReadSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) {
