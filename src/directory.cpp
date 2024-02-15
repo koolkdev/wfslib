@@ -147,7 +147,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
         node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
                           ->get_item(node_state->current_index)
                           .value();
-        current_node = (block.get())->get_object<DirectoryTreeNode>(node_offset);
+        current_node = as_const(block.get())->get_object<DirectoryTreeNode>(node_offset);
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
