@@ -5,9 +5,11 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "sub_block_allocator.h"
 #include <bit>
 #include <cassert>
+#include <memory>
+
+#include "sub_block_allocator.h"
 #include "utils.h"
 
 namespace {
@@ -24,7 +26,7 @@ int GetSizeGroup(uint16_t size) {
 
 void SubBlockAllocatorBase::Init(uint16_t extra_header_size) {
   auto* header = this->header();
-  memset(header, 0, sizeof(*header) + extra_header_size);
+  std::memset(header, 0, sizeof(*header) + extra_header_size);
 
   uint16_t free_entries = 1 << (block_->log2_size() - MAX_BLOCK_SIZE);
   for (uint16_t i = 0; i < free_entries; ++i) {
