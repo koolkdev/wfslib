@@ -203,7 +203,8 @@ struct DirectoryTreeNode {
   boost::endian::big_uint8_buf_t choices_count;
 
  public:
-  std::string prefix() const { return {reinterpret_cast<const char*>(this + 1), prefix_length.value()}; }
+  std::string prefix() const { return {prefix_view().begin(), prefix_view().end()}; }
+  std::string_view prefix_view() const { return {reinterpret_cast<const char*>(this + 1), prefix_length.value()}; }
   std::span<const std::byte> choices() const {
     return {reinterpret_cast<const std::byte*>(this + 1) + prefix_length.value(), choices_count.value()};
   }
