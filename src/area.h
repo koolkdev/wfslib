@@ -40,6 +40,8 @@ class Area : public std::enable_shared_from_this<Area> {
 
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
+  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea1() const;
+  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea2() const;
 
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(uint32_t block_number,
                                                                    const std::string& name,

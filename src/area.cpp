@@ -58,7 +58,25 @@ std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory1() 
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory2() {
-  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_2.value(), ".shadow_dir_1", {});
+  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
+}
+
+std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea1() const {
+  if (!has_wfs_header())
+    return nullptr;
+  auto metadata_block = GetMetadataBlock(wfs_header()->transactions_area_block_number.value());
+  if (!metadata_block.has_value())
+    return std::unexpected(WfsError::kTransactionsAreaCorrupted);
+  return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_1", AttributesBlock{});
+}
+
+std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea2() const {
+  if (!has_wfs_header())
+    return nullptr;
+  auto metadata_block = GetMetadataBlock(wfs_header()->transactions_area_block_number.value());
+  if (!metadata_block.has_value())
+    return std::unexpected(WfsError::kTransactionsAreaCorrupted);
+  return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_1", AttributesBlock{});
 }
 
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_number,
