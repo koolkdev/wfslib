@@ -14,14 +14,17 @@ FileDevice::FileDevice(const std::string& path,
                        uint32_t log2_sector_size,
                        uint32_t sectors_count,
                        bool read_only,
-                       bool create)
+                       bool open_create)
     : log2_sector_size_(log2_sector_size), sectors_count_(sectors_count), read_only_(read_only) {
-  std::ios_base::openmode mode = std::ios::binary;
-  if (!create)
-    mode |= std::ios::in;
-  if (create || !read_only)
+  std::ios_base::openmode mode = std::ios::binary | std::ios::in;
+  if (!read_only)
     mode |= std::ios::out;
   file_.reset(new std::fstream(path, mode));
+  if (file_->fail() && open_create) {
+    // try to create the file
+    mode |= std::ios::trunc;
+    file_.reset(new std::fstream(path, mode));
+  }
   if (file_->fail()) {
     throw std::runtime_error("FileDevice: Failed to open file");
   }
