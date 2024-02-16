@@ -264,11 +264,11 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
         ((as_const(file_.get())->attributes_data().Attributes()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) +
         1;
     size_t blocks_count = ((data_blocks_clusters_count - 1) / ClustersInBlock()) + 1;
-    return sizeof(boost::endian::big_uint32_buf_t) * blocks_count;
+    return sizeof(uint32_be_t) * blocks_count;
   }
 
   virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
-    auto blocks_list = reinterpret_cast<const boost::endian::big_uint32_buf_t*>(GetAttributesMetadataEnd());
+    auto blocks_list = reinterpret_cast<const uint32_be_t*>(GetAttributesMetadataEnd());
     int64_t block_index = offset / (ClustersInBlock() << ClusterDataLog2Size());
     size_t offset_in_block = offset % (ClustersInBlock() << ClusterDataLog2Size());
     LoadMetadataBlock(blocks_list[-block_index - 1].value());

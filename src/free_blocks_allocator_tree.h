@@ -17,13 +17,13 @@
 
 template <typename T>
 concept has_keys = std::is_array<decltype(T::keys)>::value &&
-                   std::is_convertible<std::remove_extent_t<decltype(T::keys)>, boost::endian::big_uint32_buf_t>::value;
+                   std::is_convertible<std::remove_extent_t<decltype(T::keys)>, uint32_be_t>::value;
 
 template <typename T>
 concept has_array_values = std::is_array<decltype(T::values)>::value;
 
 template <typename T>
-concept has_nibble_values = std::is_convertible<decltype(T::values), boost::endian::big_uint32_buf_t>::value;
+concept has_nibble_values = std::is_convertible<decltype(T::values), uint32_be_t>::value;
 
 template <typename T>
 concept has_values = has_array_values<T> || has_nibble_values<T>;
@@ -58,10 +58,9 @@ using conditional_types = typename conditions_are<Pairs...>::type;
 
 template <has_values T>
 struct node_value_type {
-  using type =
-      conditional_types<conditional_type_pair<has_nibble_values<T>, nibble>,
-                        conditional_type_pair<is_array_value_type<T, boost::endian::big_uint32_buf_t>, uint32_t>,
-                        conditional_type_pair<is_array_value_type<T, boost::endian::big_uint16_buf_t>, uint16_t>>;
+  using type = conditional_types<conditional_type_pair<has_nibble_values<T>, nibble>,
+                                 conditional_type_pair<is_array_value_type<T, uint32_be_t>, uint32_t>,
+                                 conditional_type_pair<is_array_value_type<T, uint16_be_t>, uint16_t>>;
 };
 
 template <has_keys T>

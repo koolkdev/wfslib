@@ -12,14 +12,15 @@
 #include <cryptopp/sha.h>
 #include <algorithm>
 #include <array>
-#include <boost/endian/buffers.hpp>
 #include <cassert>
+
 #include "block.h"
 #include "device.h"
+#include "structs.h"
 #include "utils.h"
 
 struct WfsBlockIV {
-  boost::endian::big_uint32_buf_t iv[4];
+  uint32_be_t iv[4];
 };
 
 DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
