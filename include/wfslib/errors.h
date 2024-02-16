@@ -20,6 +20,7 @@ enum WfsError {
   kFreeBlocksAllocatorCorrupted,
   kFileDataCorrupted,
   kFileMetadataCorrupted,
+  kTransactionsAreaCorrupted,
 };
 
 class WfsException : public std::exception {

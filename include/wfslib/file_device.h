@@ -20,7 +20,7 @@ class FileDevice : public Device {
              uint32_t log2_sector_size = 9 /* 512 */,
              uint32_t sectors_count = 0,
              bool read_only = true,
-             bool create = false);
+             bool open_create = false);
   void ReadSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) override;
   void WriteSectors(const std::span<std::byte>& data, uint32_t sector_address, uint32_t sectors_count) override;
   uint32_t SectorsCount() const override { return sectors_count_; }
