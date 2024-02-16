@@ -76,7 +76,7 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea2() cons
   auto metadata_block = GetMetadataBlock(wfs_header()->transactions_area_block_number.value());
   if (!metadata_block.has_value())
     return std::unexpected(WfsError::kTransactionsAreaCorrupted);
-  return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_1", AttributesBlock{});
+  return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_2", AttributesBlock{});
 }
 
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_number,
