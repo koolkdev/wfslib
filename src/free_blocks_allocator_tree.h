@@ -342,10 +342,10 @@ class PTreeIterator {
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return allocator_->get_object<ParentNodeDetails>(offset);
+    return allocator_->template get_object<ParentNodeDetails>(offset);
   }
   const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
-    return allocator_->get_object<LeafNodeDetails>(offset);
+    return allocator_->template get_object<LeafNodeDetails>(offset);
   }
 
   const Allocator* allocator_;
