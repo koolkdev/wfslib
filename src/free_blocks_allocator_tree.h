@@ -401,9 +401,11 @@ class PTree : public Allocator {
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return this->get_object<ParentNodeDetails>(offset);
+    return this->template get_object<ParentNodeDetails>(offset);
   }
-  const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const { return this->get_object<LeafNodeDetails>(offset); }
+  const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
+    return this->template get_object<LeafNodeDetails>(offset);
+  }
 };
 
 static_assert(sizeof(RTreeNode_details) == sizeof(RTreeLeaf_details));
