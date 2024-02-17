@@ -28,17 +28,15 @@ class FreeBlocksAllocator {
     std::shared_ptr<const Area> area_;
   };
 
-  using Tree = EPTree<FreeBlocksAllocator::Adapter, MetadataBlock::Adapter>;
-
-  FreeBlocksAllocator(std::shared_ptr<const Area> area, std::shared_ptr<MetadataBlock> root_block);
+  FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> root_block);
 
   FreeBlocksAllocatorHeader* header() { return root_block()->get_object<FreeBlocksAllocatorHeader>(header_offset()); }
   const FreeBlocksAllocatorHeader* header() const {
     return root_block()->get_object<FreeBlocksAllocatorHeader>(header_offset());
   }
 
-  Tree& tree() { return tree_; }
-  const Tree& tree() const { return tree_; }
+  EPTree& tree() { return tree_; }
+  const EPTree& tree() const { return tree_; }
 
  private:
   MetadataBlock* root_block() { return root_block_.get(); }
@@ -47,7 +45,7 @@ class FreeBlocksAllocator {
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader); }
 
   std::shared_ptr<const Area> area_;
-  Tree tree_;
+  EPTree tree_;
 
   std::shared_ptr<MetadataBlock> root_block_;
 };

@@ -254,20 +254,20 @@ struct TreeSubBlockAllocatorHeader {
 };
 static_assert(sizeof(TreeSubBlockAllocatorHeader) == 0x8, "Incorrect sizeof TreeSubBlockAllocatorHeader");
 
-struct NodesHeapHeader {
-  uint16_be_t freelist_head_offset;
+struct HeapHeader {
+  uint16_be_t freelist_head;
   uint16_be_t allocated_blocks;
   uint16_be_t start_offset;
   uint16_be_t total_bytes;
 };
-static_assert(sizeof(NodesHeapHeader) == 0x8, "Incorrect sizeof NodesHeapHeader");
+static_assert(sizeof(HeapHeader) == 0x8, "Incorrect sizeof HeapHeader");
 
-struct NodesHeapFreelistEntry {
+struct HeapFreelistEntry {
   uint32_be_t init_zero;  // zero, never used
   uint32_be_t next;       // index in the heap entries list
   uint16_be_t count;      // freed entries count
 };
-static_assert(sizeof(NodesHeapFreelistEntry) == 0xA, "Incorrect sizeof NodesHeapFreelistEntry");
+static_assert(sizeof(HeapFreelistEntry) == 0xA, "Incorrect sizeof HeapFreelistEntry");
 
 // The nodes represent ranges. There may between 1 and 6 sub-nodes.
 // The key represent the split point. So there can be between 0-5 keys (they end with zero keys)
@@ -297,17 +297,20 @@ struct PTreeHeader {
 };
 static_assert(sizeof(PTreeHeader) == 0x8);
 
-struct EPTreeBlockFooter {
+struct EPTreeFooter {
   PTreeHeader current_tree;
   uint32_be_t block_number;
   uint8_be_t depth;
   uint8_be_t padding[0xb];
-  NodesHeapHeader heap_hader;
 };
-static_assert(sizeof(EPTreeBlockFooter) == 0x20);
+static_assert(sizeof(EPTreeFooter) == 0x18);
 
-struct FTreesBlockFooter {
+struct FTreesFooter {
   PTreeHeader trees[7];  // tree per each size of block
-  NodesHeapHeader heap_hader;
 };
-static_assert(sizeof(FTreesBlockFooter) == 0x40);
+static_assert(sizeof(FTreesFooter) == 0x38);
+
+struct FTreesBlockHeader {
+  uint8_be_t padding[8];
+};
+static_assert(sizeof(FTreesBlockHeader) == 8);

@@ -65,7 +65,6 @@ class Area : public std::enable_shared_from_this<Area> {
   uint32_t BlockNumber() const;
   uint32_t BlocksCount() const;
 
-  std::expected<std::shared_ptr<const FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator() const;
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  private:

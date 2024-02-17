@@ -138,16 +138,9 @@ uint32_t Area::BlocksCount() const {
   return root_directory_attributes_.Attributes()->blocks_count.value();
 }
 
-std::expected<std::shared_ptr<const FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() const {
+std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() {
   auto metadata_block = GetMetadataBlock(FreeBlocksAllocatorBlockNumber);
   if (!metadata_block.has_value())
     return std::unexpected(WfsError::kFreeBlocksAllocatorCorrupted);
   return std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(*metadata_block));
-}
-
-std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() {
-  auto res = as_const(this)->GetFreeBlocksAllocator();
-  if (!res.has_value())
-    return std::unexpected(res.error());
-  return std::const_pointer_cast<FreeBlocksAllocator>(*res);
 }
