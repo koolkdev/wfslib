@@ -64,7 +64,9 @@ std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory2() 
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea1() const {
   if (!has_wfs_header())
     return nullptr;
-  auto metadata_block = GetMetadataBlock(wfs_header()->transactions_area_block_number.value());
+  auto metadata_block =
+      MetadataBlock::LoadBlock(device_, wfs_header()->transactions_area_block_number.value(), Block::BlockSize::Basic,
+                               IV(wfs_header()->transactions_area_block_number.value()));
   if (!metadata_block.has_value())
     return std::unexpected(WfsError::kTransactionsAreaCorrupted);
   return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_1", AttributesBlock{});
@@ -73,7 +75,9 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea1() cons
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea2() const {
   if (!has_wfs_header())
     return nullptr;
-  auto metadata_block = GetMetadataBlock(wfs_header()->transactions_area_block_number.value());
+  auto metadata_block =
+      MetadataBlock::LoadBlock(device_, wfs_header()->transactions_area_block_number.value() + 1,
+                               Block::BlockSize::Basic, IV(wfs_header()->transactions_area_block_number.value() + 1));
   if (!metadata_block.has_value())
     return std::unexpected(WfsError::kTransactionsAreaCorrupted);
   return std::make_shared<Area>(device_, nullptr, *metadata_block, ".transactions_area_2", AttributesBlock{});
@@ -96,13 +100,13 @@ std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(u
 
 uint32_t Area::IV(uint32_t block_number) const {
   return (header()->iv.value() ^ (root_area_ ? as_const(root_area_.get()) : this)->wfs_header()->iv.value()) +
-         (ToBasicBlockNumber(block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
+         ((block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
                                                                                Block::BlockSize size) const {
   return MetadataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size,
-                                  IV(block_number));
+                                  IV(ToBasicBlockNumber(block_number)));
 }
 
 std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t block_number,
@@ -111,7 +115,7 @@ std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t 
                                                                        const DataBlock::DataBlockHash& data_hash,
                                                                        bool encrypted) const {
   return DataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size, data_size,
-                              IV(block_number), data_hash, encrypted);
+                              IV(ToBasicBlockNumber(block_number)), data_hash, encrypted);
 }
 
 uint32_t Area::ToBasicBlockNumber(uint32_t block_number) const {
