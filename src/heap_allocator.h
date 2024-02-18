@@ -42,9 +42,9 @@ class TreeNodesAllocator {
   {
     // Find first entry with at least count frees.
     const HeapFreelistEntry* current = nullptr;
-    uint16_t prev_index = 0;
-    for (uint16_t current_index = as_const(this)->heap_header()->freelist_head.value(); current_index < entries_count();
-         current_index = current->next) {
+    uint32_t prev_index = 0;
+    for (uint32_t current_index = as_const(this)->heap_header()->freelist_head.value(); current_index < entries_count();
+         current_index = current->next.value()) {
       current = as_const(this)->get_freelist_entry(current_index);
       if (count <= current->count.value()) {
         auto* prev_next = (current_index == heap_header()->freelist_head.value())
@@ -70,17 +70,18 @@ class TreeNodesAllocator {
     requires check_node_size<T, entry_size>
   {
     assert(count > 0 && node >= get_entry<T>(0) && (node + count - 1) <= get_entry<T>(entries_count() - 1));
-    uint16_t index = node - get_entry<T>(0);
-    uint16_t next_index;
+    uint32_t index = node - get_entry<T>(0);
+    uint32_t next_index;
     if (index < heap_header()->freelist_head.value()) {
       // our entry is before the freelist, so no prev
       next_index = heap_header()->freelist_head.value();
       heap_header()->freelist_head = index;
     } else {
       // try coallese with prev
-      uint16_t prev_index = 0;
-      for (uint16_t prev_index = heap_header()->freelist_head.value(); get_freelist_entry(prev_index)->next < index;
-           prev_index = get_freelist_entry(prev_index)->next)
+      uint32_t prev_index = 0;
+      for (uint32_t prev_index = heap_header()->freelist_head.value();
+           get_freelist_entry(prev_index)->next.value() < index;
+           prev_index = get_freelist_entry(prev_index)->next.value())
         ;
       auto* prev = get_freelist_entry(index);
       next_index = prev->next.value();
@@ -138,18 +139,18 @@ class TreeNodesAllocator {
   uint16_t entries_start_offset() const { return heap_header()->start_offset.value(); }
 
   template <typename T>
-  T* get_entry(uint16_t index) {
+  T* get_entry(uint32_t index) {
     assert(index < entries_count());
     return block()->template get_object<T>(entries_start_offset() + entry_size * index);
   }
   template <typename T>
-  const T* get_entry(uint16_t index) const {
+  const T* get_entry(uint32_t index) const {
     assert(index < entries_count());
     return block()->template get_object<T>(entries_start_offset() + entry_size * index);
   }
 
-  HeapFreelistEntry* get_freelist_entry(uint16_t index) { return get_entry<HeapFreelistEntry>(index); }
-  const HeapFreelistEntry* get_freelist_entry(uint16_t index) const { return get_entry<HeapFreelistEntry>(index); }
+  HeapFreelistEntry* get_freelist_entry(uint32_t index) { return get_entry<HeapFreelistEntry>(index); }
+  const HeapFreelistEntry* get_freelist_entry(uint32_t index) const { return get_entry<HeapFreelistEntry>(index); }
 
   constexpr uint16_t footer_size() const { return sizeof(tree_header_type) + sizeof(HeapHeader); }
   constexpr uint16_t header_size() const { return sizeof(MetadataBlockHeader) + sizeof(extra_header_type); }
