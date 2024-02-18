@@ -23,8 +23,8 @@ struct WfsBlockIV {
   uint32_be_t iv[4];
 };
 
-DeviceEncryption::DeviceEncryption(std::shared_ptr<Device> device, std::span<std::byte> key)
-    : device_(device), key_(key.begin(), key.end()) {}
+DeviceEncryption::DeviceEncryption(std::shared_ptr<Device> device, std::vector<std::byte> key)
+    : device_(device), key_(std::move(key)) {}
 
 // static
 void DeviceEncryption::HashData(std::initializer_list<std::span<const std::byte>> data,

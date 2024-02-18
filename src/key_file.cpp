@@ -9,21 +9,32 @@
 
 #include <cryptopp/aes.h>
 #include <cryptopp/modes.h>
+#include <format>
 #include <fstream>
 
 template <class T>
-T* KeyFile::LoadFromFile(const std::string& path, size_t size) {
-  static_assert(std::is_base_of<KeyFile, T>::value, "T must be a descendant of KeyFile");
+class KeyFileException : public std::exception {
+ public:
+  KeyFileException(std::string error) : msg_(std::format("{}: {}", typeid(T).name(), error)) {}
+  char const* what() const noexcept override { return msg_.data(); }
 
+ private:
+  std::string msg_;
+};
+
+template <class T>
+T* KeyFile::LoadFromFile(const std::string& path, size_t size)
+  requires std::is_base_of<KeyFile, T>::value
+{
   std::fstream file(path, std::ios::binary | std::ios::in);
   if (file.fail()) {
-    throw std::runtime_error("KeyFile: Failed to open file");
+    throw KeyFileException<T>(std::format("Failed to key file {}", path));
   }
 
   std::vector<std::byte> data(size);
   file.read(reinterpret_cast<char*>(data.data()), size);
   if (file.gcount() != static_cast<std::streamsize>(size))
-    throw std::runtime_error("KeyFile: KeyFile too small");
+    throw KeyFileException<T>(std::format("key flle too small (expected: {}, actual: {})", size, file.gcount()));
   return new T(data);
 }
 
