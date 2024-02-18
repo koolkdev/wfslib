@@ -9,6 +9,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <span>
 #include <unordered_map>
 
@@ -19,7 +20,7 @@ class DeviceEncryption;
 
 class BlocksDevice {
  public:
-  BlocksDevice(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
+  BlocksDevice(std::shared_ptr<Device> device, std::optional<std::span<std::byte>> key = std::nullopt);
   virtual ~BlocksDevice() = default;
 
   virtual void WriteBlock(uint32_t block_number,

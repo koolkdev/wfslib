@@ -139,7 +139,7 @@ uint32_t Area::BlockNumber() const {
 }
 
 uint32_t Area::BlocksCount() const {
-  return root_directory_attributes_.Attributes()->blocks_count.value();
+  return header()->blocks_count.value();
 }
 
 std::expected<std::shared_ptr<const FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() const {
