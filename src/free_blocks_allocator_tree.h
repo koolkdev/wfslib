@@ -70,15 +70,15 @@ struct node_keys_capacity {
 
 template <has_keys T>
 struct node_access_key {
-  static uint32_t get(const T& node, int i) { return node.keys[i].value(); }
+  static uint32_t get(const T& node, size_t i) { return node.keys[i].value(); }
 };
-template <int index, has_keys T>
+template <size_t index, has_keys T>
   requires(0 <= index && index < node_keys_capacity<T>::value)
 uint32_t node_get_key(const T& node) {
   return node_access_key<T>::get(node, index);
 }
 template <has_keys T>
-uint32_t node_get_key(const T& node, int index) {
+uint32_t node_get_key(const T& node, size_t index) {
   assert(0 <= index && index < node_keys_capacity<T>::value);
   return node_access_key<T>::get(node, index);
 }
@@ -98,22 +98,22 @@ template <typename T>
 struct node_access_value;
 template <has_array_values T>
 struct node_access_value<T> {
-  static node_value_type<T>::type get(const T& node, int i) { return node.values[i].value(); }
+  static node_value_type<T>::type get(const T& node, size_t i) { return node.values[i].value(); }
 };
 template <has_nibble_values T>
 struct node_access_value<T> {
-  static node_value_type<T>::type get(const T& node, int i) {
+  static node_value_type<T>::type get(const T& node, size_t i) {
     return static_cast<nibble>((node.values.value() >> (4 * i)) & 0xf);
   }
 };
-template <int index, has_values T>
-  requires(0 <= index && index < node_values_capacity<T>::value)
+template <size_t index, has_values T>
+  requires(index < node_values_capacity<T>::value)
 node_value_type<T>::type node_get_value(const T& node) {
   return node_access_value<T>::get(node, index);
 }
 template <has_values T>
-node_value_type<T>::type node_get_value(const T& node, int index) {
-  assert(0 <= index && index < node_values_capacity<T>::value);
+node_value_type<T>::type node_get_value(const T& node, size_t index) {
+  assert(index < node_values_capacity<T>::value);
   return node_access_value<T>::get(node, index);
 }
 
@@ -180,18 +180,18 @@ class PTreeNodeIterator {
   using difference_type = std::ptrdiff_t;
   using value_type = std::pair<uint32_t, typename node_value_type<T>::type>;
 
-  PTreeNodeIterator(const T* node, int index, size_t size) : node(node), index(index), size(size) {}
+  PTreeNodeIterator(const T* node, size_t index, size_t size) : node(node), index(index), size(size) {}
 
   value_type operator*()
     requires is_parent_node_details<T>
   {
-    assert(index >= 0 && index < size);
+    assert(index < size);
     return value_type{index == 0 ? 0 : node_get_key(*node, index - 1), node_get_value(*node, index)};
   }
   value_type operator*()
     requires is_leaf_node_details<T>
   {
-    assert(index >= 0 && index < size);
+    assert(index < size);
     return value_type(node_get_key(*node, index), node_get_value(*node, index));
   }
 
@@ -222,7 +222,7 @@ class PTreeNodeIterator {
 
  private:
   const T* node;
-  int index;
+  size_t index;
   size_t size;
 };
 
