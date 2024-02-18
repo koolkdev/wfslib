@@ -17,7 +17,7 @@ struct WfsBlockIV;
 
 class DeviceEncryption {
  public:
-  DeviceEncryption(std::shared_ptr<Device> device, std::span<std::byte> key);
+  DeviceEncryption(std::shared_ptr<Device> device, std::vector<std::byte> key);
 
   void EncryptBlock(const std::span<std::byte>& data, uint32_t iv);
   void DecryptBlock(const std::span<std::byte>& data, uint32_t iv) const;

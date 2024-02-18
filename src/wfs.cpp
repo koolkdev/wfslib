@@ -18,12 +18,17 @@
 #include "metadata_block.h"
 #include "structs.h"
 
-Wfs::Wfs(std::shared_ptr<Device> device, std::optional<std::span<std::byte>> key)
+Wfs::Wfs(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key)
     : Wfs(std::make_shared<BlocksDevice>(std::move(device), std::move(key))) {}
 
 Wfs::Wfs(std::shared_ptr<BlocksDevice> device) : device_(std::move(device)) {
   // Read first area
-  root_area_ = throw_if_error(Area::LoadRootArea(device_));
+  auto area = Area::LoadRootArea(device_);
+  if (!area.has_value())
+    throw std::runtime_error("Failed to load first block (bad key?)");
+  if (as_const(area->get())->wfs_header()->version.value() != 0x01010800)
+    throw std::runtime_error("Unexpected WFS version (bad key?)");
+  root_area_ = *area;
 }
 
 Wfs::~Wfs() {
@@ -91,7 +96,8 @@ void Wfs::Flush() {
   device_->FlushAll();
 }
 
-void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device, const std::span<std::byte>& key) {
+void Wfs::DetectDeviceSectorSizeAndCount(std::shared_ptr<FileDevice> device,
+                                         std::optional<std::vector<std::byte>> key) {
   // The encryption of the blocks depends on the device sector size and count, which builds the IV
   // We are going to find out the correct first 0x10 bytes, and than xor it with what we read to find out the correct IV
   // From that IV we extract the sectors count and sector size of the device.
@@ -102,7 +108,6 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   // 0x10, because this is the max we are going to read right now
   device->SetSectorsCount(0x10);
   device->SetLog2SectorSize(9);
-  auto enc_device = std::make_shared<DeviceEncryption>(device, key);
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
   std::shared_ptr<const MetadataBlock> block =
       *MetadataBlock::LoadBlock(blocks_device, 0, Block::BlockSize::Basic, 0, false);
@@ -113,6 +118,13 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   if (!(wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
       (wfs_header->root_area_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
     block_size = Block::BlockSize::Regular;
+  if (!key) {
+    // If plain, guess sectore size 1<<9
+    auto sectors_count = wfs_header->root_area_attributes.blocks_count.value()
+                         << (block_size - device->Log2SectorSize());
+    device->SetSectorsCount(sectors_count);
+    return;
+  }
   block.reset();
   // Now lets read it again, this time with the correct block size
   block = *MetadataBlock::LoadBlock(blocks_device, 0, block_size, 0, false);
@@ -124,7 +136,8 @@ void Wfs::DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& devi
   xored_sectors_count = first_4_dwords[2].value();
   xored_sector_size = first_4_dwords[3].value();
   // Lets calculate the hash of the block
-  enc_device->CalculateHash(data, {data.data() + offsetof(MetadataBlockHeader, hash), enc_device->DIGEST_SIZE});
+  DeviceEncryption::CalculateHash(data,
+                                  {data.data() + offsetof(MetadataBlockHeader, hash), DeviceEncryption::DIGEST_SIZE});
   // Now xor it with the real hash
   xored_sectors_count ^= first_4_dwords[2].value();
   xored_sector_size ^= first_4_dwords[3].value();

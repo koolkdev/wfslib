@@ -24,7 +24,7 @@ class BlocksDevice;
 
 class Wfs {
  public:
-  Wfs(std::shared_ptr<Device> device, std::optional<std::span<std::byte>> key = std::nullopt);
+  Wfs(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key = std::nullopt);
   Wfs(std::shared_ptr<BlocksDevice> device);
   ~Wfs();
 
@@ -34,8 +34,8 @@ class Wfs {
   std::shared_ptr<File> GetFile(const std::string& filename);
   std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-  static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device,
-                                             const std::span<std::byte>& key);
+  static void DetectDeviceSectorSizeAndCount(std::shared_ptr<FileDevice> device,
+                                             std::optional<std::vector<std::byte>> key = std::nullopt);
 
   std::shared_ptr<Area> GetRootArea() { return root_area_; }
 

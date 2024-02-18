@@ -12,7 +12,7 @@
 #include "device.h"
 #include "device_encryption.h"
 
-BlocksDevice::BlocksDevice(std::shared_ptr<Device> device, std::optional<std::span<std::byte>> key)
+BlocksDevice::BlocksDevice(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key)
     : device_(std::move(device)),
       device_encryption_(key ? std::make_unique<DeviceEncryption>(device_, std::move(*key)) : nullptr) {}
 

@@ -69,6 +69,8 @@ class Area : public std::enable_shared_from_this<Area> {
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  private:
+  friend class Wfs;
+
   static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
 
   MetadataBlock* block() { return header_block_.get(); }

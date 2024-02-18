@@ -20,7 +20,8 @@ class KeyFile {
 
  protected:
   template <class T>
-  static T* LoadFromFile(const std::string& path, size_t size);
+  static T* LoadFromFile(const std::string& path, size_t size)
+    requires std::is_base_of<KeyFile, T>::value;
 
   std::vector<std::byte> data_;
 

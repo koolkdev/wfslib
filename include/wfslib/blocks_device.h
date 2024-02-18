@@ -20,7 +20,7 @@ class DeviceEncryption;
 
 class BlocksDevice {
  public:
-  BlocksDevice(std::shared_ptr<Device> device, std::optional<std::span<std::byte>> key = std::nullopt);
+  BlocksDevice(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key = std::nullopt);
   virtual ~BlocksDevice() = default;
 
   virtual void WriteBlock(uint32_t block_number,
