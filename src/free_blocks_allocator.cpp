@@ -11,3 +11,14 @@ FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<const Area> area, std::
     : area_(area),
       tree_{Adapter{area}, area->RelativeBlockNumber(root_block->BlockNumber())},
       root_block_(std::move(root_block)) {}
+
+void FreeBlocksAllocator::iterate() const {
+  for (const auto& [tree_block_number, free_tree] : tree()) {
+    for (const auto& free_tree_per_size : free_tree) {
+      for (const auto& [block_number, blocks_count] : free_tree_per_size) {
+        std::ignore = block_number;
+        std::ignore = blocks_count;
+      }
+    }
+  }
+}
