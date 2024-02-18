@@ -73,13 +73,13 @@ struct node_access_key {
   static uint32_t get(const T& node, size_t i) { return node.keys[i].value(); }
 };
 template <size_t index, has_keys T>
-  requires(0 <= index && index < node_keys_capacity<T>::value)
+  requires(index < node_keys_capacity<T>::value)
 uint32_t node_get_key(const T& node) {
   return node_access_key<T>::get(node, index);
 }
 template <has_keys T>
 uint32_t node_get_key(const T& node, size_t index) {
-  assert(0 <= index && index < node_keys_capacity<T>::value);
+  assert(index < node_keys_capacity<T>::value);
   return node_access_key<T>::get(node, index);
 }
 
