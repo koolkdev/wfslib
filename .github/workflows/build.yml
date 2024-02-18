@@ -12,6 +12,7 @@ jobs:
       matrix:
         platform: [ubuntu-latest, windows-latest, macos-13]
         compiler: [msvc, gcc, llvm]
+        config: [debug, release]
         exclude:
           - platform: windows-latest
             compiler: gcc
@@ -77,4 +78,4 @@ jobs:
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "default"
-          buildPreset: "release"
+          buildPreset: matrix.config
