@@ -125,7 +125,7 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenWfsWithoutDevicePara
 }
 
 namespace {
-class FakeWfsHeaderBlocksDevice : public BlocksDevice {
+class FakeWfsHeaderBlocksDevice final : public BlocksDevice {
  public:
   FakeWfsHeaderBlocksDevice(std::shared_ptr<Device> device,
                             std::optional<std::vector<std::byte>> key,
