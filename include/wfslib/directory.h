@@ -41,6 +41,7 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
  private:
   friend DirectoryItemsIterator;
+  friend class Recovery;
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<Area> area_;
