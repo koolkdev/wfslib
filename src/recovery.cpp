@@ -22,7 +22,6 @@ namespace {
 
 bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
                                       std::shared_ptr<BlocksDevice> blocks_device,
-                                      std::optional<std::vector<std::byte>> key,
                                       uint32_t block_number,
                                       uint32_t area_start_block_number,
                                       Block::BlockSize block_size,
@@ -110,7 +109,7 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
     block_size = Block::BlockSize::Regular;
   block.reset();
   uint32_t area_xor_wfs_iv;
-  if (!RestoreMetadataBlockIVParameters(device, blocks_device, key, 0, 0, block_size, area_xor_wfs_iv)) {
+  if (!RestoreMetadataBlockIVParameters(device, blocks_device, 0, 0, block_size, area_xor_wfs_iv)) {
     return WfsError::kAreaHeaderCorrupted;
   }
   return std::nullopt;
@@ -179,8 +178,8 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
 
   uint32_t root_area_xor_wfs_iv;
   // Assume regular sized area
-  if (!RestoreMetadataBlockIVParameters(device, blocks_device, key, kUsrDirectoryBlockNumber, 0,
-                                        Block::BlockSize::Regular, root_area_xor_wfs_iv)) {
+  if (!RestoreMetadataBlockIVParameters(device, blocks_device, kUsrDirectoryBlockNumber, 0, Block::BlockSize::Regular,
+                                        root_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
 
@@ -242,8 +241,7 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   }
   uint32_t sub_area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(
-          device, blocks_device, key,
-          sub_area->AbsoluteBlockNumber(sub_area->header()->root_directory_block_number.value()),
+          device, blocks_device, sub_area->AbsoluteBlockNumber(sub_area->header()->root_directory_block_number.value()),
           sub_area->AbsoluteBlockNumber(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
