@@ -13,8 +13,8 @@
 #include <memory>
 #include <optional>
 
-#include "heap_allocator.h"
 #include "structs.h"
+#include "tree_nodes_allocator.h"
 
 template <typename T>
 concept has_keys = std::is_array<decltype(T::keys)>::value &&
@@ -513,7 +513,7 @@ class EPTreeIterator {
   std::shared_ptr<Area> area_;
 };
 
-class FreeBlocksAllocator : EPTreeBlock {
+class FreeBlocksAllocator : public EPTreeBlock {
  public:
   using iterator = EPTreeIterator;
   using const_iterator = const iterator;
