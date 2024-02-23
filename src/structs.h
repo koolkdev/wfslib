@@ -239,7 +239,7 @@ struct InternalDirectoryTreeNode : DirectoryTreeNode {
 
 struct FreeBlocksAllocatorHeader {
   uint32_be_t free_blocks_count;
-  uint32_be_t unknown;  // initialized to 1
+  uint32_be_t always_one;  // initialized to 1
   // When createa a new area, a fixed amount of blocks are allocated for metadata blocks for quick allocation. When
   // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
   // When no more availabe blocks are avaialbe, it will allocate them regulary.

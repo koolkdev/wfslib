@@ -17,9 +17,9 @@
 #include "structs.h"
 #include "wfs_item.h"
 
-class FreeBlocksAllocator;
 class BlocksDevice;
 class Directory;
+class FreeBlocksAllocator;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
