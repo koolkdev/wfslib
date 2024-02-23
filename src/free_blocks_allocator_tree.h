@@ -14,6 +14,7 @@
 #include <optional>
 
 #include "structs.h"
+#include "tree_nodes_allocator.h"
 
 template <typename T>
 concept has_keys = std::is_array<decltype(T::keys)>::value &&
@@ -242,65 +243,40 @@ class PTreeNode {
   size_t size_;
 };
 
-/*
-class NodesAllocator {
- public:
-  NodesAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
-
-  template <typename T>
-  T* GetNode(uint16_t offset) {
-    return reinterpret_cast<T*>(&block_->Data()[offset]);
-  }
-
-  template <typename T>
-  T* GetRootNode() {
-    return GetNode<T>(Header()->root.value());
-  }
-
- private:
-  std::shared_ptr<MetadataBlock> block_;
-
-  // TODO uint16_t Alloc(uint16_t size);
-  // TODO void Free(uint16_t offset);
-
-  SubBlockAllocatorStruct* Header();
-};*/
-
+template <typename T, typename U>
+concept nodes_allocator_methods = requires(T& allocator, U* node_type) {
+                                    { allocator.template get_object<U>(uint16_t{0}) } -> std::same_as<U*>;
+                                    { allocator.template Alloc<U>(uint16_t{0}) } -> std::same_as<U*>;
+                                    allocator.template Free<U>(node_type, uint16_t{0});
+                                  } && requires(const T& allocator) {
+                                         { allocator.template get_object<U>(uint16_t{0}) } -> std::same_as<const U*>;
+                                       };
 template <typename T>
-T* get_object(const std::span<std::byte> block_data, uint16_t offset) {
-  return reinterpret_cast<T*>(block_data.data() + offset);
-}
+concept nodes_allocator_construct = std::constructible_from<T, std::shared_ptr<MetadataBlock>>;
 
-template <typename T>
-const T* get_object(const std::span<const std::byte> block_data, uint16_t offset) {
-  return reinterpret_cast<const T*>(block_data.data() + offset);
-}
+template <typename T, typename U>
+concept nodes_allocator = nodes_allocator_methods<T, U> && nodes_allocator_construct<T>;
 
-template <typename T>
-concept nodes_allocator = requires(T& allocator) {
-                            { allocator.data() } -> std::convertible_to<std::vector<std::byte>>;
-                            { allocator.alloc(int{0}) } -> std::convertible_to<uint16_t>;
-                            allocator.free(uint16_t{0});
-                          };
-
-template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
+template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails, typename Allocator>
+  requires nodes_allocator<Allocator, ParentNodeDetails> && nodes_allocator<Allocator, LeafNodeDetails>
 class PTreeIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = std::ptrdiff_t;
   using value_type = std::pair<uint32_t, typename node_value_type<LeafNodeDetails>::type>;
+  using iterator_type = PTreeIterator<ParentNodeDetails, LeafNodeDetails, Allocator>;
 
   template <typename T>
   using node_iterator_info = std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
 
-  PTreeIterator(std::span<const std::byte> block_data,
+  PTreeIterator(const Allocator* allocator,
                 std::vector<node_iterator_info<ParentNodeDetails>> parents,
                 std::optional<node_iterator_info<LeafNodeDetails>> leaf)
-      : block_data_(std::move(block_data)), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
+      : allocator_(allocator), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
   value_type operator*() { return *leaf_->second; }
 
-  PTreeIterator<ParentNodeDetails, LeafNodeDetails>& operator++() {
+  iterator_type& operator++() {
     if (++leaf_->second == leaf_->first.end()) {
       auto parent = parents_.end();
       if (parent == parents_.begin())
@@ -321,7 +297,7 @@ class PTreeIterator {
     return *this;
   }
 
-  PTreeIterator<ParentNodeDetails, LeafNodeDetails>& operator--() {
+  iterator_type& operator--() {
     if (leaf_->second == leaf_->first.begin()) {
       auto parent = parents_.end();
       if (parent == parents_.begin())
@@ -345,155 +321,133 @@ class PTreeIterator {
     return *this;
   }
 
-  PTreeIterator<ParentNodeDetails, LeafNodeDetails> operator++(int) {
-    PTreeIterator<ParentNodeDetails, LeafNodeDetails> tmp(*this);
+  iterator_type operator++(int) {
+    iterator_type tmp(*this);
     ++(*this);
     return tmp;
   }
 
-  PTreeIterator<ParentNodeDetails, LeafNodeDetails> operator--(int) {
-    PTreeIterator<ParentNodeDetails, LeafNodeDetails> tmp(*this);
+  iterator_type operator--(int) {
+    iterator_type tmp(*this);
     --(*this);
     return tmp;
   }
 
-  bool operator==(const PTreeIterator<ParentNodeDetails, LeafNodeDetails>& other) const {
+  bool operator==(const iterator_type& other) const {
     if (!leaf_ || !other.leaf_)
       return !other.leaf_ && !other.leaf_;
     return leaf_->second == other.leaf_->second;
   }
-  bool operator!=(const PTreeIterator<ParentNodeDetails, LeafNodeDetails>& other) const { return !operator==(other); }
+  bool operator!=(const iterator_type& other) const { return !operator==(other); }
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return get_object<ParentNodeDetails>(block_data_, offset);
+    return allocator_->template get_object<ParentNodeDetails>(offset);
   }
   const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
-    return get_object<LeafNodeDetails>(block_data_, offset);
+    return allocator_->template get_object<LeafNodeDetails>(offset);
   }
 
-  std::span<const std::byte> block_data_;
+  const Allocator* allocator_;
   std::vector<node_iterator_info<ParentNodeDetails>> parents_;
   std::optional<node_iterator_info<LeafNodeDetails>> leaf_;
 };
 
-template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
-class PTree {
+template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails, typename Allocator>
+  requires nodes_allocator<Allocator, ParentNodeDetails> && nodes_allocator<Allocator, LeafNodeDetails>
+class PTree : public Allocator {
  public:
-  using iterator = PTreeIterator<ParentNodeDetails, LeafNodeDetails>;
+  using iterator = PTreeIterator<ParentNodeDetails, LeafNodeDetails, Allocator>;
   using const_iterator = const iterator;
 
   template <typename T>
   using node_iterator_info = std::pair<PTreeNode<T>, typename PTreeNode<T>::iterator>;
 
-  PTree(const PTreeHeader* header, std::span<const std::byte> block_data) : header_(header), block_data_(block_data) {}
+  PTree(std::shared_ptr<MetadataBlock> block) : Allocator(std::move(block)) {}
 
-  size_t size() const { return header_->items_count.value(); }
+  virtual PTreeHeader* header() = 0;
+  virtual const PTreeHeader* header() const = 0;
+
+  size_t size() const { return header()->items_count.value(); }
   iterator begin() const {
     if (size() == 0)
-      return iterator(block_data_, {}, std::nullopt);
+      return iterator(this, {}, std::nullopt);
     std::vector<node_iterator_info<ParentNodeDetails>> parents;
-    uint16_t node_offset = header_->root_offset.value();
-    for (int i = 0; i < header_->tree_depth.value(); ++i) {
+    uint16_t node_offset = header()->root_offset.value();
+    for (int i = 0; i < header()->tree_depth.value(); ++i) {
       PTreeNode<ParentNodeDetails> node{GetParentNodeData(node_offset)};
       parents.push_back({node, node.begin()});
       node_offset = (*parents.back().second).second;  // TODO: by ref
     }
     PTreeNode<LeafNodeDetails> leaf{GetLeafNodeData(node_offset)};
-    return iterator(block_data_, std::move(parents), {{leaf, leaf.begin()}});
+    return iterator(this, std::move(parents), {{leaf, leaf.begin()}});
   }
   iterator end() const {
     if (size() == 0)
-      return iterator(block_data_, {}, std::nullopt);
+      return iterator(this, {}, std::nullopt);
     std::vector<node_iterator_info<ParentNodeDetails>> parents;
-    uint16_t node_offset = header_->root_offset.value();
-    for (int i = 0; i < header_->tree_depth.value(); ++i) {
+    uint16_t node_offset = header()->root_offset.value();
+    for (int i = 0; i < header()->tree_depth.value(); ++i) {
       PTreeNode<ParentNodeDetails> node{GetParentNodeData(node_offset)};
       parents.push_back({node, node.end()});
       auto prev = node.end();
       node_offset = (*--prev).second;  // TODO: by ref
     }
     PTreeNode<LeafNodeDetails> leaf{GetLeafNodeData(node_offset)};
-    return iterator(block_data_, std::move(parents), {{leaf, leaf.end()}});
+    return iterator(this, std::move(parents), {{leaf, leaf.end()}});
   }
   const_iterator cbegin() const { return begin(); }
   const_iterator cend() const { return end(); }
 
  private:
   const ParentNodeDetails* GetParentNodeData(uint16_t offset) const {
-    return get_object<ParentNodeDetails>(block_data_, offset);
+    return this->template get_object<ParentNodeDetails>(offset);
   }
   const LeafNodeDetails* GetLeafNodeData(uint16_t offset) const {
-    return get_object<LeafNodeDetails>(block_data_, offset);
+    return this->template get_object<LeafNodeDetails>(offset);
   }
-
-  const PTreeHeader* header_;
-  std::span<const std::byte> block_data_;
 };
 
-template <typename T>
-concept is_non_const_block = requires(T& block) {
-                               { block.data() } -> std::convertible_to<std::span<std::byte>>;
-                             };
+static_assert(sizeof(RTreeNode_details) == sizeof(RTreeLeaf_details));
+using EPTreeBlock = TreeNodesAllocator<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(RTreeNode_details)>;
+static_assert(sizeof(RTreeNode_details) == sizeof(FTreeLeaf_details));
+using FTreesBlock = TreeNodesAllocator<FTreesBlockHeader, FTreesFooter, sizeof(RTreeNode_details)>;
 
-template <typename T>
-concept is_const_block = requires(const T& block) {
-                           { block.data() } -> std::convertible_to<std::span<const std::byte>>;
-                         };
-
-template <typename T>
-concept is_block = is_non_const_block<T> && is_const_block<T>;
-
-template <typename T>
-concept is_blocks_retriever = requires(T& blocks_retriever) {
-                                { blocks_retriever.get_block(std::declval<uint32_t>()) } -> is_block;
-                              };
-
-template <is_block Block>
-class RTree : public PTree<RTreeNode_details, RTreeLeaf_details> {
+class RTree : public PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
  public:
-  RTree(const Block block)
-      : PTree<RTreeNode_details, RTreeLeaf_details>(
-            &get_object<EPTreeBlockFooter>(block.data(),
-                                           static_cast<uint16_t>(block.data().size() - sizeof(EPTreeBlockFooter)))
-                 ->current_tree,
-            block.data()),
-        block_(std::move(block)) {}
+  RTree(std::shared_ptr<MetadataBlock> block)
+      : PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock>(std::move(block)) {}
+
+  PTreeHeader* header() override { return &tree_header()->current_tree; }
+  const PTreeHeader* header() const override { return &tree_header()->current_tree; }
+};
+
+class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
+ public:
+  FTree(std::shared_ptr<MetadataBlock> block, int block_size)
+      : PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)), block_size_(block_size) {}
+
+  PTreeHeader* header() override { return &tree_header()->trees[block_size_]; }
+  const PTreeHeader* header() const override { return &tree_header()->trees[block_size_]; }
 
  private:
-  Block block_;
+  int block_size_;
 };
 
-template <is_block Block>
-class FTree : public PTree<RTreeNode_details, FTreeLeaf_details> {
- public:
-  FTree(const Block block, int block_size)
-      : PTree<RTreeNode_details, FTreeLeaf_details>(
-            &get_object<FTreesBlockFooter>(block.data(),
-                                           static_cast<uint16_t>(block.data().size() - sizeof(FTreesBlockFooter)))
-                 ->trees[block_size],
-            block.data()),
-        block_(std::move(block)) {}
-
- private:
-  Block block_;
-};
-
-template <is_blocks_retriever BlocksRetriever, is_block Block>
 class EPTreeIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = std::ptrdiff_t;
-  using value_type = std::pair<uint32_t, std::array<FTree<Block>, 7>>;
+  using value_type = std::pair<uint32_t, std::array<FTree, 7>>;
 
-  using node_iterator_info = std::pair<RTree<Block>, typename RTree<Block>::iterator>;
+  using node_iterator_info = std::pair<RTree, typename RTree::iterator>;
 
-  EPTreeIterator(std::vector<node_iterator_info> nodes, BlocksRetriever blocks_retriever)
-      : nodes_(std::move(nodes)), blocks_retriever_(std::move(blocks_retriever)) {}
+  EPTreeIterator(std::vector<node_iterator_info> nodes, std::shared_ptr<Area> area)
+      : nodes_(std::move(nodes)), area_(std::move(area)) {}
 
   template <std::size_t N, std::size_t... Is>
-  std::array<FTree<Block>, N> CreateFTreeArray(uint32_t block_number, std::index_sequence<Is...>) {
-    auto block = blocks_retriever_.get_block(block_number);
+  std::array<FTree, N> CreateFTreeArray(uint32_t block_number, std::index_sequence<Is...>) {
+    auto block = throw_if_error(area_->GetMetadataBlock(block_number));
     return {{FTree(block, Is)...}};
   }
 
@@ -511,7 +465,7 @@ class EPTreeIterator {
     }
     uint32_t node_block_number = (*node->second).second;  // todo: by ref
     for (++node; node != nodes_.end(); ++node) {
-      node->first = {blocks_retriever_.get_block(node_block_number)};
+      node->first = {throw_if_error(area_->GetMetadataBlock(node_block_number))};
       node->second = node->first.begin();
       node_block_number = (*node->second).second;  // todo: by ref
     }
@@ -527,7 +481,7 @@ class EPTreeIterator {
     --node->second;
     uint32_t node_block_number = (*node->second).second;  // todo: by ref
     for (++node; node != nodes_.end(); ++node) {
-      node->first = {blocks_retriever_.get_block(node_block_number)};
+      node->first = {throw_if_error(area_->GetMetadataBlock(node_block_number))};
       node->second = node->first.end();
       --node->second;
       node_block_number = (*node->second).second;  // todo: by ref
@@ -556,53 +510,46 @@ class EPTreeIterator {
 
  private:
   std::vector<node_iterator_info> nodes_;
-  BlocksRetriever blocks_retriever_;
+  std::shared_ptr<Area> area_;
 };
 
-template <is_blocks_retriever BlocksRetriever, is_block Block>
-class EPTree {
+class FreeBlocksAllocator : public EPTreeBlock {
  public:
-  using iterator = EPTreeIterator<BlocksRetriever, Block>;
+  using iterator = EPTreeIterator;
   using const_iterator = const iterator;
 
-  EPTree(BlocksRetriever blocks_retriever, uint32_t root_block_number)
-      : blocks_retriever_(std::move(blocks_retriever)),
-        block_(blocks_retriever_.get_block(root_block_number)),
-        header_(
-            get_object<EPTreeBlockFooter>(block_.data(),
-                                          static_cast<uint16_t>(block_.data().size() - sizeof(EPTreeBlockFooter)))) {}
+  FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block)
+      : EPTreeBlock(std::move(block)), area_(std::move(area)) {}
 
   // size_t size() { return header_->block_number; }
   iterator begin() const {
-    if (header_->current_tree.items_count.value() == 0)
-      return iterator({}, blocks_retriever_);
+    if (tree_header()->current_tree.items_count.value() == 0)
+      return iterator({}, area_);
     std::vector<typename iterator::node_iterator_info> nodes;
     uint32_t node_block_number = 0;
-    for (int i = 0; i < header_->depth.value(); i++) {
-      RTree node_tree(i == 0 ? block_ : blocks_retriever_.get_block(node_block_number));
+    for (int i = 0; i < tree_header()->depth.value(); i++) {
+      RTree node_tree(i == 0 ? original_block() : throw_if_error(area_->GetMetadataBlock(node_block_number)));
       nodes.push_back({node_tree, node_tree.begin()});
       node_block_number = (*nodes.back().second).second;  // todo: by ref
     }
-    return iterator(std::move(nodes), blocks_retriever_);
+    return iterator(std::move(nodes), area_);
   }
   iterator end() const {
-    if (header_->current_tree.items_count.value() == 0)
-      return iterator({}, blocks_retriever_);
+    if (tree_header()->current_tree.items_count.value() == 0)
+      return iterator({}, area_);
     std::vector<typename iterator::node_iterator_info> nodes;
     uint32_t node_block_number = 0;
-    for (int i = 0; i < header_->depth.value(); i++) {
-      RTree node(i == 0 ? block_ : blocks_retriever_.get_block(node_block_number));
+    for (int i = 0; i < tree_header()->depth.value(); i++) {
+      RTree node(i == 0 ? original_block() : throw_if_error(area_->GetMetadataBlock(node_block_number)));
       nodes.push_back({node, node.end()});
       auto prev = node.end();
       node_block_number = (*--prev).second;  // todo: by ref
     }
-    return iterator(std::move(nodes), blocks_retriever_);
+    return iterator(std::move(nodes), area_);
   }
   const_iterator cbegin() const { return begin(); }
   const_iterator cend() const { return end(); }
 
  private:
-  BlocksRetriever blocks_retriever_;
-  const Block block_;
-  const EPTreeBlockFooter* header_;
+  std::shared_ptr<Area> area_;
 };
