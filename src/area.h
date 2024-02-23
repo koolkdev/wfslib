@@ -70,6 +70,7 @@ class Area : public std::enable_shared_from_this<Area> {
 
  private:
   friend class Wfs;
+  friend class Recovery;
 
   static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
 

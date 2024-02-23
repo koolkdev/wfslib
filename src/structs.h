@@ -13,6 +13,8 @@
 
 #include "utils.h"
 
+static constexpr uint32_t WFS_VERSION = 0x01010800;
+
 // sizeof 0x18
 struct MetadataBlockHeader {
   // Flags:
@@ -25,6 +27,7 @@ struct MetadataBlockHeader {
     AREA = 0x00400000,
     ROOT_AREA = 0x00800000,
     EXTERNAL_DIRECTORY_TREE = 0x20000000,
+    UNKNOWN = 0x40000000,
     DIRECTORY = 0x80000000,
   };
   uint32_be_t block_flags;  // 20 least bits ignored

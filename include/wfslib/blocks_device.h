@@ -13,6 +13,8 @@
 #include <span>
 #include <unordered_map>
 
+#include "device_encryption.h"
+
 class Block;
 
 class Device;

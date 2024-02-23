@@ -21,6 +21,7 @@ enum WfsError {
   kFileDataCorrupted,
   kFileMetadataCorrupted,
   kTransactionsAreaCorrupted,
+  kInvalidWfsVersion,
 };
 
 class WfsException : public std::exception {

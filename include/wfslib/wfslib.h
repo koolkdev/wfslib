@@ -8,7 +8,9 @@
 #pragma once
 
 #include "directory.h"
+#include "errors.h"
 #include "file.h"
 #include "file_device.h"
 #include "key_file.h"
+#include "recovery.h"
 #include "wfs.h"

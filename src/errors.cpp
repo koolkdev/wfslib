@@ -29,6 +29,8 @@ char const* WfsException::what() const noexcept {
       return "File metadata corrupted";
     case WfsError::kTransactionsAreaCorrupted:
       return "Transactions area corrupted";
+    case WfsError::kInvalidWfsVersion:
+      return "Invalid WFS version";
   }
   return "";
 }
