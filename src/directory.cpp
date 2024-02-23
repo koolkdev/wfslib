@@ -115,7 +115,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
       auto res = std::lower_bound(choices.begin(), choices.end(), std::byte{(uint8_t)next_expected_char});
       if (res == choices.end() || std::to_integer<char>(*res) != next_expected_char) {
         // Not found
-        return {};
+        return std::unexpected(kItemNotFound);
       }
       auto value_offset = external_node->get_item(res - choices.begin()).value();
       if (pos_in_path == name.end()) {
@@ -165,7 +165,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
     }
     if (!last_block_number) {
       // Not found
-      return {};
+      return std::unexpected(kItemNotFound);
     }
     auto next_block = area_->GetMetadataBlock(last_block_number);
     if (!next_block.has_value())

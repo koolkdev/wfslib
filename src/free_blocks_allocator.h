@@ -42,6 +42,8 @@ class FreeBlocksAllocator {
   MetadataBlock* root_block() { return root_block_.get(); }
   const MetadataBlock* root_block() const { return root_block_.get(); }
 
+  void iterate() const;  // TODO: temp function to test tree compilation
+
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader); }
 
   std::shared_ptr<const Area> area_;

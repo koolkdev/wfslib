@@ -12,8 +12,9 @@
 #include "device.h"
 #include "device_encryption.h"
 
-BlocksDevice::BlocksDevice(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
-    : device_(device), device_encryption_(std::make_unique<DeviceEncryption>(device, key)) {}
+BlocksDevice::BlocksDevice(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key)
+    : device_(std::move(device)),
+      device_encryption_(key ? std::make_unique<DeviceEncryption>(device_, std::move(*key)) : nullptr) {}
 
 void BlocksDevice::WriteBlock(uint32_t block_number,
                               uint32_t /*size_in_blocks*/,
@@ -22,9 +23,20 @@ void BlocksDevice::WriteBlock(uint32_t block_number,
                               uint32_t iv,
                               bool encrypt,
                               bool recalculate_hash) {
+  assert(data.size() % device_->SectorSize() == 0);
+  auto const sector_address = ToDeviceSector(block_number);
+  auto const sectors_count = static_cast<uint32_t>(data.size() / device_->SectorSize());
+
   if (recalculate_hash)
-    device_encryption_->CalculateHash(data, hash);
-  device_encryption_->WriteBlock(ToDeviceSector(block_number), data, iv, encrypt);
+    DeviceEncryption::CalculateHash(data, hash);
+
+  if (encrypt && device_encryption_) {
+    std::vector<std::byte> enc_data(data.begin(), data.end());
+    device_encryption_->EncryptBlock(enc_data, iv);
+    device_->WriteSectors(enc_data, sector_address, sectors_count);
+  } else {
+    device_->WriteSectors(data, sector_address, sectors_count);
+  }
 }
 
 bool BlocksDevice::ReadBlock(uint32_t block_number,
@@ -34,8 +46,14 @@ bool BlocksDevice::ReadBlock(uint32_t block_number,
                              uint32_t iv,
                              bool encrypt,
                              bool check_hash) {
-  device_encryption_->ReadBlock(ToDeviceSector(block_number), data, iv, encrypt);
-  return !check_hash || device_encryption_->CheckHash(data, hash);
+  assert(data.size() % device_->SectorSize() == 0);
+  auto const sector_address = ToDeviceSector(block_number);
+  auto const sectors_count = static_cast<uint32_t>(data.size() / device_->SectorSize());
+  device_->ReadSectors(data, sector_address, sectors_count);
+
+  if (encrypt && device_encryption_)
+    device_encryption_->DecryptBlock(data, iv);
+  return !check_hash || DeviceEncryption::CheckHash(data, hash);
 }
 
 uint32_t BlocksDevice::ToDeviceSector(uint32_t block_number) const {

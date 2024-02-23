@@ -27,11 +27,10 @@ class FileDevice : public Device {
   uint32_t Log2SectorSize() const override { return log2_sector_size_; }
   bool IsReadOnly() const override { return read_only_; }
 
- private:
-  friend Wfs;
   void SetSectorsCount(uint32_t sectors_count) { sectors_count_ = sectors_count; }
   void SetLog2SectorSize(uint32_t log2_sector_size) { log2_sector_size_ = log2_sector_size; }
 
+ private:
   std::unique_ptr<std::iostream> file_;
   std::mutex io_lock_;
 

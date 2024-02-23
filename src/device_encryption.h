@@ -17,20 +17,20 @@ struct WfsBlockIV;
 
 class DeviceEncryption {
  public:
-  DeviceEncryption(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
+  DeviceEncryption(std::shared_ptr<Device> device, std::vector<std::byte> key);
 
-  void WriteBlock(uint32_t sector_address, const std::span<std::byte>& data, uint32_t iv, bool encrypt);
-  void ReadBlock(uint32_t sector_address, const std::span<std::byte>& data, uint32_t iv, bool encrypt) const;
+  void EncryptBlock(const std::span<std::byte>& data, uint32_t iv);
+  void DecryptBlock(const std::span<std::byte>& data, uint32_t iv) const;
 
-  void CalculateHash(const std::span<const std::byte>& data, const std::span<std::byte>& hash) const;
-  bool CheckHash(const std::span<const std::byte>& data, const std::span<const std::byte>& hash) const;
+  static void CalculateHash(const std::span<const std::byte>& data, const std::span<std::byte>& hash);
+  static bool CheckHash(const std::span<const std::byte>& data, const std::span<const std::byte>& hash);
 
   std::shared_ptr<const Device> device() { return device_; }
 
   static constexpr size_t DIGEST_SIZE = CryptoPP::SHA1::DIGESTSIZE;
 
  private:
-  void HashData(const std::list<std::span<const std::byte>>& data, const std::span<std::byte>& hash) const;
+  static void HashData(std::initializer_list<std::span<const std::byte>> data, const std::span<std::byte>& hash);
   WfsBlockIV GetIV(uint32_t sectors_count, uint32_t iv) const;
 
   std::shared_ptr<Device> device_;

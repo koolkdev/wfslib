@@ -8,6 +8,7 @@
 #pragma once
 
 #include <memory>
+#include <optional>
 #include <span>
 #include <string>
 #include <vector>
@@ -23,8 +24,8 @@ class BlocksDevice;
 
 class Wfs {
  public:
-  Wfs(const std::shared_ptr<Device>& device, const std::span<std::byte>& key);
-  Wfs(const std::shared_ptr<BlocksDevice>& device);
+  Wfs(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key = std::nullopt);
+  Wfs(std::shared_ptr<BlocksDevice> device);
   ~Wfs();
 
   const std::shared_ptr<BlocksDevice>& GetDevice() { return device_; }
@@ -33,9 +34,6 @@ class Wfs {
   std::shared_ptr<File> GetFile(const std::string& filename);
   std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-  static void DetectDeviceSectorSizeAndCount(const std::shared_ptr<FileDevice>& device,
-                                             const std::span<std::byte>& key);
-
   std::shared_ptr<Area> GetRootArea() { return root_area_; }
 
   void Flush();
@@ -43,6 +41,4 @@ class Wfs {
  private:
   std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Area> root_area_;
-
-  static bool VerifyDeviceAndKey(const std::shared_ptr<FileDevice>& device, const std::span<std::byte>& key);
 };

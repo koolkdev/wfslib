@@ -23,11 +23,12 @@ struct WfsBlockIV {
   uint32_be_t iv[4];
 };
 
-DeviceEncryption::DeviceEncryption(const std::shared_ptr<Device>& device, const std::span<std::byte>& key)
-    : device_(device), key_(key.begin(), key.end()) {}
+DeviceEncryption::DeviceEncryption(std::shared_ptr<Device> device, std::vector<std::byte> key)
+    : device_(device), key_(std::move(key)) {}
 
-void DeviceEncryption::HashData(const std::list<std::span<const std::byte>>& data,
-                                const std::span<std::byte>& hash) const {
+// static
+void DeviceEncryption::HashData(std::initializer_list<std::span<const std::byte>> data,
+                                const std::span<std::byte>& hash) {
   // Pad and hash
   CryptoPP::SHA1 sha1;
   for (auto& data_part : data) {
@@ -36,7 +37,8 @@ void DeviceEncryption::HashData(const std::list<std::span<const std::byte>>& dat
   sha1.Final(reinterpret_cast<uint8_t*>(hash.data()));
 }
 
-void DeviceEncryption::CalculateHash(const std::span<const std::byte>& data, const std::span<std::byte>& hash) const {
+// static
+void DeviceEncryption::CalculateHash(const std::span<const std::byte>& data, const std::span<std::byte>& hash) {
   bool hash_in_block = data.size() >= hash.size() && data.data() <= hash.data() &&
                        hash.data() + hash.size() <= data.data() + data.size();
   // Fill hash space with 0xFF
@@ -46,46 +48,28 @@ void DeviceEncryption::CalculateHash(const std::span<const std::byte>& data, con
   HashData({data}, hash);
 }
 
-void DeviceEncryption::WriteBlock(uint32_t sector_address,
-                                  const std::span<std::byte>& data,
-                                  uint32_t iv,
-                                  bool encrypt) {
+void DeviceEncryption::EncryptBlock(const std::span<std::byte>& data, uint32_t iv) {
   assert(data.size() % device_->SectorSize() == 0);
   auto const sectors_count = static_cast<uint32_t>(data.size() / device_->SectorSize());
 
-  std::vector<std::byte> enc_data(data.begin(), data.end());
-  if (encrypt) {
-    // Encrypt
-    auto _iv = GetIV(sectors_count, iv);
-    CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(reinterpret_cast<const uint8_t*>(key_.data()), key_.size(),
-                                                            reinterpret_cast<uint8_t*>(&_iv));
-    encryptor.ProcessData(reinterpret_cast<uint8_t*>(enc_data.data()), reinterpret_cast<uint8_t*>(enc_data.data()),
-                          enc_data.size());
-  }
-
-  // Write
-  device_->WriteSectors(enc_data, sector_address, sectors_count);
+  auto _iv = GetIV(sectors_count, iv);
+  CryptoPP::CBC_Mode<CryptoPP::AES>::Encryption encryptor(reinterpret_cast<const uint8_t*>(key_.data()), key_.size(),
+                                                          reinterpret_cast<uint8_t*>(&_iv));
+  encryptor.ProcessData(reinterpret_cast<uint8_t*>(data.data()), reinterpret_cast<uint8_t*>(data.data()), data.size());
 }
 
-void DeviceEncryption::ReadBlock(uint32_t sector_address,
-                                 const std::span<std::byte>& data,
-                                 uint32_t iv,
-                                 bool encrypt) const {
+void DeviceEncryption::DecryptBlock(const std::span<std::byte>& data, uint32_t iv) const {
   assert(data.size() % device_->SectorSize() == 0);
   auto const sectors_count = static_cast<uint32_t>(data.size() / device_->SectorSize());
 
-  device_->ReadSectors(data, sector_address, sectors_count);
-
-  if (encrypt) {
-    auto _iv = GetIV(sectors_count, iv);
-    CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(reinterpret_cast<const uint8_t*>(key_.data()), key_.size(),
-                                                            reinterpret_cast<uint8_t*>(&_iv));
-    decryptor.ProcessData(reinterpret_cast<uint8_t*>(data.data()), reinterpret_cast<uint8_t*>(data.data()),
-                          data.size());
-  }
+  auto _iv = GetIV(sectors_count, iv);
+  CryptoPP::CBC_Mode<CryptoPP::AES>::Decryption decryptor(reinterpret_cast<const uint8_t*>(key_.data()), key_.size(),
+                                                          reinterpret_cast<uint8_t*>(&_iv));
+  decryptor.ProcessData(reinterpret_cast<uint8_t*>(data.data()), reinterpret_cast<uint8_t*>(data.data()), data.size());
 }
 
-bool DeviceEncryption::CheckHash(const std::span<const std::byte>& data, const std::span<const std::byte>& hash) const {
+// static
+bool DeviceEncryption::CheckHash(const std::span<const std::byte>& data, const std::span<const std::byte>& hash) {
   bool hash_in_block = data.size() >= hash.size() && data.data() <= hash.data() &&
                        hash.data() + hash.size() <= data.data() + data.size();
 
