@@ -26,7 +26,7 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   class DataCategory3Reader;
   class DataCategory4Reader;
 
-  File(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area)
+  File(const std::string& name, const AttributesBlock& attributes, std::shared_ptr<Area> area)
       : WfsItem(name, attributes), area_(area) {}
 
   uint32_t Size() const;
@@ -54,10 +54,10 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
-  const std::shared_ptr<Area>& area() const { return area_; }
+  std::shared_ptr<Area> area() const { return area_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<Area> area_;
 
-  static std::shared_ptr<DataCategoryReader> CreateReader(const std::shared_ptr<File>& file);
+  static std::shared_ptr<DataCategoryReader> CreateReader(std::shared_ptr<File> file);
 };

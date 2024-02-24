@@ -31,7 +31,7 @@ std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(cons
   if (!attributes_block.has_value()) {
     return std::unexpected(attributes_block.error());
   }
-  auto attributes = attributes_block->Attributes();
+  auto attributes = attributes_block->data();
   if (attributes->IsLink() || !attributes->IsDirectory()) {
     // Not a directory
     return std::unexpected(kNotDirectory);
@@ -47,7 +47,7 @@ std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::str
   if (!attributes_block.has_value()) {
     return std::unexpected(attributes_block.error());
   }
-  auto attributes = attributes_block->Attributes();
+  auto attributes = attributes_block->data();
   if (attributes->IsLink() || attributes->IsDirectory()) {
     // Not a file
     return std::unexpected(kNotFile);
@@ -61,7 +61,7 @@ std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::str
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
     const std::string& name,
     const AttributesBlock& attributes_block) const {
-  auto attributes = attributes_block.Attributes();
+  auto attributes = attributes_block.data();
   if (attributes->IsLink()) {
     // TODO, I think that the link info is in the attributes metadata
     return std::make_shared<Link>(name, attributes_block, area_);
@@ -88,8 +88,7 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
 std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
                                                                         const std::string& name) const {
   DirectoryTree dir_tree{block};
-  auto current_node =
-      as_const(block.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+  auto current_node = block->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
   if (block->Header()->block_flags.value() & block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto pos_in_path = name.begin();
     while (true) {
@@ -124,7 +123,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
       }
       pos_in_path++;
       // Go to next node
-      current_node = as_const(block.get())->get_object<DirectoryTreeNode>(value_offset);
+      current_node = block->get_object<DirectoryTreeNode>(value_offset);
     }
   } else {
     // Arghh, trees over trees
@@ -147,7 +146,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
         node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
                           ->get_item(node_state->current_index)
                           .value();
-        current_node = as_const(block.get())->get_object<DirectoryTreeNode>(node_offset);
+        current_node = block->get_object<DirectoryTreeNode>(node_offset);
         std::string path =
             node_state->path +
             std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
@@ -180,8 +179,7 @@ size_t Directory::Size() const {
 
 DirectoryItemsIterator Directory::begin() const {
   DirectoryTree dir_tree{block_};
-  auto current_node =
-      as_const(block_.get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+  auto current_node = block_->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
   if (!current_node->choices_count.value())
     return end();
   auto node_state = std::make_shared<NodeState>(NodeState{block_, current_node, nullptr, 0, current_node->prefix()});

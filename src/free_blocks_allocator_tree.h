@@ -245,7 +245,7 @@ class PTreeNode {
 
 template <typename T, typename U>
 concept nodes_allocator_methods = requires(T& allocator, U* node_type) {
-                                    { allocator.template get_object<U>(uint16_t{0}) } -> std::same_as<U*>;
+                                    { allocator.template get_mutable_object<U>(uint16_t{0}) } -> std::same_as<U*>;
                                     { allocator.template Alloc<U>(uint16_t{0}) } -> std::same_as<U*>;
                                     allocator.template Free<U>(node_type, uint16_t{0});
                                   } && requires(const T& allocator) {
@@ -365,7 +365,7 @@ class PTree : public Allocator {
 
   PTree(std::shared_ptr<MetadataBlock> block) : Allocator(std::move(block)) {}
 
-  virtual PTreeHeader* header() = 0;
+  virtual PTreeHeader* mutable_header() = 0;
   virtual const PTreeHeader* header() const = 0;
 
   size_t size() const { return header()->items_count.value(); }
@@ -418,7 +418,7 @@ class RTree : public PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
   RTree(std::shared_ptr<MetadataBlock> block)
       : PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock>(std::move(block)) {}
 
-  PTreeHeader* header() override { return &tree_header()->current_tree; }
+  PTreeHeader* mutable_header() override { return &mutable_tree_header()->current_tree; }
   const PTreeHeader* header() const override { return &tree_header()->current_tree; }
 };
 
@@ -427,7 +427,7 @@ class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
   FTree(std::shared_ptr<MetadataBlock> block, int block_size)
       : PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)), block_size_(block_size) {}
 
-  PTreeHeader* header() override { return &tree_header()->trees[block_size_]; }
+  PTreeHeader* mutable_header() override { return &mutable_tree_header()->trees[block_size_]; }
   const PTreeHeader* header() const override { return &tree_header()->trees[block_size_]; }
 
  private:

@@ -80,10 +80,12 @@ class Area : public std::enable_shared_from_this<Area> {
   uint16_t wfs_header_offset() const { return sizeof(MetadataBlockHeader); }
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (has_wfs_header() ? sizeof(WfsHeader) : 0); }
 
-  WfsAreaHeader* header() { return block()->get_object<WfsAreaHeader>(header_offset()); }
+  WfsAreaHeader* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
   const WfsAreaHeader* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
 
-  WfsHeader* wfs_header() { return has_wfs_header() ? block()->get_object<WfsHeader>(wfs_header_offset()) : NULL; }
+  WfsHeader* mutable_wfs_header() {
+    return has_wfs_header() ? block()->get_mutable_object<WfsHeader>(wfs_header_offset()) : NULL;
+  }
   const WfsHeader* wfs_header() const {
     return has_wfs_header() ? block()->get_object<WfsHeader>(wfs_header_offset()) : NULL;
   }

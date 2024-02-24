@@ -43,14 +43,14 @@ void Block::Resize(uint32_t data_size) {
 }
 
 bool Block::Fetch(bool check_hash) {
-  return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, as_const(this)->Hash(), iv_,
-                            encrypted_, check_hash);
+  return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
+                            check_hash);
 }
 
 void Block::Flush() {
   if (!dirty_)
     return;
-  device_->WriteBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
+  device_->WriteBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, MutableHash(), iv_, encrypted_,
                       /*recalculate_hash=*/true);
   dirty_ = false;
 }

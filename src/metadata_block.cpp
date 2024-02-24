@@ -56,8 +56,8 @@ void MetadataBlock::Resize(uint32_t data_size) {
   assert(false);
 }
 
-std::span<std::byte> MetadataBlock::Hash() {
-  return {data().data() + offsetof(MetadataBlockHeader, hash), DeviceEncryption::DIGEST_SIZE};
+std::span<std::byte> MetadataBlock::MutableHash() {
+  return {mutable_data().data() + offsetof(MetadataBlockHeader, hash), DeviceEncryption::DIGEST_SIZE};
 }
 
 std::span<const std::byte> MetadataBlock::Hash() const {

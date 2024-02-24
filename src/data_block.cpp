@@ -52,8 +52,8 @@ std::expected<std::shared_ptr<DataBlock>, WfsError> DataBlock::LoadBlock(const s
   return block;
 }
 
-std::span<std::byte> DataBlock::Hash() {
-  return {hash_metadata_block()->data().data() + hash_offset(), DeviceEncryption::DIGEST_SIZE};
+std::span<std::byte> DataBlock::MutableHash() {
+  return {hash_metadata_block()->mutable_data().data() + hash_offset(), DeviceEncryption::DIGEST_SIZE};
 }
 
 std::span<const std::byte> DataBlock::Hash() const {

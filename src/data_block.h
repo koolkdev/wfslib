@@ -40,7 +40,7 @@ class DataBlock : public Block {
                                                                        bool encrypted);
 
  protected:
-  std::span<std::byte> Hash() override;
+  std::span<std::byte> MutableHash() override;
   std::span<const std::byte> Hash() const override;
 
  private:
