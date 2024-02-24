@@ -13,7 +13,6 @@
 #include "free_blocks_allocator_tree.h"
 #include "metadata_block.h"
 #include "structs.h"
-#include "utils.h"
 #include "wfs.h"
 
 Area::Area(const std::shared_ptr<BlocksDevice>& device,
@@ -49,16 +48,15 @@ std::expected<std::shared_ptr<Directory>, WfsError> Area::GetDirectory(uint32_t 
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetRootDirectory() {
-  return GetDirectory(as_const(this)->header()->root_directory_block_number.value(), root_directory_name_,
-                      root_directory_attributes_);
+  return GetDirectory(header()->root_directory_block_number.value(), root_directory_name_, root_directory_attributes_);
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory1() {
-  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
+  return GetDirectory(header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory2() {
-  return GetDirectory(as_const(this)->header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
+  return GetDirectory(header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
 }
 
 std::expected<std::shared_ptr<Area>, WfsError> Area::GetTransactionsArea1() const {
@@ -99,7 +97,8 @@ std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(u
 }
 
 uint32_t Area::IV(uint32_t block_number) const {
-  return (header()->iv.value() ^ (root_area_ ? as_const(root_area_.get()) : this)->wfs_header()->iv.value()) +
+  return (header()->iv.value() ^
+          (root_area_ ? const_cast<const Area*>(root_area_.get()) : this)->wfs_header()->iv.value()) +
          ((block_number) << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 

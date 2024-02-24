@@ -12,7 +12,6 @@
 #include "data_block.h"
 #include "metadata_block.h"
 #include "structs.h"
-#include "utils.h"
 
 struct FileDataChunkInfo {
   std::shared_ptr<Block> data_block;
@@ -21,11 +20,11 @@ struct FileDataChunkInfo {
 };
 
 uint32_t File::Size() const {
-  return attributes_data().Attributes()->size.value();
+  return attributes_data().data()->size.value();
 }
 
 uint32_t File::SizeOnDisk() const {
-  return attributes_data().Attributes()->size_on_disk.value();
+  return attributes_data().data()->size_on_disk.value();
 }
 
 static size_t GetOffsetInMetadataBlock(const std::shared_ptr<const MetadataBlock>& block, const std::byte* data) {
@@ -40,13 +39,13 @@ class File::DataCategoryReader {
   virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) = 0;
   size_t Read(std::byte* data, size_t offset, size_t size) {
     auto chunk_info = GetFileDataChunkInfo(offset, size);
-    auto data_begin = as_const(chunk_info.data_block.get())->data().begin();
+    auto data_begin = chunk_info.data_block->data().begin();
     std::copy(data_begin + chunk_info.offset_in_block, data_begin + chunk_info.offset_in_block + chunk_info.size, data);
     return chunk_info.size;
   }
   size_t Write(const std::byte* data, size_t offset, size_t size) {
     auto chunk_info = GetFileDataChunkInfo(offset, size);
-    auto data_begin = chunk_info.data_block->data().begin();
+    auto data_begin = chunk_info.data_block->mutable_data().begin();
     std::copy(data, data + chunk_info.size, data_begin + chunk_info.offset_in_block);
     chunk_info.data_block->Flush();
     return chunk_info.size;
@@ -58,19 +57,16 @@ class File::DataCategoryReader {
   std::shared_ptr<File> file_;
 
   size_t GetAttributesMetadataOffset() const {
-    return as_const(file_.get())->attributes_data().attributes_offset +
-           as_const(file_.get())->attributes_data().Attributes()->DataOffset();
+    return file_->attributes_data().attributes_offset + file_->attributes_data().data()->DataOffset();
   }
   size_t GetAttributesMetadataEndOffset() const {
-    return as_const(file_.get())->attributes_data().attributes_offset +
-           align_to_power_of_2(as_const(file_.get())->attributes_data().Attributes()->DataOffset() +
-                               GetAttributesMetadataSize());
+    return file_->attributes_data().attributes_offset +
+           align_to_power_of_2(file_->attributes_data().data()->DataOffset() + GetAttributesMetadataSize());
   }
   const std::byte* GetAttributesMetadataEnd() const {
     // We can't do [GetAttributesMetadataEndOffset()] because it might point to data.end(), so in debug it will cause an
     // error
-    return as_const(as_const(file_.get())->attributes_data().block.get())->data().data() +
-           GetAttributesMetadataEndOffset();
+    return file_->attributes_data().block->data().data() + GetAttributesMetadataEndOffset();
   }
 };
 
@@ -79,18 +75,15 @@ class File::DataCategory0Reader : public File::DataCategoryReader {
  public:
   DataCategory0Reader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
-  virtual size_t GetAttributesMetadataSize() const {
-    return as_const(file_.get())->attributes_data().Attributes()->size_on_disk.value();
-  }
+  virtual size_t GetAttributesMetadataSize() const { return file_->attributes_data().data()->size_on_disk.value(); }
 
   virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
-    return FileDataChunkInfo{as_const(file_.get())->attributes_data().block, GetAttributesMetadataOffset() + offset,
-                             size};
+    return FileDataChunkInfo{file_->attributes_data().block, GetAttributesMetadataOffset() + offset, size};
   }
 
   virtual void Resize(size_t new_size) {
     // Just update the attribute, the data in the metadata block
-    file_->attributes_data().Attributes()->size = static_cast<uint32_t>(new_size);
+    file_->attributes_data().mutable_data()->size = static_cast<uint32_t>(new_size);
   }
 };
 
@@ -100,8 +93,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
 
   virtual size_t GetAttributesMetadataSize() const {
     // round up dividation
-    size_t data_blocks_count =
-        ((as_const(file_.get())->attributes_data().Attributes()->size_on_disk.value() - 1) >> GetDataBlockSize()) + 1;
+    size_t data_blocks_count = ((file_->attributes_data().data()->size_on_disk.value() - 1) >> GetDataBlockSize()) + 1;
     return sizeof(DataBlockMetadata) * data_blocks_count;
   }
 
@@ -109,13 +101,12 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
     auto blocks_list = reinterpret_cast<const DataBlockMetadata*>(GetAttributesMetadataEnd());
     int64_t block_index = offset >> GetDataBlockSize();
     size_t offset_in_block = offset & ((1 << GetDataBlockSize()) - 1);
-    auto hash_block = as_const(file_.get())->attributes_data().block;
+    auto hash_block = file_->attributes_data().block;
     uint32_t block_offset = static_cast<uint32_t>((offset >> GetDataBlockSize()) << GetDataBlockSize());
 
     LoadDataBlock(blocks_list[-block_index - 1].block_number.value(),
                   static_cast<uint32_t>(
-                      std::min(1U << GetDataBlockSize(),
-                               as_const(file_.get())->attributes_data().Attributes()->size.value() - block_offset)),
+                      std::min(1U << GetDataBlockSize(), file_->attributes_data().data()->size.value() - block_offset)),
                   {hash_block, GetOffsetInMetadataBlock(hash_block, reinterpret_cast<const std::byte*>(
                                                                         &blocks_list[-block_index - 1].hash))});
     size = std::min(size, current_data_block->size() - offset_in_block);
@@ -123,7 +114,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   }
 
   virtual void Resize(size_t new_size) {
-    size_t old_size = as_const(file_.get())->attributes_data().Attributes()->size.value();
+    size_t old_size = file_->attributes_data().data()->size.value();
     while (old_size != new_size) {
       std::shared_ptr<Block> current_block;
       size_t new_block_size = 0;
@@ -154,7 +145,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
           old_size += new_block_size;
         }
       }
-      file_->attributes_data().Attributes()->size = static_cast<uint32_t>(old_size);
+      file_->attributes_data().mutable_data()->size = static_cast<uint32_t>(old_size);
       if (current_block) {
         assert(std::dynamic_pointer_cast<DataBlock>(current_block));
         current_block->Resize(static_cast<uint32_t>(new_block_size));
@@ -172,9 +163,9 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
     if (current_data_block && file_->area()->RelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
       return;
-    auto block = file_->area()->GetDataBlock(
-        block_number, GetDataBlockSize(), data_size, data_hash,
-        !(as_const(file_.get())->attributes_data().Attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
+    auto block =
+        file_->area()->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash,
+                                    !(file_->attributes_data().data()->flags.value() & Attributes::UNENCRYPTED_FILE));
     if (!block.has_value())
       throw WfsException(WfsError::kFileDataCorrupted);
     current_data_block = std::move(*block);
@@ -209,14 +200,13 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
 
   virtual size_t GetAttributesMetadataSize() const {
     size_t data_blocks_clusters_count =
-        ((as_const(file_.get())->attributes_data().Attributes()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) +
-        1;
+        ((file_->attributes_data().data()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) + 1;
     return sizeof(DataBlocksClusterMetadata) * data_blocks_clusters_count;
   }
 
   virtual FileDataChunkInfo GetFileDataChunkInfo(size_t offset, size_t size) {
     return GetFileDataChunkInfoFromClustersList(
-        offset, offset, size, as_const(file_.get())->attributes_data().block,
+        offset, offset, size, file_->attributes_data().block,
         reinterpret_cast<const DataBlocksClusterMetadata*>(GetAttributesMetadataEnd()), true);
   }
 
@@ -241,8 +231,7 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
     LoadDataBlock(
         cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
         static_cast<uint32_t>(
-            std::min(1U << GetDataBlockSize(),
-                     as_const(file_.get())->attributes_data().Attributes()->size.value() - block_offset)),
+            std::min(1U << GetDataBlockSize(), file_->attributes_data().data()->size.value() - block_offset)),
         {metadata_block,
          GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<const std::byte*>(&cluster->hash[block_index]))});
     size = std::min(size, current_data_block->size() - offset_in_block);
@@ -261,8 +250,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   virtual size_t GetAttributesMetadataSize() const {
     size_t data_blocks_clusters_count =
-        ((as_const(file_.get())->attributes_data().Attributes()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) +
-        1;
+        ((file_->attributes_data().data()->size_on_disk.value() - 1) >> ClusterDataLog2Size()) + 1;
     size_t blocks_count = ((data_blocks_clusters_count - 1) / ClustersInBlock()) + 1;
     return sizeof(uint32_be_t) * blocks_count;
   }
@@ -274,9 +262,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
     LoadMetadataBlock(blocks_list[-block_index - 1].value());
     return GetFileDataChunkInfoFromClustersList(
         offset_in_block, offset, size, current_metadata_block,
-        reinterpret_cast<const DataBlocksClusterMetadata*>(
-            &as_const(current_metadata_block.get())->data()[sizeof(MetadataBlockHeader)]),
-        false);
+        current_metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)), false);
   }
 
  protected:
@@ -300,8 +286,8 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 };
 
-std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_ptr<File>& file) {
-  switch (as_const(file.get())->attributes_data().Attributes()->size_category.value()) {
+std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<File> file) {
+  switch (file->attributes_data().data()->size_category.value()) {
     case 0:
       return std::make_shared<DataCategory0Reader>(file);
     case 1:
@@ -319,7 +305,7 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(const std::shared_p
 
 void File::Resize(size_t new_size) {
   // TODO: implment it, write now change up to size_on_disk without ever chaning size_on_disk
-  auto attributes = attributes_.Attributes();
+  auto attributes = attributes_.data();
   new_size = std::min(new_size, static_cast<size_t>(attributes->size_on_disk.value()));
   size_t old_size = attributes->size.value();
   if (new_size != old_size) {
@@ -330,7 +316,7 @@ void File::Resize(size_t new_size) {
 File::file_device::file_device(const std::shared_ptr<File>& file) : file_(file), reader_(CreateReader(file)), pos_(0) {}
 
 size_t File::file_device::size() const {
-  return as_const(file_.get())->attributes_data().Attributes()->size.value();
+  return file_->attributes_data().data()->size.value();
 }
 
 std::streamsize File::file_device::read(char_type* s, std::streamsize n) {

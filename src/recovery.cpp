@@ -226,10 +226,10 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
       continue;
     // this is probably a corrupted quota, let's check
     const auto attributes = system_save_dir->GetObjectAttributes(system_save_dir->block_, name);
-    if (!attributes.has_value() || !attributes->Attributes()->IsQuota())
+    if (!attributes.has_value() || !attributes->data()->IsQuota())
       continue;
     // ok this is quota
-    auto new_area = system_save_dir->area()->GetArea(attributes->Attributes()->directory_block_number.value(), name,
+    auto new_area = system_save_dir->area()->GetArea(attributes->data()->directory_block_number.value(), name,
                                                      *attributes, Block::BlockSize::Regular);
     if (!new_area.has_value())
       return std::unexpected(new_area.error());

@@ -24,7 +24,7 @@ Wfs::Wfs(std::shared_ptr<BlocksDevice> device) : device_(std::move(device)) {
   auto area = Area::LoadRootArea(device_);
   if (!area.has_value())
     throw std::runtime_error("Failed to load first block (bad key?)");
-  if (as_const(area->get())->wfs_header()->version.value() != WFS_VERSION)
+  if ((*area)->wfs_header()->version.value() != WFS_VERSION)
     throw std::runtime_error("Unexpected WFS version (bad key?)");
   root_area_ = *area;
 }

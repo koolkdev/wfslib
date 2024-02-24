@@ -46,7 +46,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
                         ->get_item(node_state_->current_index)
                         .value();
     }
-    auto current_node = as_const(block.get())->get_object<DirectoryTreeNode>(node_offset);
+    auto current_node = block->get_object<DirectoryTreeNode>(node_offset);
     std::string path = node_state_->path +
                        std::string(1, std::to_integer<char>(node_state_->node->choices()[node_state_->current_index])) +
                        current_node->prefix();
@@ -60,8 +60,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
     if (!block.has_value())
       throw WfsException(WfsError::kDirectoryCorrupted);
     DirectoryTree dir_tree{*block};
-    auto current_node =
-        as_const(block->get())->get_object<DirectoryTreeNode>(std::as_const(dir_tree).extra_header()->root.value());
+    auto current_node = (*block)->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
     node_state_ =
         std::make_shared<NodeState>(NodeState{*block, current_node, std::move(node_state_), 0, current_node->prefix()});
     // -- because it will be advanced immedialty to 0 when we do ++
@@ -99,7 +98,7 @@ DirectoryItemsIterator::value_type DirectoryItemsIterator::operator*() {
     auto block = node_state_->block;
     auto external_node = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node);
     const AttributesBlock attributes{block, external_node->get_item(node_state_->current_index).value()};
-    auto name = attributes.Attributes()->GetCaseSensitiveName(node_state_->path);
+    auto name = attributes.data()->GetCaseSensitiveName(node_state_->path);
     return {name, directory_->GetObjectInternal(name, attributes)};
   } else {
     // Should not happen (can't happen, the iterator should stop only at external trees)

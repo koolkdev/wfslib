@@ -34,7 +34,7 @@ class Block {
 
   std::span<const std::byte> data() const { return {data_.data(), data_.data() + size()}; }
   // Accessing the non-const variant of data will mark the block as dirty.
-  std::span<std::byte> data() { return GetDataForWriting(); }
+  std::span<std::byte> mutable_data() { return GetDataForWriting(); }
 
   template <typename T>
   const T* get_object(size_t offset) const {
@@ -42,8 +42,8 @@ class Block {
   }
 
   template <typename T>
-  T* get_object(size_t offset) {
-    return reinterpret_cast<T*>(data().data() + offset);
+  T* get_mutable_object(size_t offset) {
+    return reinterpret_cast<T*>(mutable_data().data() + offset);
   }
 
   uint32_t BlockNumber() const { return block_number_; }
@@ -67,7 +67,7 @@ class Block {
         bool encrypted);
   virtual ~Block();
 
-  virtual std::span<std::byte> Hash() = 0;
+  virtual std::span<std::byte> MutableHash() = 0;
   virtual std::span<const std::byte> Hash() const = 0;
 
   std::shared_ptr<BlocksDevice> device_;
