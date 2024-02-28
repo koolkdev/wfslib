@@ -442,7 +442,7 @@ class PTreeNodeIterator : public PTreeNodeConstIterator<T, Allocator> {
   PTreeNodeIterator(node_ref<T, Allocator> node, size_t index) : base(node, index) {}
 
   reference operator*() const {
-    assert(base::index = node_keys_capacity<T>::value);
+    assert(base::index < node_keys_capacity<T>::value);
     return {{base::node, base::index}, {base::node, base::index}};
   }
 
@@ -833,7 +833,7 @@ class PTree : public Allocator {
       // can't grow anymore in depth
       return nullptr;
     }
-    auto* nodes = this->Alloc<ParentNodeDetails>(nodes_to_alloc);
+    auto* nodes = this->template Alloc<ParentNodeDetails>(nodes_to_alloc);
     if (!nodes)
       return nullptr;
     auto* node = &nodes[1];
@@ -873,7 +873,7 @@ class PTree : public Allocator {
     auto items_count = header()->items_count.value();
     if (items_count == 0) {
       // first item in tree
-      auto* node = this->Alloc<LeafNodeDetails>(1);
+      auto* node = this->template Alloc<LeafNodeDetails>(1);
       if (!node) {
         // Tree is full
         return false;
