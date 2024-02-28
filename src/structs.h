@@ -23,7 +23,7 @@ struct MetadataBlockHeader {
   // 0x20000000 - leaf directory tree
   // 0x40000000 - ?
   // 0x80000000 - Directory?
-  enum Flags {
+  enum Flags : uint32_t {
     AREA = 0x00400000,
     ROOT_AREA = 0x00800000,
     EXTERNAL_DIRECTORY_TREE = 0x20000000,
@@ -59,7 +59,7 @@ static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 
 // sizeof 0x2c
 struct Attributes {
-  enum Flags {
+  enum Flags : uint32_t {
     UNENCRYPTED_FILE = 0x2000000,
     LINK = 0x4000000,
     AREA_SIZE_BASIC = 0x10000000,

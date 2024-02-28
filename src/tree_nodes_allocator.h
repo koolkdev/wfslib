@@ -47,16 +47,19 @@ class TreeNodesAllocator {
          current_index = current->next.value()) {
       current = get_freelist_entry(current_index);
       if (count <= current->count.value()) {
-        auto* prev_next = (current_index == heap_header()->freelist_head.value())
-                              ? &mutable_heap_header()->freelist_head
-                              : &get_mutable_freelist_entry(prev_index)->next;
         if (count == current->count.value()) {
-          *prev_next = current->next;
+          if (current_index == heap_header()->freelist_head.value())
+            mutable_heap_header()->freelist_head = static_cast<uint16_t>(current->next.value());
+          else
+            get_mutable_freelist_entry(prev_index)->next = current->next;
         } else {
           auto* new_free = get_mutable_freelist_entry(current_index + count);
           new_free->next = current->next.value();
           new_free->count = new_free->count.value() - count;
-          *prev_next = current_index + count;
+          if (current_index == heap_header()->freelist_head.value())
+            mutable_heap_header()->freelist_head = static_cast<uint16_t>(current_index + count);
+          else
+            get_mutable_freelist_entry(prev_index)->next = current_index + count;
         }
         return get_mutable_entry<T>(current_index);
       }
@@ -105,6 +108,13 @@ class TreeNodesAllocator {
     }
   }
 
+  template <typename T>
+  uint16_t to_offset(const T* node) const
+    requires check_node_size<T, entry_size>
+  {
+    return static_cast<uint16_t>(reinterpret_cast<const uint8_t*>(node) - block()->template get_object<uint8_t>(0));
+  }
+
   extra_header_type* mutable_extra_header() {
     return block()->template get_mutable_object<extra_header_type>(extra_header_offset());
   }
@@ -116,16 +126,16 @@ class TreeNodesAllocator {
   const MetadataBlock* block() const { return block_.get(); }
 
   template <typename T>
-  T* get_mutable_object(uint16_t offset)
+  T* get_mutable_object(uint16_t offset) const
     requires check_node_size<T, entry_size>
   {
-    return block()->template get_mutable_object<T>(offset);
+    return block_->template get_mutable_object<T>(offset);
   }
   template <typename T>
   const T* get_object(uint16_t offset) const
     requires check_node_size<T, entry_size>
   {
-    return block()->template get_object<T>(offset);
+    return block_->template get_object<T>(offset);
   }
 
   tree_header_type* mutable_tree_header() {
