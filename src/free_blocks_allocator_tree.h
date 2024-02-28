@@ -682,16 +682,16 @@ class PTreeIterator {
 
   iterator_type& operator++() {
     if (++leaf_->iterator == leaf_->node.end()) {
-      auto parent = parents_.end();
-      if (parent == parents_.begin())
+      auto rparent = parents_.rbegin();
+      if (rparent == parents_.rend())
         return *this;  // end
-      for (--parent; ++parent->iterator == parent->node.end(); --parent) {
-        ++parent->iterator;
-        if (parent == parents_.begin())
+      for (; ++rparent->iterator == rparent->node.end(); ++rparent) {
+        ++rparent->iterator;
+        if (rparent == parents_.rend())
           return *this;  // end
       }
-      uint16_t node_offset = (*parent->iterator).value;  // TODO: by ref
-      for (++parent; parent != parents_.end(); ++parent) {
+      uint16_t node_offset = (*rparent->iterator).value;  // TODO: by ref
+      for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent->node = {{allocator_, node_offset}};
         parent->iterator = parent->node.begin();
         node_offset = (*parent->iterator).value;  // TODO: by ref
@@ -704,16 +704,16 @@ class PTreeIterator {
 
   iterator_type& operator--() {
     if (leaf_->iterator == leaf_->node.begin()) {
-      auto parent = parents_.end();
-      if (parent == parents_.begin())
+      auto rparent = parents_.rbegin();
+      if (rparent == parents_.rend())
         return *this;  // begin
-      for (--parent; parent->iterator == parent->node.begin(); --parent) {
-        if (parent == parents_.begin())
+      for (; rparent->iterator == rparent->node.begin(); ++rparent) {
+        if (rparent == parents_.rend())
           return *this;  // begin
       }
-      --parent->iterator;
-      uint16_t node_offset = (*parent->iterator).value;  // TODO: by ref
-      for (++parent; parent != parents_.end(); ++parent) {
+      --rparent->iterator;
+      uint16_t node_offset = (*rparent->iterator).value;  // TODO: by ref
+      for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent->node = {{allocator_, node_offset}};
         parent->iterator = parent->node.end();
         --parent->iterator;
