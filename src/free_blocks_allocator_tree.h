@@ -282,7 +282,7 @@ class PTreeNodeValueRef {
  public:
   PTreeNodeValueRef(node_ref<T, Allocator> node, size_t index) : node(std::move(node)), index(index) {}
 
-  operator node_value_type<T>::type() const {
+  operator typename node_value_type<T>::type() const {
     assert(index < node_values_size(*node.get()));
     return node_get_value(*node.get(), index);
   }
@@ -507,7 +507,7 @@ class PTreeNode {
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  PTreeNode(node_ref<T, Allocator> node) : PTreeNode(std::move(node), node_values_size(*node_.get())) {}
+  PTreeNode(node_ref<T, Allocator> node) : PTreeNode(node, node_values_size(*node.get())) {}
   PTreeNode(node_ref<T, Allocator> node, size_t size) : node_(std::move(node)), size_(size) {}
 
   size_t size() const { return size_; }
@@ -1102,11 +1102,11 @@ class FreeBlocksAllocator : public EPTree {
   //  TODO: Ensure that not already free
   // }
 
-  template <typename T>
+  /*template <typename T>
   // requires T subclass of block
   std::vector<T> alloc_blocks(uint32_t count, Block::BlockSize size, uint32_t minimum_block_number = 0) {
     return {};
-  }
+  }*/
 };
 
 // Iterator for specific size
