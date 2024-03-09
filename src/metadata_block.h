@@ -28,7 +28,8 @@ class MetadataBlock : public Block {
                                                                            uint32_t block_number,
                                                                            Block::BlockSize size_category,
                                                                            uint32_t iv,
-                                                                           bool check_hash = true);
+                                                                           bool check_hash = true,
+                                                                           bool load_data = true);
 
   MetadataBlockHeader* Header();
   const MetadataBlockHeader* Header() const;

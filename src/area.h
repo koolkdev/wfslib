@@ -47,9 +47,11 @@ class Area : public std::enable_shared_from_this<Area> {
                                                                    const std::string& name,
                                                                    const AttributesBlock& attributes);
 
-  std::expected<std::shared_ptr<MetadataBlock>, WfsError> GetMetadataBlock(uint32_t block_number) const;
   std::expected<std::shared_ptr<MetadataBlock>, WfsError> GetMetadataBlock(uint32_t block_number,
-                                                                           Block::BlockSize size) const;
+                                                                           bool new_block = false) const;
+  std::expected<std::shared_ptr<MetadataBlock>, WfsError> GetMetadataBlock(uint32_t block_number,
+                                                                           Block::BlockSize size,
+                                                                           bool new_block = false) const;
 
   std::expected<std::shared_ptr<DataBlock>, WfsError> GetDataBlock(uint32_t block_number,
                                                                    Block::BlockSize size,

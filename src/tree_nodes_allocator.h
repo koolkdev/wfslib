@@ -30,7 +30,7 @@ class TreeNodesAllocator {
     header->start_offset = header_size();
     header->total_bytes = total_bytes();
     auto* freelist_entry = get_mutable_entry<HeapFreelistEntry>(header->freelist_head.value());
-    freelist_entry->size = entries_count();
+    freelist_entry->count = entries_count();
     freelist_entry->init_zero = 0;
     freelist_entry->next = entries_count();
     std::fill(mutable_tree_header(), mutable_tree_header() + 1, std::byte{0});

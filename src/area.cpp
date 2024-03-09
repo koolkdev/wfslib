@@ -92,8 +92,9 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_numb
                                 root_directory_name, root_directory_attributes);
 }
 
-std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number) const {
-  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(header()->log2_block_size.value()));
+std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
+                                                                               bool new_block) const {
+  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(header()->log2_block_size.value()), new_block);
 }
 
 uint32_t Area::IV(uint32_t block_number) const {
@@ -103,9 +104,10 @@ uint32_t Area::IV(uint32_t block_number) const {
 }
 
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
-                                                                               Block::BlockSize size) const {
+                                                                               Block::BlockSize size,
+                                                                               bool new_block) const {
   return MetadataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size,
-                                  IV(ToBasicBlockNumber(block_number)));
+                                  IV(ToBasicBlockNumber(block_number)), /*check_hash=*/true, !new_block);
 }
 
 std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t block_number,
