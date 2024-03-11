@@ -578,7 +578,7 @@ class PTreeNode {
   iterator split_point(iterator pos, key_type& split_key)
     requires std::same_as<T, FTreeLeaf_details>
   {
-    assert(cbegin() <= pos <= cend());
+    assert(cbegin() <= pos && pos <= cend());
     assert(full());
     auto res = pos;
     switch (pos - begin()) {
@@ -603,7 +603,7 @@ class PTreeNode {
   iterator split_point(iterator pos, key_type& split_key)
     requires std::same_as<T, RTreeLeaf_details>
   {
-    assert(cbegin() <= pos <= cend());
+    assert(cbegin() <= pos && pos <= cend());
     assert(full());
     auto res = pos;
     switch (pos - begin()) {
@@ -627,7 +627,7 @@ class PTreeNode {
   iterator split_point(iterator pos, key_type& split_key)
     requires std::same_as<T, RTreeNode_details>
   {
-    assert(cbegin() <= pos <= cend());
+    assert(cbegin() <= pos && pos <= cend());
     assert(full());
     auto res = pos;
     switch (pos - begin()) {
