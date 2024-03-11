@@ -1417,7 +1417,7 @@ class FreeBlocksAllocatorBucket {
     iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}, {}};
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.end());
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}, {}};
     ftree.iterator = ftree.node.begin();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
@@ -1428,7 +1428,7 @@ class FreeBlocksAllocatorBucket {
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.begin());
     --eptree.iterator;  // EPTree size should always be >= 1
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}, {}};
     ftree.iterator = ftree.node.end();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
@@ -1438,7 +1438,7 @@ class FreeBlocksAllocatorBucket {
     eptree.iterator = eptree.node.find(key, exact_match);
     if (exact_match && eptree.iterator == eptree.node.end())
       return end();
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}, {}};
     ftree.iterator = ftree.node.find(key, exact_match);
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
