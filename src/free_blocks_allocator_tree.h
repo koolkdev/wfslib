@@ -1279,6 +1279,7 @@ class EPTree : public EPTreeBlock {
     if (it == end())
       return false;
     erase(it);
+    return true;
   }
 
  private:
@@ -1529,6 +1530,7 @@ class FreeBlocksAllocatorBucket {
     if (it == end())
       return false;
     erase(it);
+    return true;
   }
 
  private:
