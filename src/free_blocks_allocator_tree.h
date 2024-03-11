@@ -552,7 +552,7 @@ class PTreeNode {
   }
 
   void erase(iterator pos) {
-    assert(cbegin() <= pos < cend());
+    assert(cbegin() <= pos && pos < cend());
     auto new_end = end() - 1;
     std::copy<const_iterator, iterator>(pos + 1, cend(), pos);
     std::fill(new_end, end(), 0);
