@@ -534,7 +534,7 @@ class PTreeNode {
   bool insert(iterator pos, const typename iterator::value_type& key_val) {
     if (size_ >= node_keys_capacity<T>::value)
       return false;
-    assert(cbegin() <= pos <= cend());
+    assert(cbegin() <= pos && pos <= cend());
     std::copy<const_iterator, iterator>(pos, cend(), pos + 1);
     *pos = key_val;
     size_++;
@@ -544,7 +544,7 @@ class PTreeNode {
   bool insert(iterator pos, const_iterator it_start, const_iterator it_end) {
     if (size_ + (it_end - it_start) > node_keys_capacity<T>::value)
       return false;
-    assert(cbegin() <= pos <= cend());
+    assert(cbegin() <= pos && pos <= cend());
     std::copy<const_iterator, iterator>(pos, cend(), pos + (it_end - it_start));
     std::copy<const_iterator, iterator>(it_start, it_end, pos);
     size_ += it_end - it_start;
@@ -560,8 +560,8 @@ class PTreeNode {
   }
 
   void erase(iterator it_start, iterator it_end) {
-    assert(cbegin() <= it_start <= cend());
-    assert(cbegin() <= it_end <= cend());
+    assert(cbegin() <= it_start && it_start <= cend());
+    assert(cbegin() <= it_end && it_end <= cend());
     assert(it_start <= it_end);
     auto new_end = it_start + (cend() - it_end);
     std::copy<const_iterator, iterator>(it_end, cend(), it_start);
@@ -1340,6 +1340,7 @@ class FreeBlocksAllocatorBucketIterator {
     block_size_index_ = other.block_size_index_;
     eptree_ = std::make_unique<eptree_node_info>(*other.eptree_);
     ftree_ = std::make_unique<ftree_node_info>(*other.ftree_);
+    return *this;
   }
 
   reference operator*() const { return *ftree_->iterator; }
@@ -1413,7 +1414,7 @@ class FreeBlocksAllocatorBucket {
 
   iterator begin() const {
     // TODO: Get the block from the freeblocksallocator
-    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}, {}};
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.end());
     iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
@@ -1423,7 +1424,7 @@ class FreeBlocksAllocatorBucket {
 
   iterator end() const {
     // TODO: Get the block from the freeblocksallocator
-    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}, {}};
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.begin());
     --eptree.iterator;  // EPTree size should always be >= 1
@@ -1433,7 +1434,7 @@ class FreeBlocksAllocatorBucket {
   }
 
   iterator find(key_type key, bool exact_match = false) const {
-    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}, {}};
     eptree.iterator = eptree.node.find(key, exact_match);
     if (exact_match && eptree.iterator == eptree.node.end())
       return end();
@@ -1503,6 +1504,7 @@ class FreeBlocksAllocatorBucket {
     else
       FTree(right_block, block_size_index_).insert(key_val);
     // TODO: handle directly_allocated_block
+    std::ignore = directly_allocated_block;
     return pos.eptree().node.insert({split_point_key, right_block_number});
   }
 
