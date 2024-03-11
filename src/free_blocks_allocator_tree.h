@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <algorithm>
 #include <array>
 #include <cassert>
 #include <concepts>
@@ -17,6 +18,10 @@
 #include "free_blocks_allocator.h"
 #include "structs.h"
 #include "tree_nodes_allocator.h"
+
+// Log2 of number of block in for each single quanta in each bucket
+constexpr size_t kSizeBuckets[] = {0, 3, 6, 10, 14, 18, 22, 26};
+constexpr size_t kSizeBucketsCount = std::extent<decltype(kSizeBuckets)>::value;
 
 template <typename T>
 concept has_keys = std::is_array<decltype(T::keys)>::value &&
@@ -123,7 +128,7 @@ struct node_access_value<T> {
     return static_cast<nibble>((node.values.value() >> (4 * i)) & 0xf);
   }
   static void set(T& node, size_t i, node_value_type<T>::type value) {
-    node.values = (node.values.value() & ~(0xf << (4 * i))) | (value << (4 * i));
+    node.values = (node.values.value() & ~(0xf << (4 * i))) | (static_cast<uint8_t>(value) << (4 * i));
   }
 };
 template <size_t index, has_values T>
@@ -238,7 +243,7 @@ concept nodes_allocator_methods = requires(T& allocator, U* node_type) {
                                   } && requires(const T& allocator, const U* node_type) {
                                          { allocator.template get_object<U>(uint16_t{0}) } -> std::same_as<const U*>;
                                          { allocator.template to_offset<U>(node_type) } -> std::same_as<uint16_t>;
-                                         { allocator.block() } -> std::same_as<std::shared_ptr<MetadataBlock>&>;
+                                         { allocator.block() } -> std::same_as<std::shared_ptr<MetadataBlock>>;
                                        };
 template <typename T>
 concept nodes_allocator_construct = std::constructible_from<T, std::shared_ptr<MetadataBlock>>;
@@ -674,7 +679,7 @@ class PTreeIterator {
   PTreeIterator(std::shared_ptr<Block> block, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
       : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
-  reference operator*() { return *leaf_->iterator; }
+  reference operator*() const { return *leaf_->iterator; }
 
   iterator_type& operator++() {
     if (++leaf_->iterator == leaf_->node.end()) {
@@ -940,11 +945,11 @@ class PTree : public Allocator {
     if (pos.leaf().node.empty()) {
       auto parent = pos.parents().rbegin();
       for (; parent != pos.parents().rend(); parent++) {
-        parent.node.erase(parent.iterator);
-        if (!parent.node.empty())
+        parent->node.erase(parent->iterator);
+        if (!parent->node.empty())
           break;
       }
-      if (parent == pos.parents.rend()) {
+      if (parent == pos.parents().rend()) {
         mutable_header()->tree_depth = 0;
       }
     }
@@ -1005,8 +1010,6 @@ class RTree : public PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
 
 class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
  public:
-  static constexpr size_t kSizeBucketsCount = 7;
-
   FTree(std::shared_ptr<MetadataBlock> block, size_t block_size_index)
       : PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)),
         block_size_index_(block_size_index) {}
@@ -1015,13 +1018,13 @@ class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
   const PTreeHeader* header() const override { return &tree_header()->trees[block_size_index_]; }
 
   static std::array<FTree, kSizeBucketsCount> CreateFTrees(std::shared_ptr<MetadataBlock> block) {
-    return CreateFTreeArray<kSizeBucketsCount>(std::move(block), std::make_index_sequence<7>{});
+    return CreateFTreeArray<kSizeBucketsCount>(std::move(block), std::make_index_sequence<kSizeBucketsCount>{});
   }
 
  private:
   template <std::size_t N, std::size_t... Is>
   static std::array<FTree, N> CreateFTreeArray(std::shared_ptr<MetadataBlock> block, std::index_sequence<Is...>) {
-    return {{FTree(block, Is)...}};
+    return {{{block, Is}...}};
   }
 
   size_t block_size_index_;
@@ -1033,14 +1036,18 @@ class EPTreeIterator {
   using difference_type = std::ptrdiff_t;
   using value_type = RTree::iterator::value_type;
 
+  using const_reference = RTree::iterator::const_reference;
+  using reference = RTree::iterator::reference;
+  using pointer = RTree::iterator::pointer;
+
   using node_info = node_iterator_info<RTree>;
 
   EPTreeIterator() = default;
 
-  EPTreeIterator(std::vector<node_info> nodes, std::shared_ptr<Area> area)
-      : nodes_(std::move(nodes)), area_(std::move(area)) {}
+  EPTreeIterator(FreeBlocksAllocator* allocator, std::vector<node_info> nodes)
+      : allocator_(allocator), nodes_(std::move(nodes)) {}
 
-  value_type operator*() { return *nodes_.back().iterator; }
+  reference operator*() const { return *nodes_.back().iterator; }
 
   EPTreeIterator& operator++() {
     // TODO: Optimize?
@@ -1052,7 +1059,7 @@ class EPTreeIterator {
     }
     uint32_t node_block_number = (*node->iterator).value;  // todo: by ref
     for (++node; node != nodes_.end(); ++node) {
-      node->node = {throw_if_error(area_->GetMetadataBlock(node_block_number))};
+      node->node = {allocator_->LoadAllocatorBlock(node_block_number)};
       node->iterator = node->node.begin();
       node_block_number = (*node->iterator).value;  // todo: by ref
     }
@@ -1068,7 +1075,7 @@ class EPTreeIterator {
     --node->iterator;
     uint32_t node_block_number = (*node->iterator).value;  // todo: by ref
     for (++node; node != nodes_.end(); ++node) {
-      node->node = {throw_if_error(area_->GetMetadataBlock(node_block_number))};
+      node->node = {allocator_->LoadAllocatorBlock(node_block_number)};
       node->iterator = node->node.end();
       --node->iterator;
       node_block_number = (*node->iterator).value;  // todo: by ref
@@ -1097,8 +1104,9 @@ class EPTreeIterator {
   std::vector<node_info>& nodes() { return nodes_; };
 
  private:
+  FreeBlocksAllocator* allocator_;
+
   std::vector<node_info> nodes_;
-  std::shared_ptr<Area> area_;
 };
 static_assert(std::bidirectional_iterator<EPTreeIterator>);
 
@@ -1109,43 +1117,41 @@ class EPTree : public EPTreeBlock {
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  EPTree(std::shared_ptr<FreeBlocksAllocator> allocator,
-         std::shared_ptr<Area> area,
-         std::shared_ptr<MetadataBlock> block)
-      : EPTreeBlock(std::move(block)), allocator_(allocator), area_(std::move(area)) {}
+  EPTree(FreeBlocksAllocator* allocator, std::shared_ptr<MetadataBlock> block)
+      : EPTreeBlock(std::move(block)), allocator_(allocator) {}
 
   // size_t size() { return header_->block_number; }
   iterator begin() const {
     if (tree_header()->current_tree.items_count.value() == 0)
-      return iterator({}, area_);
+      return iterator(allocator_, {});
     std::vector<typename iterator::node_info> nodes;
     uint32_t node_block_number = 0;
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      RTree node_tree(i == 0 ? block() : throw_if_error(area_->GetMetadataBlock(node_block_number)));
+      RTree node_tree(i == 0 ? block() : allocator_->LoadAllocatorBlock(node_block_number));
       nodes.push_back({node_tree, node_tree.begin()});
       node_block_number = (*nodes.back().iterator).value;
     }
-    return iterator(std::move(nodes), area_);
+    return iterator(allocator_, std::move(nodes));
   }
   iterator end() const {
     if (tree_header()->current_tree.items_count.value() == 0)
-      return iterator({}, area_);
+      return iterator(allocator_, {});
     std::vector<typename iterator::node_info> nodes;
     uint32_t node_block_number = 0;
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      RTree node(i == 0 ? block() : throw_if_error(area_->GetMetadataBlock(node_block_number)));
+      RTree node(i == 0 ? block() : allocator_->LoadAllocatorBlock(node_block_number));
       nodes.push_back({node, node.end()});
       --nodes.back().iterator;
       node_block_number = (*nodes.back().iterator).value;
     }
-    return iterator(std::move(nodes), area_);
+    return iterator(allocator_, std::move(nodes));
   }
 
   const_iterator cbegin() const { return begin(); }
   const_iterator cend() const { return end(); }
 
-  reverse_iterator rbegin() const { return {end()}; }
-  reverse_iterator rend() const { return {begin()}; }
+  reverse_iterator rbegin() const { return reverse_iterator{end()}; }
+  reverse_iterator rend() const { return reverse_iterator{begin()}; }
 
   iterator find(key_type key, bool exact_match = false) {
     if (tree_header()->current_tree.items_count.value() == 0)
@@ -1153,12 +1159,12 @@ class EPTree : public EPTreeBlock {
     std::vector<typename iterator::node_info> nodes;
     uint32_t node_block_number = 0;
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      RTree node(i == 0 ? block() : throw_if_error(area_->GetMetadataBlock(node_block_number)));
+      RTree node(i == 0 ? block() : allocator_->LoadAllocatorBlock(node_block_number));
       nodes.push_back({node, node.find(key, exact_match && i + 1 == tree_header()->depth.value())});
       assert(nodes.back().iterator != nodes.back().node.end());
       node_block_number = (*nodes.back().iterator).value;
     }
-    return iterator(std::move(nodes), area_);
+    return iterator(allocator_, std::move(nodes));
   }
 
   bool insert(const iterator::value_type& key_value) {
@@ -1175,14 +1181,14 @@ class EPTree : public EPTreeBlock {
       auto split_point = node_level.middle();
       auto split_point_key = (*split_point).key;
       // Alloc new right side tree
-      auto right_block_number = allocator_->PopFreeBlockNumberFromMetadataCache();
+      auto right_block_number = allocator_->AllocMetedataBlockFromCache();
       if (!right_block_number) {
         right_block_number = allocator_->FindFreeMetadataBlockNumber(node_level.block()->BlockNumber());
         if (!right_block_number)
           return false;
         directly_allocated_blocks.push_back(right_block_number);
       }
-      RTree new_right(throw_if_error(area_->GetMetadataBlock(right_block_number, /*new_block=*/true)));
+      RTree new_right(allocator_->LoadAllocatorBlock(right_block_number, /*new_block=*/true));
       if (depth == tree_header()->depth.value()) {
         // This is the root split it to two new trees
         if (depth == 3) {
@@ -1190,14 +1196,14 @@ class EPTree : public EPTreeBlock {
           return false;
         }
         // We need a new left side too
-        auto left_block_number = allocator_->PopFreeBlockNumberFromMetadataCache();
+        auto left_block_number = allocator_->AllocMetedataBlockFromCache();
         if (!left_block_number) {
           left_block_number = allocator_->FindFreeMetadataBlockNumber(node_level.block()->BlockNumber());
           if (!left_block_number)
             return false;
           directly_allocated_blocks.push_back(left_block_number);
         }
-        RTree new_left(throw_if_error(area_->GetMetadataBlock(left_block_number, /*new_block=*/true)));
+        RTree new_left(allocator_->LoadAllocatorBlock(left_block_number, /*new_block=*/true));
         new_right.Init(depth);
         new_left.Init(depth);
         node_level.split(new_left, new_right, split_point);
@@ -1248,6 +1254,7 @@ class EPTree : public EPTreeBlock {
       // node is empty, delete parent too
       blocks_to_delete.push_back(node_level.block()->BlockNumber());
     }
+    // TODO: Move this part up to the allocator?
     // Optimize tree if empty
     if (pos.nodes()[0].node.header()->tree_depth.value() <= 1) {
       return;
@@ -1275,9 +1282,7 @@ class EPTree : public EPTreeBlock {
   }
 
  private:
-  std::shared_ptr<FreeBlocksAllocator> allocator_;
-
-  std::shared_ptr<Area> area_;
+  FreeBlocksAllocator* allocator_;
 };
 
 class FreeBlocksAllocatora {
@@ -1311,56 +1316,88 @@ class FreeBlocksAllocatorBucketIterator {
   using eptree_node_info = node_iterator_info<EPTree>;
   using ftree_node_info = node_iterator_info<FTree>;
 
-  FreeBlocksAllocatorBucketIterator(std::shared_ptr<Area> area,
+  FreeBlocksAllocatorBucketIterator() = default;
+  FreeBlocksAllocatorBucketIterator(FreeBlocksAllocator* allocator,
                                     size_t block_size_index,
                                     eptree_node_info eptree,
                                     ftree_node_info ftree)
-      : area_(std::move(area)),
-        block_size_index(block_size_index),
-        eptree_(std::move(eptree)),
-        ftree_(std::move(ftree)) {}
+      : allocator_(allocator),
+        block_size_index_(block_size_index),
+        eptree_(std::make_unique<eptree_node_info>(std::move(eptree))),
+        ftree_(std::make_unique<ftree_node_info>(std::move(ftree))) {}
+  FreeBlocksAllocatorBucketIterator(const FreeBlocksAllocatorBucketIterator& other)
+      : allocator_(other.allocator_),
+        block_size_index_(other.block_size_index_),
+        eptree_(std::make_unique<eptree_node_info>(*other.eptree_)),
+        ftree_(std::make_unique<ftree_node_info>(*other.ftree_)) {}
+  FreeBlocksAllocatorBucketIterator(FreeBlocksAllocatorBucketIterator&& other)
+      : allocator_(other.allocator_),
+        block_size_index_(other.block_size_index_),
+        eptree_(std::move(other.eptree_)),
+        ftree_(std::move(other.ftree_)) {}
+  FreeBlocksAllocatorBucketIterator& operator=(const FreeBlocksAllocatorBucketIterator& other) {
+    allocator_ = other.allocator_;
+    block_size_index_ = other.block_size_index_;
+    eptree_ = std::make_unique<eptree_node_info>(*other.eptree_);
+    ftree_ = std::make_unique<ftree_node_info>(*other.ftree_);
+  }
 
-  reference operator*() { return *ftree_.iterator; }
+  reference operator*() const { return *ftree_->iterator; }
 
   FreeBlocksAllocatorBucketIterator& operator++() {
-    if (++ftree_.iterator == ftree_.node.end()) {
-      if (++eptree_.iterator == eptree_.node.end()) {
-        --eptree_.iterator;
+    if (++ftree_->iterator == ftree_->node.end()) {
+      if (++eptree_->iterator == eptree_->node.end()) {
+        --eptree_->iterator;
         return *this;  // end
       }
-      ftree_.node = FTree(throw_if_error(area_->GetMetadataBlock((*eptree_.iterator).value)), block_size_index);
-      ftree_.iterator = ftree_.node.begin();
+
+      ftree_ = std::make_unique<ftree_node_info>(
+          FTree{allocator_->LoadAllocatorBlock((*eptree_->iterator).value), block_size_index_});
+      ftree_->iterator = ftree_->node.begin();
     }
     return *this;
   }
 
   FreeBlocksAllocatorBucketIterator& operator--() {
-    if (ftree_.iterator == ftree_.node.begin()) {
-      if (eptree_.iterator == eptree_.node.begin()) {
+    if (ftree_->iterator == ftree_->node.begin()) {
+      if (eptree_->iterator == eptree_->node.begin()) {
         return *this;  // begin
       }
 
-      ftree_.node = FTree(throw_if_error(area_->GetMetadataBlock((*--eptree_.iterator).value)), block_size_index);
-      ftree_.iterator = ftree_.node.end();
+      ftree_ = std::make_unique<ftree_node_info>(
+          FTree{allocator_->LoadAllocatorBlock((*--eptree_->iterator).value), block_size_index_});
+      ftree_->iterator = ftree_->node.end();
     }
-    --ftree_.iterator;
+    --ftree_->iterator;
     return *this;
   }
 
-  bool operator==(const FreeBlocksAllocatorBucketIterator& other) const {
-    return ftree_.iterator == other.ftree_.iterator;
+  FreeBlocksAllocatorBucketIterator operator++(int) {
+    FreeBlocksAllocatorBucketIterator tmp(*this);
+    ++(*this);
+    return tmp;
   }
 
-  eptree_node_info& eptree() { return eptree_; }
+  FreeBlocksAllocatorBucketIterator operator--(int) {
+    FreeBlocksAllocatorBucketIterator tmp(*this);
+    --(*this);
+    return tmp;
+  }
 
-  ftree_node_info& ftree() { return ftree_; }
+  bool operator==(const FreeBlocksAllocatorBucketIterator& other) const {
+    return ftree_->iterator == other.ftree_->iterator;
+  }
+
+  eptree_node_info& eptree() { return *eptree_; }
+
+  ftree_node_info& ftree() { return *ftree_; }
 
  private:
-  std::shared_ptr<Area> area_;
-  size_t block_size_index;
+  FreeBlocksAllocator* allocator_;
+  size_t block_size_index_;
 
-  eptree_node_info eptree_;
-  ftree_node_info ftree_;
+  std::unique_ptr<eptree_node_info> eptree_;
+  std::unique_ptr<ftree_node_info> ftree_;
 };
 static_assert(std::bidirectional_iterator<FreeBlocksAllocatorBucketIterator>);
 
@@ -1371,44 +1408,38 @@ class FreeBlocksAllocatorBucket {
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  FreeBlocksAllocatorBucket(std::shared_ptr<Area> area, size_t block_size_index)
-      : area_(std::move(area)), block_size_index_(block_size_index) {}
+  FreeBlocksAllocatorBucket(FreeBlocksAllocator* allocator, size_t block_size_index)
+      : allocator_(allocator), block_size_index_(block_size_index) {}
 
   iterator begin() const {
     // TODO: Get the block from the freeblocksallocator
-    iterator::eptree_node_info eptree{
-        {throw_if_error(area_->GetFreeBlocksAllocator()), area_, throw_if_error(area_->GetMetadataBlock(1))}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.end());
-    iterator::ftree_node_info ftree{
-        {throw_if_error(area_->GetMetadataBlock((*eptree.iterator).value)), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
     ftree.iterator = ftree.node.begin();
-    return {area_, block_size_index_, std::move(eptree), std::move(ftree)};
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
   iterator end() const {
     // TODO: Get the block from the freeblocksallocator
-    iterator::eptree_node_info eptree{
-        {throw_if_error(area_->GetFreeBlocksAllocator()), area_, throw_if_error(area_->GetMetadataBlock(1))}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
     eptree.iterator = eptree.node.begin();
     assert(eptree.iterator != eptree.node.begin());
     --eptree.iterator;  // EPTree size should always be >= 1
-    iterator::ftree_node_info ftree{
-        {throw_if_error(area_->GetMetadataBlock((*eptree.iterator).value)), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
     ftree.iterator = ftree.node.end();
-    return {area_, block_size_index_, std::move(eptree), std::move(ftree)};
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
   iterator find(key_type key, bool exact_match = false) const {
-    iterator::eptree_node_info eptree{
-        {throw_if_error(area_->GetFreeBlocksAllocator()), area_, throw_if_error(area_->GetMetadataBlock(1))}};
+    iterator::eptree_node_info eptree{{allocator_, allocator_->LoadAllocatorBlock(1)}};
     eptree.iterator = eptree.node.find(key, exact_match);
     if (exact_match && eptree.iterator == eptree.node.end())
       return end();
-    iterator::ftree_node_info ftree{
-        {throw_if_error(area_->GetMetadataBlock((*eptree.iterator).value)), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
     ftree.iterator = ftree.node.find(key, exact_match);
-    return {area_, block_size_index_, std::move(eptree), std::move(ftree)};
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
   bool update(const iterator::value_type& key_val) {
@@ -1431,15 +1462,31 @@ class FreeBlocksAllocatorBucket {
       return true;
     }
 
-    auto old_block = pos.ftree().node.block().Clone();
-    auto left_block_number = old_block.BlockNumber();
-    auto left_block = throw_if_error(area_->GetMetadataBlock(left_block_number, true));
-    auto right_block = throw_if_error(area_->GetMetadataBlock(right_block_number, true));
+    auto old_block = pos.ftree().node.block()->CreateInMemoryClone();
+    auto old_ftrees = FTree::CreateFTrees(old_block);
+
+    auto left_block = pos.ftree().node.block();
+    std::fill(left_block->mutable_data().begin(), left_block->mutable_data().end(), std::byte{0});
+
+    uint32_t directly_allocated_block = 0;
+    auto right_block_number = allocator_->AllocMetedataBlockFromCache();
+    if (!right_block_number) {
+      // Just get a block from the current FTree
+      for (const auto& ftree : old_ftrees) {
+        if (ftree.size() > 0) {
+          right_block_number = (*ftree.begin()).key;
+          break;
+        }
+      }
+      if (!right_block_number)
+        return false;
+      directly_allocated_block = right_block_number;
+    }
+    auto right_block = allocator_->LoadAllocatorBlock(right_block_number, true);
     // TODO: New right/left
     FTreesBlock(left_block).Init();
     FTreesBlock(right_block).Init();
 
-    auto old_ftrees = FTree::CreateFTrees(old_block);
     auto left_ftrees = FTree::CreateFTrees(left_block);
     auto right_ftrees = FTree::CreateFTrees(right_block);
 
@@ -1455,7 +1502,7 @@ class FreeBlocksAllocatorBucket {
       FTree(left_block, block_size_index_).insert(key_val);
     else
       FTree(right_block, block_size_index_).insert(key_val);
-    // TODO, replace node block with that
+    // TODO: handle directly_allocated_block
     return pos.eptree().node.insert({split_point_key, right_block_number});
   }
 
@@ -1483,6 +1530,7 @@ class FreeBlocksAllocatorBucket {
   }
 
  private:
-  std::shared_ptr<Area> area_;
+  FreeBlocksAllocator* allocator_;
+
   size_t block_size_index_;
 };

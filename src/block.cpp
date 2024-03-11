@@ -16,17 +16,20 @@ Block::Block(const std::shared_ptr<BlocksDevice>& device,
              Block::BlockSize size_category,
              uint32_t data_size,
              uint32_t iv,
-             bool encrypted)
+             bool encrypted,
+             bool in_memory)
     : device_(device),
       block_number_(block_number),
       size_category_(size_category),
       data_size_(data_size),
       iv_(iv),
       encrypted_(encrypted),
+      in_memory_(in_memory),
       data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
 Block::~Block() {
-  device_->RemoveFromCache(block_number_);
+  if (!in_memory_)
+    device_->RemoveFromCache(block_number_);
 }
 
 void Block::Resize(uint32_t data_size) {
@@ -43,12 +46,13 @@ void Block::Resize(uint32_t data_size) {
 }
 
 bool Block::Fetch(bool check_hash) {
+  assert(!in_memory_);
   return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
                             check_hash);
 }
 
 void Block::Flush() {
-  if (!dirty_)
+  if (in_memory_ || !dirty_)
     return;
   device_->WriteBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, MutableHash(), iv_, encrypted_,
                       /*recalculate_hash=*/true);

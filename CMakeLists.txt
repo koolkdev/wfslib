@@ -32,6 +32,7 @@ add_library(${PROJECT_NAME}
     src/errors.cpp
     src/file.cpp
     src/file_device.cpp
+    src/free_blocks_allocator.cpp
     src/key_file.cpp
     src/metadata_block.cpp
     src/structs.cpp

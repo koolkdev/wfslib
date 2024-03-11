@@ -33,7 +33,8 @@ class TreeNodesAllocator {
     freelist_entry->count = entries_count();
     freelist_entry->init_zero = 0;
     freelist_entry->next = entries_count();
-    std::fill(mutable_tree_header(), mutable_tree_header() + 1, std::byte{0});
+    std::fill(reinterpret_cast<std::byte*>(mutable_tree_header()),
+              reinterpret_cast<std::byte*>(mutable_tree_header() + 1), std::byte{0});
   }
 
   template <typename T>
@@ -122,7 +123,7 @@ class TreeNodesAllocator {
     return block()->template get_object<extra_header_type>(extra_header_offset());
   }
 
-  std::shared_ptr<MetadataBlock>& block() const { return block_; }
+  std::shared_ptr<MetadataBlock> block() const { return block_; }
 
   template <typename T>
   T* get_mutable_object(uint16_t offset) const

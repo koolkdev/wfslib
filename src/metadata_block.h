@@ -21,7 +21,8 @@ class MetadataBlock : public Block {
   MetadataBlock(const std::shared_ptr<BlocksDevice>& device,
                 uint32_t block_number,
                 Block::BlockSize size_category,
-                uint32_t iv);
+                uint32_t iv,
+                bool in_memory = false);
   ~MetadataBlock() override;
 
   static std::expected<std::shared_ptr<MetadataBlock>, WfsError> LoadBlock(const std::shared_ptr<BlocksDevice>& device,
@@ -35,6 +36,8 @@ class MetadataBlock : public Block {
   const MetadataBlockHeader* Header() const;
 
   void Resize(uint32_t data_size) override;
+
+  std::shared_ptr<MetadataBlock> CreateInMemoryClone();
 
  protected:
   std::span<std::byte> MutableHash() override;

@@ -14,8 +14,9 @@
 MetadataBlock::MetadataBlock(const std::shared_ptr<BlocksDevice>& device,
                              uint32_t block_number,
                              Block::BlockSize size_category,
-                             uint32_t iv)
-    : Block(device, block_number, size_category, 1 << size_category, iv, true) {}
+                             uint32_t iv,
+                             bool in_memory)
+    : Block(device, block_number, size_category, 1 << size_category, iv, true, in_memory) {}
 
 MetadataBlock::~MetadataBlock() {
   Flush();
@@ -57,6 +58,12 @@ void MetadataBlock::Resize(uint32_t data_size) {
   std::ignore = data_size;
   // Can't resize metadata block
   assert(false);
+}
+
+std::shared_ptr<MetadataBlock> MetadataBlock::CreateInMemoryClone() {
+  auto res = std::make_shared<MetadataBlock>(device_, BlockNumber(), log2_size(), iv_, true);
+  std::copy(data().begin(), data().end(), res->mutable_data().begin());
+  return res;
 }
 
 std::span<std::byte> MetadataBlock::MutableHash() {

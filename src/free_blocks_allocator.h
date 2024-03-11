@@ -12,14 +12,22 @@
 class EPTree;
 class Area;
 class MetadataBlock;
+struct FreeBlocksAllocatorHeader;
 
 class FreeBlocksAllocator {
  public:
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
 
-  uint32_t PopFreeBlockNumberFromMetadataCache();
+  uint32_t AllocMetedataBlockFromCache();
   uint32_t FindFreeMetadataBlockNumber(uint32_t near);
 
+  std::shared_ptr<MetadataBlock> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
+
  private:
-  std::unique_ptr<EPTree> eptree_;
+  std::unique_ptr<EPTree> GetEPTree();
+  const FreeBlocksAllocatorHeader* header();
+  FreeBlocksAllocatorHeader* mutable_header();
+
+  std::shared_ptr<Area> area_;
+  std::shared_ptr<MetadataBlock> block_;
 };
