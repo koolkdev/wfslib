@@ -34,6 +34,7 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
         return info.block_number == possible_result.block_number;
       });
       if (res == allocated.end()) {
+        possible_result.blocks_count = 1;
         allocated.push_back(possible_result);
         return possible_result.block_number;
       }
@@ -43,6 +44,10 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
     }
   }
   // Not found
+  if (near != 0) {
+    // try again but all blocks
+    return FindSmallestFreeBlockExtent(0, allocated);
+  }
   return 0;
 }
 

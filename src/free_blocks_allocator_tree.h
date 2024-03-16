@@ -267,6 +267,10 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
     --(*this);
     return tmp;
   }
+  TreeReverseIterator& operator=(const TreeReverseIterator& other) {
+    std::reverse_iterator<T>::operator=(other);
+    return *this;
+  }
 
   bool is_begin() const { return this->base().is_end(); }
   bool is_end() const { return this->base().is_begin(); }
@@ -1508,11 +1512,8 @@ class EPTree : public EPTreeBlock {
         break;
       key_val_to_add = iterator::value_type{split_point_key, right_block_number};
     }
-    for (auto extent : allocated_extents) {
-      // mark block allocated (block_number, 1)
-      // TODO: Change call to the right one
+    for (auto extent : allocated_extents)
       allocator_->RemoveFreeBlocksExtent(extent);
-    }
     return true;
   }
 
@@ -1752,6 +1753,7 @@ class FreeBlocksAllocatorBucket {
       }
       if (!allocated_extent)
         return false;
+      allocated_extent->blocks_count = 1;
       right_block_number = allocated_extent->block_number;
     }
     auto right_block = allocator_->LoadAllocatorBlock(right_block_number, true);
