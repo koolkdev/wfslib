@@ -243,6 +243,7 @@ struct FreeBlocksAllocatorHeader {
   // When createa a new area, a fixed amount of blocks are allocated for metadata blocks for quick allocation. When
   // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
   // When no more availabe blocks are avaialbe, it will allocate them regulary.
+  // TODO: This is not metadata specific blocks, so rename this, this is just quick alloc cache
   uint32_be_t free_metadata_block;
   uint32_be_t free_metadata_blocks_count;
 };
@@ -309,9 +310,9 @@ struct EPTreeFooter {
 static_assert(sizeof(EPTreeFooter) == 0x18);
 
 struct FTreesFooter {
-  PTreeHeader trees[8];  // tree per each size of block
+  PTreeHeader trees[7];  // tree per each size of block
 };
-static_assert(sizeof(FTreesFooter) == 0x40);
+static_assert(sizeof(FTreesFooter) == 0x38);
 
 struct FTreesBlockHeader {
   uint8_be_t padding[8];
