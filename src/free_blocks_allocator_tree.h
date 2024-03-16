@@ -877,6 +877,7 @@ class PTree : public Allocator {
   using leaf_node = PTreeNode<LeafNodeDetails>;
 
   PTree(std::shared_ptr<MetadataBlock> block) : Allocator(std::move(block)) {}
+  virtual ~PTree() = default;
 
   virtual PTreeHeader* mutable_header() = 0;
   virtual const PTreeHeader* header() const = 0;
@@ -1225,7 +1226,7 @@ class FTrees {
     // TODO: llvm fold support
     // return *std::ranges::fold_right_last(
     // ftrees_ | std::views::transform([](const FTree& ftree) { return ftree.size(); }), std::plus<>());
-    return std::accumulate(ftrees_.begin(), ftrees_.end(), 0,
+    return std::accumulate(ftrees_.begin(), ftrees_.end(), size_t{0},
                            [](auto acc, const FTree& ftree) { return acc + ftree.size(); });
   }
 
