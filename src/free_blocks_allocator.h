@@ -21,6 +21,11 @@ struct FreeBlocksExtentInfo {
   size_t bucket_index;
 };
 
+struct FreeBlocksRangeInfo {
+  uint32_t block_number;
+  uint32_t blocks_count;
+};
+
 class FreeBlocksAllocator {
  public:
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
