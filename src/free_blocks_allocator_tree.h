@@ -1948,6 +1948,4 @@ class FreeBlocksTree {
 
  private:
   FreeBlocksAllocator* allocator_;
-
-  size_t block_size_index_;
 };
