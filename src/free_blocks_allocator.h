@@ -19,11 +19,15 @@ struct FreeBlocksExtentInfo {
   uint32_t block_number;
   uint32_t blocks_count;
   size_t bucket_index;
+
+  uint32_t end_block_number() const { return block_number + blocks_count; }
 };
 
 struct FreeBlocksRangeInfo {
   uint32_t block_number;
   uint32_t blocks_count;
+
+  uint32_t end_block_number() const { return block_number + blocks_count; }
 };
 
 class FreeBlocksAllocator {
@@ -33,11 +37,25 @@ class FreeBlocksAllocator {
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);
 
-  // Just mark the blocks as frees by adding them to the tree
-  void AddFreeBlocks(uint32_t block_number, uint32_t blocks_count);
+  std::vector<uint32_t> AllocBlocks(uint32_t blocks_count, size_t block_size_index, bool use_cache);
+  std::vector<FreeBlocksRangeInfo> AllocAreaBlocks(uint32_t blocks_count, size_t block_size_index);
+
+  // Mark the blocks as frees by adding them to the tree
+  void AddFreeBlocks(FreeBlocksRangeInfo range);
+
+  // Mark the blocks as frees by adding them to a specific size tree
+  void AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t bucket_index);
+
+  // Add new single extent to the tree
+  bool AddFreeBlocksExtent(FreeBlocksExtentInfo info);
 
   // Remove blocks from the tree
-  void RemoveFreeBlocksExtent(FreeBlocksExtentInfo info);
+  bool RemoveFreeBlocksExtent(FreeBlocksExtentInfo info);
+
+  void RecreateEPTreeIfNeeded();
+
+  // Return whether any part of the block is freed
+  bool IsRangeIsFree(FreeBlocksRangeInfo range);
 
   std::shared_ptr<MetadataBlock> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
 
