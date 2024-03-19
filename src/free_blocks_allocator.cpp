@@ -45,12 +45,9 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
       if (res->blocks_count < possible_result.blocks_count)
         return res->block_number + res->blocks_count++;
     }
+    // TODO: Search backward
   }
   // Not found
-  if (near != 0) {
-    // try again but all blocks
-    return FindSmallestFreeBlockExtent(0, allocated);
-  }
   return 0;
 }
 
@@ -231,6 +228,7 @@ std::vector<FreeBlocksRangeInfo> FreeBlocksAllocator::AllocAreaBlocks(uint32_t b
     }
   }
   if (selected_range) {
+    // remove  unneeded blocks
     selected_range->second.back().block_number += selected_range->first.blocks_count - blocks_count;
     selected_range->second.back().blocks_count -= selected_range->first.blocks_count - blocks_count;
     selected_range->first.blocks_count = blocks_count;
@@ -238,6 +236,7 @@ std::vector<FreeBlocksRangeInfo> FreeBlocksAllocator::AllocAreaBlocks(uint32_t b
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
     return {selected_range->first};
   }
+  // use the bigger chunkis first
   std::sort(ranges.begin(), ranges.end(), [](const range_and_extents& a, const range_and_extents& b) {
     return b.first.blocks_count < a.first.blocks_count;
   });
@@ -251,10 +250,11 @@ std::vector<FreeBlocksRangeInfo> FreeBlocksAllocator::AllocAreaBlocks(uint32_t b
   }
   if (total_blocks < blocks_count || used_ranges.size() > 0x100)
     return {};  // not enough space
-
+  // now sort by block number
   std::sort(ranges.begin(), ranges.end(), [](const range_and_extents& a, const range_and_extents& b) {
     return a.first.block_number < b.first.blocks_count;
   });
+  // remove from first chunk unneeded blocks
   used_ranges.begin()->first.block_number += total_blocks - blocks_count;
   while (used_ranges.begin()->second.back().end_block_number() <= used_ranges.begin()->first.block_number) {
     total_blocks -= used_ranges.begin()->second.back().blocks_count;

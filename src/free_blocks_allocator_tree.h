@@ -1609,7 +1609,8 @@ class FreeBlocksTreeBucketIteratorBase {
 
   FreeBlocksTreeBucketIteratorBase& operator++() {
     assert(!is_end());
-    if ((++ftree_.iterator).is_end()) {
+    ++ftree_.iterator;
+    while (ftree_.iterator.is_end()) {
       if ((++eptree_.iterator).is_end()) {
         --eptree_.iterator;
         return *this;  // end
@@ -1623,7 +1624,7 @@ class FreeBlocksTreeBucketIteratorBase {
 
   FreeBlocksTreeBucketIteratorBase& operator--() {
     assert(!is_begin());
-    if (ftree_.iterator.is_begin()) {
+    while (ftree_.iterator.is_begin()) {
       if (eptree_.iterator.is_begin()) {
         return *this;  // begin
       }
@@ -1705,6 +1706,7 @@ class FreeBlocksTreeBucket {
 
   // Note: find may return an empty FTree iterator, which isn't compatible with other functinalities
   // TODO: Remove this class at all? move this logic somewhere else
+  // TODO: Fix this
   iterator find(key_type key, bool exact_match = true) const {
     iterator::eptree_node_info eptree{{allocator_}};
     eptree.iterator = eptree.node->find(key, exact_match);
@@ -1712,6 +1714,7 @@ class FreeBlocksTreeBucket {
       return end();
     iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
     ftree.iterator = ftree.node->find(key, exact_match);
+    // TODO: If empty iterator back over eptree to find the last one
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
@@ -1726,6 +1729,7 @@ class FreeBlocksTreeBucket {
   }
 
   bool insert(const iterator::value_type& key_val) {
+    // TODO: If implementing the thing in find, we will have to specificlly find eptree here
     auto pos = find(key_val.key, false);
     if (!pos.is_end() && (*pos).key == key_val.key) {
       // already in tree
@@ -1828,7 +1832,9 @@ class FreeBlocksTreeIteratorBase {
 
   FreeBlocksTreeIteratorBase& operator++() {
     assert(!is_end());
-    if ((++ftrees_.iterator).is_end()) {
+    ++ftrees_.iterator;
+    // support empty ftrees?
+    while (ftrees_.iterator.is_end()) {
       if ((++eptree_.iterator).is_end()) {
         --eptree_.iterator;
         return *this;  // end
