@@ -752,11 +752,11 @@ struct node_iterator_info_base {
 template <typename T>
 using node_iterator_info = node_iterator_info_base<T, typename T::iterator>;
 template <typename T>
-using node_const_iterator_info = node_iterator_info_base<T, typename T::const_iterator>;
+using node_const_iterator_info = node_iterator_info_base<const T, typename T::const_iterator>;
 template <typename T>
 using node_reverse_iterator_info = node_iterator_info_base<T, typename T::reverse_iterator>;
 template <typename T>
-using node_const_reverse_iterator_info = node_iterator_info_base<T, typename T::const_reverse_iterator>;
+using node_const_reverse_iterator_info = node_iterator_info_base<const T, typename T::const_reverse_iterator>;
 
 template <typename T, typename U>
 concept is_const_iterator_info =
