@@ -15,6 +15,7 @@
 #include <numeric>
 #include <optional>
 #include <ranges>
+#include <variant>
 
 #include "free_blocks_allocator.h"
 #include "structs.h"
@@ -1103,8 +1104,46 @@ class PTree : public Allocator {
   }
 
   bool insert_compact(const iterator& it_start, const iterator& it_end) {
-    // TODO
-    return insert(it_start, it_end);
+    if (!empty()) {
+      assert(false);
+      return false;
+    }
+
+    // Fill up to 5 items in each edge
+    auto* header = mutable_header();
+    header->tree_depth = 0;
+    std::vector<std::pair<key_type, uint16_t>> current_nodes;
+    for (auto it = it_start; it != it_end;) {
+      auto* node = this->template Alloc<LeafNodeDetails>(1);
+      leaf_node new_node{{this->block(), this->to_offset(node)}, 0};
+      new_node.clear(true);
+      for (int i = 0; i < 5 && it != it_end; ++i, ++it) {
+        new_node.insert(new_node.end(), *it);
+        header->items_count += 1;
+      }
+      current_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
+    }
+
+    // Create the tree
+    while (current_nodes.size() > 1) {
+      header->tree_depth += 1;
+      std::vector<std::pair<key_type, uint16_t>> new_nodes;
+      for (auto it = current_nodes.begin(); it != current_nodes.end(); ++it) {
+        auto* node = this->template Alloc<ParentNodeDetails>(1);
+        parent_node new_node{{this->block(), this->to_offset(node)}, 0};
+        new_node.clear(true);
+        for (int i = 0; i < 5 && it != current_nodes.end(); ++i, ++it) {
+          new_node.insert(new_node.end(), {it->first, it->second});
+        }
+        new_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
+      }
+      current_nodes.swap(new_nodes);
+    }
+
+    // Update the root
+    header->root_offset = current_nodes[0].second;
+
+    return true;
   }
 
   void erase(iterator& pos) {
