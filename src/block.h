@@ -19,8 +19,12 @@ class Block {
   enum BlockSize {
     Basic = 12,
     Regular = 13,
-    MegaBasic = 15,
-    MegaRegular = 16,
+  };
+
+  enum BlockSizeType {
+    Single = 0,
+    Big = 3,
+    BigCluster = 6,
   };
 
   bool Fetch(bool check_hash = true);

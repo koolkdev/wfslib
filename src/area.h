@@ -59,6 +59,10 @@ class Area : public std::enable_shared_from_this<Area> {
                                                                    const DataBlock::DataBlockHash& data_hash,
                                                                    bool encrypted) const;
 
+  std::expected<std::shared_ptr<MetadataBlock>, WfsError> AllocMetadataBlock();
+  std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t chunks_count,
+                                                                 Block::BlockSizeType chunk_size);
+
   uint32_t RelativeBlockNumber(uint32_t block_number) const;
   uint32_t AbsoluteBlockNumber(uint32_t block_number) const;
 
@@ -67,11 +71,14 @@ class Area : public std::enable_shared_from_this<Area> {
   uint32_t BlockNumber() const;
   uint32_t BlocksCount() const;
 
+  size_t BlocksCacheSize() const;
+
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  private:
   friend class Wfs;
   friend class Recovery;
+  friend class FreeBlocksAllocator;
 
   static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
 

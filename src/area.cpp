@@ -149,3 +149,32 @@ std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlock
     return std::unexpected(WfsError::kFreeBlocksAllocatorCorrupted);
   return std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(*metadata_block));
 }
+
+size_t Area::BlocksCacheSize() const {
+  auto blocks_count = header()->blocks_count.value();
+  auto log2_block_size = header()->log2_block_size.value();
+  return (blocks_count >> (24 - Block::BlockSize::Basic))
+             ? ((blocks_count >> (30 - log2_block_size) ? 23 : 21) - log2_block_size)
+             : 0;
+}
+
+std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::AllocMetadataBlock() {
+  auto allocator = GetFreeBlocksAllocator();
+  if (!allocator)
+    return std::unexpected(allocator.error());
+  auto res = (*allocator)->AllocBlocks(1, Block::BlockSizeType::Single, true);
+  if (!res)
+    return std::unexpected(kNoSpace);
+  return GetMetadataBlock((*res)[0], /*new_block=*/true);
+}
+
+std::expected<std::vector<uint32_t>, WfsError> Area::AllocDataBlocks(uint32_t chunks_count,
+                                                                     Block::BlockSizeType chunk_size) {
+  auto allocator = GetFreeBlocksAllocator();
+  if (!allocator)
+    return std::unexpected(allocator.error());
+  auto res = (*allocator)->AllocBlocks(chunks_count, chunk_size, false);
+  if (!res)
+    return std::unexpected(kNoSpace);
+  return *res;
+}
