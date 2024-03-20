@@ -31,6 +31,8 @@ char const* WfsException::what() const noexcept {
       return "Transactions area corrupted";
     case WfsError::kInvalidWfsVersion:
       return "Invalid WFS version";
+    case WfsError::kNoSpace:
+      return "Not enough free space";
   }
   return "";
 }
