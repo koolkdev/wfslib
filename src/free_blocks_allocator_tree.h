@@ -801,11 +801,11 @@ class PTreeIterator {
       }
       uint16_t node_offset = (*rparent->iterator).value;
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
-        *parent = {{{block_, node_offset}}};
+        *parent = {{node_ref<ParentNodeDetails>{block_, node_offset}}};
         parent->iterator = parent->node->begin();
         node_offset = (*parent->iterator).value;
       }
-      leaf_ = {{{block_, node_offset}}};
+      leaf_ = {{node_ref<LeafNodeDetails>{block_, node_offset}}};
       leaf_->iterator = leaf_->node->begin();
     }
     return *this;
@@ -823,12 +823,12 @@ class PTreeIterator {
       }
       uint16_t node_offset = (*--rparent->iterator).value;  // TODO: by ref
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
-        *parent = {{{block_, node_offset}}};
+        *parent = {{node_ref<ParentNodeDetails>{block_, node_offset}}};
         parent->iterator = parent->node->end();
         --parent->iterator;
         node_offset = (*parent->iterator).value;  // TODO: by ref
       }
-      leaf_ = {{{block_, node_offset}}};
+      leaf_ = {{node_ref<LeafNodeDetails>{block_, node_offset}}};
       leaf_->iterator = leaf_->node->end();
     }
     --leaf_->iterator;
