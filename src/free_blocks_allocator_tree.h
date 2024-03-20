@@ -1804,7 +1804,7 @@ class FreeBlocksTreeBucket {
     return true;
   }
 
-  bool insert(const iterator::value_type& key_val) {
+  bool insert(FTree::iterator::value_type key_val) {
     // TODO: If implementing the thing in find, we will have to specificlly find eptree here
     auto pos = find(key_val.key, false);
     if (!pos.is_end() && (*pos).key == key_val.key) {
@@ -1814,8 +1814,8 @@ class FreeBlocksTreeBucket {
     return insert(pos, key_val);
   }
 
-  bool insert(iterator& pos, const iterator::value_type& key_val) {
-    if (pos.ftree().node->insert({key_val.key, key_val.value})) {
+  bool insert(iterator& pos, FTree::iterator::value_type key_val) {
+    if (pos.ftree().node->insert(key_val)) {
       return true;
     }
 
@@ -1850,9 +1850,9 @@ class FreeBlocksTreeBucket {
     key_type split_point_key;
     old_ftrees.split(left_ftrees, right_ftrees, split_point_key);
     if (key_val.key < split_point_key)
-      left_ftrees.ftrees()[block_size_index_].insert({key_val.key, key_val.value});
+      left_ftrees.ftrees()[block_size_index_].insert(key_val);
     else
-      right_ftrees.ftrees()[block_size_index_].insert({key_val.key, key_val.value});
+      right_ftrees.ftrees()[block_size_index_].insert(key_val);
     if (!pos.eptree().node->insert({split_point_key, right_block_number}))
       return false;
     if (allocated_extent)
