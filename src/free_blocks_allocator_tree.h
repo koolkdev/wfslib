@@ -1985,30 +1985,30 @@ class FreeBlocksTree {
   template <typename Iterator>
   Iterator tbegin() const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tbegin<decltype(Iterator::eptree_node_info::iterator)>();
+    eptree.iterator = eptree.node->template tbegin<decltype(Iterator::eptree_node_info::iterator)>();
     assert(!eptree.iterator.is_end());
     typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
-    ftrees.iterator = ftrees.node->tbegin<decltype(Iterator::ftrees_node_info::iterator)>();
+    ftrees.iterator = ftrees.node->template tbegin<decltype(Iterator::ftrees_node_info::iterator)>();
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
 
   template <typename Iterator>
   Iterator tend() const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tend<decltype(Iterator::eptree_node_info::iterator)>();
+    eptree.iterator = eptree.node->template tend<decltype(Iterator::eptree_node_info::iterator)>();
     assert(!eptree.iterator.is_begin());
     --eptree.iterator;  // EPTree size should always be >= 1
     typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
-    ftrees.iterator = ftrees.node->tend<decltype(Iterator::ftrees_node_info::iterator)>();
+    ftrees.iterator = ftrees.node->template tend<decltype(Iterator::ftrees_node_info::iterator)>();
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
 
   template <typename Iterator>
   Iterator tfind(key_type key) const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tfind<decltype(Iterator::eptree_node_info::iterator)>(key, false);
+    eptree.iterator = eptree.node->template tfind<decltype(Iterator::eptree_node_info::iterator)>(key, false);
     typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
-    ftrees.iterator = ftrees.node->tfind<decltype(Iterator::ftrees_node_info::iterator)>(key);
+    ftrees.iterator = ftrees.node->template tfind<decltype(Iterator::ftrees_node_info::iterator)>(key);
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
   FreeBlocksAllocator* allocator_;
