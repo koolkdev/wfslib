@@ -1128,7 +1128,7 @@ class PTree : public Allocator {
     while (current_nodes.size() > 1) {
       header->tree_depth += 1;
       std::vector<std::pair<key_type, uint16_t>> new_nodes;
-      for (auto it = current_nodes.begin(); it != current_nodes.end(); ++it) {
+      for (auto it = current_nodes.begin(); it != current_nodes.end();) {
         auto* node = this->template Alloc<ParentNodeDetails>(1);
         parent_node new_node{{this->block(), this->to_offset(node)}, 0};
         new_node.clear(true);
