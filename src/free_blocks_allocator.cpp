@@ -206,7 +206,8 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
     return;
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   // eptree is empty (aka have only initial FTreee), resize it to one eptree
-  for (auto& [node_level, node_it] : std::views::reverse(last.base().nodes())) {
+  auto nodes = last.base().nodes();
+  for (auto& [node_level, node_it] : std::views::reverse(nodes)) {
     if (node_level->header() == &eptree.tree_header()->current_tree) {
       // this is the root, reinitialize it
       node_level->Init(1);
