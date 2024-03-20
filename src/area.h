@@ -62,6 +62,7 @@ class Area : public std::enable_shared_from_this<Area> {
   std::expected<std::shared_ptr<MetadataBlock>, WfsError> AllocMetadataBlock();
   std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t chunks_count,
                                                                  Block::BlockSizeType chunk_size);
+  bool DeleteBlocks(uint32_t block_number, uint32_t blocks_count);
 
   uint32_t RelativeBlockNumber(uint32_t block_number) const;
   uint32_t AbsoluteBlockNumber(uint32_t block_number) const;

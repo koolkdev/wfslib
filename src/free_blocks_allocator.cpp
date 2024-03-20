@@ -71,14 +71,15 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
   return 0;
 }
 
-void FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
+bool FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
   if (!IsRangeIsFree(range)) {
     // Error: part of this range is already free.
     assert(false);
-    return;
+    return false;
   }
   AddFreeBlocksForSize(range, kSizeBucketsCount - 1);
   mutable_header()->free_blocks_count += range.blocks_count;
+  return true;
 }
 
 void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t bucket_index) {

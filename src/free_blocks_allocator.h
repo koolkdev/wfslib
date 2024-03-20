@@ -44,7 +44,7 @@ class FreeBlocksAllocator {
   std::optional<std::vector<FreeBlocksRangeInfo>> AllocAreaBlocks(uint32_t chunks_count, Block::BlockSizeType size);
 
   // Mark the blocks as frees by adding them to the tree
-  void AddFreeBlocks(FreeBlocksRangeInfo range);
+  bool AddFreeBlocks(FreeBlocksRangeInfo range);
 
   // Remove blocks from the tree
   bool RemoveFreeBlocksExtent(FreeBlocksExtentInfo info);

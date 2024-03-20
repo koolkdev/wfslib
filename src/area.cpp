@@ -178,3 +178,10 @@ std::expected<std::vector<uint32_t>, WfsError> Area::AllocDataBlocks(uint32_t ch
     return std::unexpected(kNoSpace);
   return *res;
 }
+
+bool Area::DeleteBlocks(uint32_t block_number, uint32_t blocks_count) {
+  auto allocator = GetFreeBlocksAllocator();
+  if (!allocator)
+    return false;
+  return (*allocator)->AddFreeBlocks({block_number, blocks_count});
+}
