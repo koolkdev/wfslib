@@ -1551,10 +1551,20 @@ class EPTree : public EPTreeBlock {
   }
 
   template <typename ReverseIterator>
-    requires std::is_same_v<ReverseIterator, reverse_iterator> ||
-             std::is_same_v<ReverseIterator, const_reverse_iterator>
+    requires std::is_same_v<ReverseIterator, reverse_iterator>
   ReverseIterator tfind(key_type key, bool exact_match = false) const {
-    auto res = find(key, exact_match);
+    auto res = tfind<iterator>(key, exact_match);
+    if (res.is_end())
+      return ReverseIterator{res};
+    else
+      return ReverseIterator{++res};
+  }
+
+  template <typename ReverseIterator>
+    requires(!std::is_same_v<reverse_iterator, const_reverse_iterator> &&
+             std::is_same_v<ReverseIterator, const_reverse_iterator>)  // TODO
+  ReverseIterator tfind(key_type key, bool exact_match = false) const {
+    auto res = tfind<const_iterator>(key, exact_match);
     if (res.is_end())
       return ReverseIterator{res};
     else
