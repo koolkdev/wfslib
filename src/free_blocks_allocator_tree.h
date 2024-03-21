@@ -1840,11 +1840,11 @@ class FreeBlocksTreeBucket {
     requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, const_iterator>
   Iterator tbegin() const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tbegin<decltype(Iterator::eptree_node_info::iterator)>();
+    eptree.iterator = eptree.node->template tbegin<decltype(Iterator::eptree_node_info::iterator)>();
     assert(eptree.iterator != eptree.node->tend<decltype(Iterator::eptree_node_info::iterator)>());
     typename Iterator::ftree_node_info ftree{
         {allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
-    ftree.iterator = ftree.node->tbegin<decltype(Iterator::ftree_node_info::iterator)>();
+    ftree.iterator = ftree.node->template tbegin<decltype(Iterator::ftree_node_info::iterator)>();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
@@ -1852,12 +1852,12 @@ class FreeBlocksTreeBucket {
     requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, const_iterator>
   Iterator tend() const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tend<decltype(Iterator::eptree_node_info::iterator)>();
+    eptree.iterator = eptree.node->template tend<decltype(Iterator::eptree_node_info::iterator)>();
     assert(eptree.iterator != eptree.node->tbegin<decltype(Iterator::ftree_node_info::iterator)>());
     --eptree.iterator;  // EPTree size should always be >= 1
     typename Iterator::ftree_node_info ftree{
         {allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
-    ftree.iterator = ftree.node->tend<decltype(Iterator::ftree_node_info::iterator)>();
+    ftree.iterator = ftree.node->template tend<decltype(Iterator::ftree_node_info::iterator)>();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
@@ -1865,12 +1865,12 @@ class FreeBlocksTreeBucket {
     requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, const_iterator>
   Iterator tfind(key_type key, bool exact_match = true) const {
     typename Iterator::eptree_node_info eptree{{allocator_}};
-    eptree.iterator = eptree.node->tfind<decltype(Iterator::eptree_node_info::iterator)>(key, exact_match);
+    eptree.iterator = eptree.node->template tfind<decltype(Iterator::eptree_node_info::iterator)>(key, exact_match);
     if (exact_match && eptree.iterator == eptree.node->tend<decltype(Iterator::eptree_node_info::iterator)>())
       return tend<Iterator>();
     typename Iterator::ftree_node_info ftree{
         {allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
-    ftree.iterator = ftree.node->tfind<decltype(Iterator::ftree_node_info::iterator)>(key, exact_match);
+    ftree.iterator = ftree.node->template tfind<decltype(Iterator::ftree_node_info::iterator)>(key, exact_match);
     // If FTree is empty or our key is smaller than the first key, go to previous node with value
     if (ftree.iterator.is_end() || key < (*ftree.iterator).key) {
       if (exact_match)
@@ -1878,7 +1878,7 @@ class FreeBlocksTreeBucket {
       while (!eptree.iterator.is_begin()) {
         typename Iterator::ftree_node_info nftree{
             {allocator_->LoadAllocatorBlock((*--eptree.iterator).value), block_size_index_}};
-        nftree.iterator = nftree.node->tend<decltype(Iterator::ftree_node_info::iterator)>();
+        nftree.iterator = nftree.node - template tend<decltype(Iterator::ftree_node_info::iterator)>();
         if (!nftree.iterator.is_begin()) {
           ftree = std::move(nftree);
           break;

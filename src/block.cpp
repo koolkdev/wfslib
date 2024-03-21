@@ -50,7 +50,7 @@ void Block::Detach() {
 }
 
 bool Block::Fetch(bool check_hash) {
-  assert(!in_memory_);
+  assert(!detached_);
   return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
                             check_hash);
 }

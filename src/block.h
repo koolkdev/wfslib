@@ -86,7 +86,7 @@ class Block {
   bool encrypted_;
 
   bool dirty_{false};
-  bool detached_;
+  bool detached_{false};
 
   // data buffer of at least size_, rounded to sector.
   std::vector<std::byte> data_;
