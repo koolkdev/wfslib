@@ -901,6 +901,7 @@ class PTree : public Allocator {
   virtual const PTreeHeader* header() const = 0;
 
   size_t size() const { return header()->items_count.value(); }
+  bool empty() const { return size() == 0; }
 
   template <typename Iterator>
     requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, const_iterator>
@@ -981,8 +982,6 @@ class PTree : public Allocator {
 
   const_iterator cbegin() const { return begin(); }
   const_iterator cend() const { return end(); }
-
-  bool empty() const { return header()->items_count.value() == 0; }
 
   auto find(key_type key, bool exact_match = true) { return tfind<iterator>(key, exact_match); }
   auto find(key_type key, bool exact_match = true) const { return tfind<const_iterator>(key, exact_match); }
@@ -1913,11 +1912,12 @@ class FreeBlocksTreeBucket {
       return true;
     }
 
-    auto old_block = pos.ftree().node->block()->CreateInMemoryClone();
+    auto old_block = pos.ftree().node->block();
+    old_block->Detach();
     FTrees old_ftrees{old_block};
+    auto left_block_number = old_block->BlockNumber();
 
-    auto left_block = pos.ftree().node->block();
-    std::fill(left_block->mutable_data().begin(), left_block->mutable_data().end(), std::byte{0});
+    auto left_block = allocator_->LoadAllocatorBlock(left_block_number, true);
 
     std::optional<FreeBlocksExtentInfo> allocated_extent;
     auto right_block_number = allocator_->AllocFreeBlockFromCache();

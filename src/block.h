@@ -57,6 +57,8 @@ class Block {
 
   virtual void Resize(uint32_t data_size);
 
+  void Detach();
+
   // TODO: fix private/protected
  private:
   uint32_t GetAlignedSize(uint32_t size) const;
@@ -69,8 +71,7 @@ class Block {
         Block::BlockSize size_category,
         uint32_t data_size,
         uint32_t iv,
-        bool encrypted,
-        bool in_memory = false);
+        bool encrypted);
   virtual ~Block();
 
   virtual std::span<std::byte> MutableHash() = 0;
@@ -85,7 +86,7 @@ class Block {
   bool encrypted_;
 
   bool dirty_{false};
-  bool in_memory_;
+  bool detached_;
 
   // data buffer of at least size_, rounded to sector.
   std::vector<std::byte> data_;
