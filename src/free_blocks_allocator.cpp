@@ -84,6 +84,7 @@ bool FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
 
 void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t bucket_index) {
   assert(bucket_index < kSizeBucketsCount);
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   const uint32_t size_blocks_count = 1 << kSizeBuckets[bucket_index];
   uint32_t range_in_size_start = align_ceil_pow2(range.block_number, kSizeBuckets[bucket_index]);
   uint32_t range_in_size_end = align_floor_pow2(range.end_block_number(), kSizeBuckets[bucket_index]);
@@ -97,11 +98,11 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
       (bucket_index + 1 == kSizeBucketsCount) ? (kSizeBuckets[bucket_index] + 4) : kSizeBuckets[bucket_index + 1];
   uint32_t next_size_blocks_count = 1 << next_size_pow2;
   FreeBlocksTreeBucket bucket{this, bucket_index};
-  std::optional<FreeBlocksExtentInfo> join_before, join_after;
-  FreeBlocksTreeBucket::iterator join_before_iter, join_after_iter;
+  std::optional<FreeBlocksExtentInfo> join_before;
+  FreeBlocksTreeBucket::iterator join_before_iter;
   auto pos = bucket.find(range_in_size.block_number, false);
   auto ftree = pos.ftree();
-  if (pos.is_end()) {
+  if (!pos.is_end()) {
     // Join with prev if:
     // 1. It ends exactly at this range start.
     // 2. This range start isn't aligned to one size up bucket block.
@@ -118,17 +119,23 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     // 1. It start  exactly at this range end.
     // 2. This range end isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    ++pos;
+    if ((*pos).block_number() < range_in_size.block_number)  // We could be at begin() before
+      ++pos;
+    assert(pos.is_end() || (*pos).block_number() > range_in_size.block_number);
     if (!pos.is_end() && (*pos).block_number() == range_in_size.end_block_number() &&
         (!is_aligned_pow2(range_in_size.end_block_number(), next_size_pow2) ||
          (*pos).blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
-      join_after = *pos;
-      join_after_iter = pos;
-      range_in_size.block_number = join_after->block_number;
-      range_in_size.blocks_count += join_after->blocks_count;
+      FreeBlocksExtentInfo join_after = *pos;
+      range_in_size.block_number = join_after.block_number;
+      range_in_size.blocks_count += join_after.blocks_count;
+      // We give up on the optimization that is done in the original logic (just update the join after block number to
+      // the new one if we were going to add it to the same leaf FTree anyway) because:
+      // 1. Inn such case simple removal and addition of one key will be pretty simple anyway.
+      // 2. In case of maximum bucket size, the iterator can change so we can't just save it, we will need to keep
+      // tracking it, which will make the code more complex because we don't optimize it in such way anyway currently.
+      bucket.erase(pos, blocks_to_delete);
     }
   }
-  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   FreeBlocksRangeInfo sub_range = range_in_size;
   while (sub_range.blocks_count) {
     if (sub_range.blocks_count >= next_size_blocks_count) {
@@ -137,9 +144,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
         sub_range.blocks_count = align_ceil_pow2(sub_range.block_number, next_size_pow2) - sub_range.block_number;
       } else {
         if (join_before)
-          bucket.erase(join_before->block_number, blocks_to_delete);
-        if (join_after)
-          bucket.erase(join_after->block_number, blocks_to_delete);
+          bucket.erase(join_before_iter, blocks_to_delete);
         AddFreeBlocks(sub_range);
       }
     } else {
@@ -148,12 +153,11 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
       auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
       if (join_before && sub_range.block_number == range_in_size.block_number) {
         (*join_before_iter).value = new_value;
-        if (join_after && sub_range.end_block_number() == range_in_size.end_block_number())
-          bucket.erase(join_after_iter, blocks_to_delete);
-      } else if (join_after && sub_range.end_block_number() == range_in_size.end_block_number()) {
-        (*join_after_iter).key = sub_range.block_number;
-        (*join_after_iter).value = new_value;
       } else {
+        // Don't use pos to insert because:
+        // 1. Our find may go back so it isn't the exact location to insert it.
+        // 2. Won't work when inserting multiple items (in maximum bucket size), we will need to keep updating the
+        // iterator and we don't do it currently.
         bucket.insert({sub_range.block_number, new_value});
       }
     }
@@ -166,7 +170,11 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     AddFreeBlocksForSize(
         {range_in_size.end_block_number(), range.end_block_number() - range_in_size.end_block_number()},
         bucket_index - 1);
+  // Another thing that we do differently, clean up the tree properly if we somehow got empty FTrees after this
+  // operation. (In the original code it may leave the tree with empty FTrees..)
   std::ranges::for_each(blocks_to_delete, std::bind(&FreeBlocksAllocator::AddFreeBlocks, this, std::placeholders::_1));
+  if (!blocks_to_delete.empty())
+    RecreateEPTreeIfNeeded();
 }
 
 bool FreeBlocksAllocator::RemoveFreeBlocksExtent(FreeBlocksExtentInfo extent) {

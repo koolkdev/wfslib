@@ -21,6 +21,8 @@
 #include "structs.h"
 #include "tree_nodes_allocator.h"
 
+// tree_utils.h
+
 // Log2 of number of block in for each single quanta in each bucket
 constexpr size_t kSizeBuckets[] = {0, 3, 6, 10, 14, 18, 22};
 constexpr size_t kSizeBucketsCount = std::extent<decltype(kSizeBuckets)>::value;
@@ -293,6 +295,8 @@ concept nodes_allocator_construct = std::constructible_from<T, std::shared_ptr<M
 
 template <typename T, typename U>
 concept nodes_allocator = nodes_allocator_methods<T, U> && nodes_allocator_construct<T>;
+
+// File tree_node.h
 
 template <is_node_details T>
 struct node_ref {
@@ -727,6 +731,7 @@ class PTreeNode {
   size_t size_;
 };
 
+// File tree_utils.h
 template <typename T, typename Iterator>
 struct node_iterator_info_base {
   std::shared_ptr<T> node;
@@ -765,6 +770,8 @@ concept is_const_iterator_info =
 template <typename T, typename U>
 concept is_reverse_iterator_info =
     std::same_as<node_reverse_iterator_info<T>, U> || std::same_as<node_const_reverse_iterator_info<T>, U>;
+
+// File ptree.h
 
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
 class PTreeIterator {
@@ -1047,6 +1054,15 @@ class PTree : public Allocator {
   }
 
   bool insert(const typename iterator::value_type& key_val) {
+    auto pos = find(key_val.key, false);
+    if (!pos.leaf().iterator.is_end() && (*pos).key == key_val.key) {
+      // key already exists
+      return false;
+    }
+    return insert(pos, key_val);
+  }
+
+  bool insert(iterator pos, const typename iterator::value_type& key_val) {
     auto items_count = header()->items_count.value();
     if (items_count == 0) {
       // first item in tree
@@ -1064,11 +1080,6 @@ class PTree : public Allocator {
       header->root_offset = node_offset;
       header->tree_depth = 0;
       return true;
-    }
-    auto pos = find(key_val.key, false);
-    if (!pos.leaf().iterator.is_end() && (*pos).key == key_val.key) {
-      // key already exists
-      return false;
     }
     auto leaf_pos_to_insert = key_val.key < (*pos).key ? pos.leaf().iterator : pos.leaf().iterator + 1;
     if (!pos.leaf().node->full()) {
@@ -1112,36 +1123,40 @@ class PTree : public Allocator {
     // Fill up to 5 items in each edge
     auto* header = mutable_header();
     header->tree_depth = 0;
-    std::vector<std::pair<key_type, uint16_t>> current_nodes;
+    std::vector<typename PTreeNodeIterator<ParentNodeDetails>::value_type> current_nodes;
     for (auto it = it_start; it != it_end;) {
       auto* node = this->template Alloc<LeafNodeDetails>(1);
       leaf_node new_node{{this->block(), this->to_offset(node)}, 0};
       new_node.clear(true);
-      for (int i = 0; i < 5 && it != it_end; ++i, ++it) {
-        new_node.insert(new_node.end(), *it);
-        header->items_count += 1;
+      auto range_start = it;
+      uint16_t added_items = 0;
+      for (; added_items < 5 && it != it_end; ++added_items, ++it) {
       }
+      header->items_count += added_items;
+      std::copy(range_start, it, new_node.begin());
       current_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
     }
 
     // Create the tree
     while (current_nodes.size() > 1) {
       header->tree_depth += 1;
-      std::vector<std::pair<key_type, uint16_t>> new_nodes;
+      std::vector<typename PTreeNodeIterator<ParentNodeDetails>::value_type> new_nodes;
       for (auto it = current_nodes.begin(); it != current_nodes.end();) {
         auto* node = this->template Alloc<ParentNodeDetails>(1);
         parent_node new_node{{this->block(), this->to_offset(node)}, 0};
         new_node.clear(true);
-        for (int i = 0; i < 5 && it != current_nodes.end(); ++i, ++it) {
-          new_node.insert(new_node.end(), {it->first, it->second});
-        }
+        auto range_start = it;
+        it += std::min<size_t>(5, current_nodes.end() - it);
+        std::copy(range_start, it, new_node.begin());
         new_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
       }
       current_nodes.swap(new_nodes);
     }
 
-    // Update the root
-    header->root_offset = current_nodes[0].second;
+    if (current_nodes.size()) {
+      // Update the root
+      header->root_offset = current_nodes[0].value;
+    }
 
     return true;
   }
@@ -1194,6 +1209,8 @@ class PTree : public Allocator {
   }
 };
 
+// file rtree.h
+
 static_assert(sizeof(RTreeNode_details) == sizeof(RTreeLeaf_details));
 using EPTreeBlock = TreeNodesAllocator<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(RTreeNode_details)>;
 static_assert(sizeof(RTreeNode_details) == sizeof(FTreeLeaf_details));
@@ -1213,6 +1230,8 @@ class RTree : public PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
     mutable_tree_header()->block_number = block_->BlockNumber();
   }
 };
+
+// file ftrees.h
 
 class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
  public:
@@ -1414,6 +1433,8 @@ class FTrees {
 
   std::array<FTree, kSizeBucketsCount> ftrees_;
 };
+
+// file eptree.h
 
 class EPTreeIterator {
  public:
@@ -1704,6 +1725,8 @@ class EPTree : public EPTreeBlock {
   FreeBlocksAllocator* allocator_;
 };
 
+// file free_blocks_tree_bucket.h
+
 // Iterator for specific size
 template <typename eptree_node_info_type, typename ftree_node_info_type>
 class FreeBlocksTreeBucketIteratorBase {
@@ -1833,9 +1856,6 @@ class FreeBlocksTreeBucket {
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
-  // Note: find may return an empty FTree iterator, which isn't compatible with other functinalities
-  // TODO: Remove this class at all? move this logic somewhere else
-  // TODO: Fix this
   iterator find(key_type key, bool exact_match = true) const {
     iterator::eptree_node_info eptree{{allocator_}};
     eptree.iterator = eptree.node->find(key, exact_match);
@@ -1843,7 +1863,29 @@ class FreeBlocksTreeBucket {
       return end();
     iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
     ftree.iterator = ftree.node->find(key, exact_match);
-    // TODO: If empty iterator back over eptree to find the last one
+    // If FTree is empty or our key is smaller than the first key, go to previous node with value
+    if (ftree.iterator.is_end() || key < (*ftree.iterator).key) {
+      if (exact_match)
+        return end();
+      while (!eptree.iterator.is_begin()) {
+        iterator::ftree_node_info nftree{
+            {allocator_->LoadAllocatorBlock((*--eptree.iterator).value), block_size_index_}};
+        nftree.iterator = nftree.node->end();
+        if (!nftree.iterator.is_begin()) {
+          ftree = std::move(nftree);
+          break;
+        }
+      }
+    }
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+  }
+
+  iterator find_for_insert(key_type key) const {
+    iterator::eptree_node_info eptree{{allocator_}};
+    eptree.iterator = eptree.node->find(key, false);
+    assert(eptree.iterator != eptree.node->begin());
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    ftree.iterator = ftree.node->find(key, false);
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
 
@@ -1858,8 +1900,7 @@ class FreeBlocksTreeBucket {
   }
 
   bool insert(FTree::iterator::value_type key_val) {
-    // TODO: If implementing the thing in find, we will have to specificlly find eptree here
-    auto pos = find(key_val.key, false);
+    auto pos = find_for_insert(key_val.key);
     if (!pos.is_end() && (*pos).key == key_val.key) {
       // already in tree
       return false;
@@ -1868,7 +1909,7 @@ class FreeBlocksTreeBucket {
   }
 
   bool insert(iterator& pos, FTree::iterator::value_type key_val) {
-    if (pos.ftree().node->insert(key_val)) {
+    if (pos.ftree().node->insert(pos.ftree().iterator, key_val)) {
       return true;
     }
 
@@ -1938,6 +1979,8 @@ class FreeBlocksTreeBucket {
 
   size_t block_size_index_;
 };
+
+// File free_blocks_tree.h
 
 template <typename eptree_node_info_type, typename ftrees_node_info_type>
 class FreeBlocksTreeIteratorBase {
