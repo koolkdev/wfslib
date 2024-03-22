@@ -251,6 +251,7 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
  public:
   TreeReverseIterator() = default;
   explicit TreeReverseIterator(T it) : std::reverse_iterator<T>(std::move(it)) {}
+  TreeReverseIterator(TreeReverseIterator&& other) : std::reverse_iterator<T>(other) {}
   template <typename It>
     requires std::convertible_to<It, T>
   TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
