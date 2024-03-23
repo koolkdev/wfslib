@@ -251,10 +251,19 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
  public:
   TreeReverseIterator() = default;
   explicit TreeReverseIterator(T it) : std::reverse_iterator<T>(std::move(it)) {}
+  TreeReverseIterator(const TreeReverseIterator& other) : std::reverse_iterator<T>(other) {}
   TreeReverseIterator(TreeReverseIterator&& other) : std::reverse_iterator<T>(other) {}
   template <typename It>
     requires std::convertible_to<It, T>
   TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
+
+  typename T::pointer operator->() const {
+    T tmp(std::reverse_iterator<T>::base());
+    --tmp;
+    // We need to store the value for the ref.
+    const_cast<TreeReverseIterator*>(this)->val_ = *tmp.operator->();
+    return const_cast<T::pointer>(&val_);
+  }
 
   TreeReverseIterator& operator++() {
     std::reverse_iterator<T>::operator++();
@@ -281,6 +290,9 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
 
   bool is_begin() const { return this->base().is_end(); }
   bool is_end() const { return this->base().is_begin(); }
+
+ private:
+  std::remove_pointer_t<std::remove_cvref_t<typename T::pointer>> val_;
 };
 
 template <typename T, typename U>
@@ -313,8 +325,12 @@ struct node_ref {
 };
 
 template <is_node_details T>
+class PTreeNodeConstIterator;
+
+template <is_node_details T>
 class PTreeNodeKeyRef {
  public:
+  PTreeNodeKeyRef() = default;
   PTreeNodeKeyRef(node_ref<T> node, size_t index) : node(std::move(node)), index(index) {}
 
   operator key_type() const {
@@ -328,6 +344,8 @@ class PTreeNodeKeyRef {
   }
 
  private:
+  friend class PTreeNodeConstIterator<T>;
+
   node_ref<T> node;
   size_t index;
 };
@@ -335,6 +353,7 @@ class PTreeNodeKeyRef {
 template <is_node_details T>
 class PTreeNodeValueRef {
  public:
+  PTreeNodeValueRef() = default;
   PTreeNodeValueRef(node_ref<T> node, size_t index) : node(std::move(node)), index(index) {}
 
   operator typename node_value_type<T>::type() const {
@@ -348,6 +367,8 @@ class PTreeNodeValueRef {
   }
 
  private:
+  friend class PTreeNodeConstIterator<T>;
+
   node_ref<T> node;
   size_t index;
 };
@@ -405,31 +426,6 @@ struct PTreeNodeIteratorValueRef {
   bool operator==(key_type other_key) const { return static_cast<key_type>(this->key) == other_key; }
 };
 
-struct FreeBlocksExtent {
-  uint32_t key;
-  nibble value;
-  size_t bucket_index;
-
-  uint32_t block_number() const { return key; }
-  uint32_t blocks_count() const { return (static_cast<uint32_t>(value) + 1) << kSizeBuckets[bucket_index]; }
-  uint32_t end_block_number() const { return block_number() + blocks_count(); }
-
-  operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index}; }
-};
-
-struct FreeBlocksExtentRef {
-  PTreeNodeKeyRef<FTreeLeaf_details> key;
-  PTreeNodeValueRef<FTreeLeaf_details> value;
-  const size_t bucket_index;
-
-  operator FreeBlocksExtent() const { return {key, value, bucket_index}; }
-  operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index}; }
-
-  uint32_t block_number() const { return this->operator FreeBlocksExtent().block_number(); }
-  uint32_t blocks_count() const { return this->operator FreeBlocksExtent().blocks_count(); }
-  uint32_t end_block_number() const { return this->operator FreeBlocksExtent().end_block_number(); }
-};
-
 template <is_node_details T>
 class PTreeNodeConstIterator {
  public:
@@ -440,68 +436,78 @@ class PTreeNodeConstIterator {
   using ref_type = PTreeNodeIteratorValueRef<T>;
 
   using const_reference = value_type;
+  using const_pointer = const ref_type*;
+
   using reference = const_reference;
+  using pointer = const_pointer;
 
   PTreeNodeConstIterator() = default;
-  PTreeNodeConstIterator(node_ref<T> node, size_t index) : node(std::move(node)), index(index) {
+  PTreeNodeConstIterator(node_ref<T> node, size_t index) : value_{{node, index}, {node, index}} {
     assert(index <= node_values_capacity<T>::value);
   }
 
-  reference operator*() const {
-    auto* _node = node.get();
-    assert(index < node_values_size(*_node));
-    return {node_get_full_key(*_node, index), node_get_value(*_node, index)};
-  }
+  reference operator*() const { return value_; }
+
+  pointer operator->() const { return &value_; }
 
   PTreeNodeConstIterator& operator++() {
-    ++index;
+    ++value_.key.index;
+    ++value_.value.index;
     return *this;
   }
 
   PTreeNodeConstIterator& operator--() {
-    --index;
+    --value_.key.index;
+    --value_.value.index;
     return *this;
   }
 
-  PTreeNodeConstIterator operator++(int) { return PTreeNodeConstIterator(node, index + 1); }
+  PTreeNodeConstIterator operator++(int) { return PTreeNodeConstIterator(node(), index() + 1); }
 
-  PTreeNodeConstIterator operator--(int) { return PTreeNodeConstIterator(node, index - 1); }
+  PTreeNodeConstIterator operator--(int) { return PTreeNodeConstIterator(node(), index() - 1); }
 
   PTreeNodeConstIterator& operator+=(difference_type n) {
-    index += n;
-    assert(index <= node_values_capacity<T>::value);
+    value_.key.index += n;
+    value_.value.index += n;
+    assert(index() <= node_values_capacity<T>::value);
     return *this;
   }
   PTreeNodeConstIterator& operator-=(difference_type n) {
-    index -= n;
-    assert(index <= node_values_capacity<T>::value);
+    value_.key.index -= n;
+    value_.value.index -= n;
+    assert(index() <= node_values_capacity<T>::value);
     return *this;
   }
-  PTreeNodeConstIterator operator+(difference_type n) const { return PTreeNodeConstIterator(node, index + n); }
-  PTreeNodeConstIterator operator-(difference_type n) const { return PTreeNodeConstIterator(node, index - n); }
+  PTreeNodeConstIterator operator+(difference_type n) const { return PTreeNodeConstIterator(node(), index() + n); }
+  PTreeNodeConstIterator operator-(difference_type n) const { return PTreeNodeConstIterator(node(), index() - n); }
   difference_type operator-(const PTreeNodeConstIterator& other) const {
-    return static_cast<int>(index) - static_cast<int>(other.index);
+    return static_cast<difference_type>(index()) - static_cast<difference_type>(other.index());
   }
 
   auto operator<=>(const PTreeNodeConstIterator& other) const {
-    const auto res = node <=> other.node;
+    const auto res = node() <=> other.node();
     if (res != 0)
       return res;
-    return index <=> other.index;
+    return index() <=> other.index();
   }
 
-  bool operator==(const PTreeNodeConstIterator& other) const { return node == other.node && index == other.index; }
+  bool operator==(const PTreeNodeConstIterator& other) const {
+    return node() == other.node() && index() == other.index();
+  }
 
   reference operator[](difference_type n) const { return *(*this + n); }
 
-  bool is_begin() const { return index == 0; }
+  bool is_begin() const { return index() == 0; }
   bool is_end() const {
-    return index == node_values_capacity<T>::value || (index > 0 && node_get_full_key(*node.get(), index) == 0);
+    return index() == node_values_capacity<T>::value ||
+           (index() > 0 && node_get_full_key(*value_.key.node.get(), value_.key.index) == 0);
   }
 
  protected:
-  node_ref<T> node;
-  size_t index;
+  node_ref<T> node() const { return value_.key.node; }
+  size_t index() const { return value_.key.index; }
+
+  PTreeNodeIteratorValueRef<T> value_;
 };
 
 template <is_node_details T>
@@ -515,46 +521,41 @@ class PTreeNodeIterator : public PTreeNodeConstIterator<T> {
 
   using ref_type = PTreeNodeIteratorValueRef<T>;
 
-  using const_reference = value_type;
   using reference = ref_type;
+  using pointer = ref_type*;
 
   PTreeNodeIterator() = default;
-  PTreeNodeIterator(node_ref<T> node, size_t index) : base(node, index) {}
+  PTreeNodeIterator(node_ref<T> node, size_t index) : base(std::move(node), index) {}
 
-  reference operator*() const {
-    assert(base::index < node_values_capacity<T>::value);
-    return {{base::node, base::index}, {base::node, base::index}};
-  }
+  reference operator*() const { return base::value_; }
+
+  pointer operator->() const { return const_cast<pointer>(base::operator->()); }
 
   PTreeNodeIterator& operator++() {
-    ++base::index;
+    base::operator++();
     return *this;
   }
 
   PTreeNodeIterator& operator--() {
-    --base::index;
+    base::operator--();
     return *this;
   }
 
-  PTreeNodeIterator operator++(int) { return PTreeNodeIterator(base::node, base::index + 1); }
+  PTreeNodeIterator operator++(int) { return PTreeNodeIterator(base::node(), base::index() + 1); }
 
-  PTreeNodeIterator operator--(int) { return PTreeNodeIterator(base::node, base::index - 1); }
+  PTreeNodeIterator operator--(int) { return PTreeNodeIterator(base::node(), base::index() - 1); }
 
   PTreeNodeIterator& operator+=(difference_type n) {
-    base::index += n;
-    assert(base::index <= node_values_capacity<T>::value);
+    base::operator+=(n);
     return *this;
   }
   PTreeNodeIterator& operator-=(difference_type n) {
-    base::index -= n;
-    assert(base::index <= node_values_capacity<T>::value);
+    base::operator-=(n);
     return *this;
   }
-  PTreeNodeIterator operator+(difference_type n) const { return PTreeNodeIterator<T>(base::node, base::index + n); }
-  PTreeNodeIterator operator-(difference_type n) const { return PTreeNodeIterator<T>(base::node, base::index - n); }
-  difference_type operator-(const PTreeNodeIterator& other) const {
-    return static_cast<int>(base::index) - static_cast<int>(other.index);
-  }
+  PTreeNodeIterator operator+(difference_type n) const { return PTreeNodeIterator<T>(base::node(), base::index() + n); }
+  PTreeNodeIterator operator-(difference_type n) const { return PTreeNodeIterator<T>(base::node(), base::index() - n); }
+  difference_type operator-(const PTreeNodeIterator& other) const { return base::operator-(other); }
 
   reference operator[](difference_type n) const { return *(*this + n); }
 };
@@ -604,7 +605,7 @@ class PTreeNode {
     auto it = std::upper_bound(begin(), end(), key);
     if (it != begin())
       --it;
-    if (exact_match && (it == end() || (*it).key != key))
+    if (exact_match && (it == end() || it->key != key))
       return end();
     return it;
   }
@@ -627,7 +628,7 @@ class PTreeNode {
 
   template <typename InputIt>
   iterator insert(const const_iterator& pos, const InputIt& start_it, const InputIt& end_it) {
-    auto items = std::distance(start_it, end_it);
+    auto items = static_cast<typename iterator::difference_type>(std::distance(start_it, end_it));
     if (size_ + items > node_keys_capacity<T>::value)
       return end();
     assert(cbegin() <= pos && pos <= cend());
@@ -687,7 +688,7 @@ class PTreeNode {
         res = begin() + 4;
         break;
     }
-    split_key = (*res).key;
+    split_key = res->key;
     return res;
   }
 
@@ -711,7 +712,7 @@ class PTreeNode {
         res = begin() + 3;
         break;
     }
-    split_key = (*res).key;
+    split_key = res->key;
     return res;
   }
 
@@ -734,7 +735,7 @@ class PTreeNode {
         res = begin() + 4;
         break;
     }
-    split_key = (*res).key;
+    split_key = res->key;
     return res;
   }
 
@@ -783,13 +784,15 @@ template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNod
 class PTreeConstIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
   using value_type = typename PTreeNodeIterator<LeafNodeDetails>::value_type;
   using ref_type = typename PTreeNodeIterator<LeafNodeDetails>::ref_type;
 
   using const_reference = typename PTreeNodeIterator<LeafNodeDetails>::const_reference;
+  using const_pointer = typename PTreeNodeIterator<LeafNodeDetails>::const_pointer;
 
   using reference = const_reference;
+  using pointer = const_pointer;
 
   using parent_node_info = node_iterator_info<PTreeNode<ParentNodeDetails>>;
   using leaf_node_info = node_iterator_info<PTreeNode<LeafNodeDetails>>;
@@ -801,6 +804,7 @@ class PTreeConstIterator {
       : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
   reference operator*() const { return *leaf_->iterator; }
+  pointer operator->() const { return leaf_->iterator.operator->(); }
 
   PTreeConstIterator& operator++() {
     assert(!is_end());
@@ -815,12 +819,12 @@ class PTreeConstIterator {
           return *this;  // end
         }
       }
-      uint16_t node_offset = (*rparent->iterator).value;
+      uint16_t node_offset = rparent->iterator->value;
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{{block_, node_offset}}};
         new_parent.iterator = new_parent.node->begin();
         *parent = std::move(new_parent);
-        node_offset = (*parent->iterator).value;
+        node_offset = parent->iterator->value;
       }
       leaf_node_info new_leaf{{{block_, node_offset}}};
       new_leaf.iterator = new_leaf.node->begin();
@@ -839,13 +843,13 @@ class PTreeConstIterator {
         if (++rparent == parents_.rend())
           return *this;  // begin
       }
-      uint16_t node_offset = (*--rparent->iterator).value;  // TODO: by ref
+      uint16_t node_offset = (--rparent->iterator)->value;  // TODO: by ref
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{{block_, node_offset}}};
         new_parent.iterator = new_parent.node->end();
         --new_parent.iterator;
         *parent = std::move(new_parent);
-        node_offset = (*parent->iterator).value;  // TODO: by ref
+        node_offset = parent->iterator->value;  // TODO: by ref
       }
       leaf_node_info new_leaf{{{block_, node_offset}}};
       new_leaf.iterator = new_leaf.node->end();
@@ -897,13 +901,12 @@ class PTreeIterator : public PTreeConstIterator<ParentNodeDetails, LeafNodeDetai
   using base = PTreeConstIterator<ParentNodeDetails, LeafNodeDetails>;
 
   using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
   using value_type = base::value_type;
   using ref_type = base::ref_type;
 
-  using const_reference = base::const_reference;
-
   using reference = ref_type;
+  using pointer = ref_type*;
 
   using parent_node_info = base::parent_node_info;
   using leaf_node_info = base::leaf_node_info;
@@ -913,6 +916,7 @@ class PTreeIterator : public PTreeConstIterator<ParentNodeDetails, LeafNodeDetai
       : base(std::move(block), std::move(parents), std::move(leaf)) {}
 
   reference operator*() const { return *base::leaf().iterator; }
+  pointer operator->() const { return base::leaf().iterator.operator->(); }
 
   PTreeIterator& operator++() {
     base::operator++();
@@ -1035,7 +1039,7 @@ class PTree : public Allocator {
 
   bool insert(const typename iterator::value_type& key_val) {
     auto pos = find(key_val.key, false);
-    if (!pos.leaf().iterator.is_end() && (*pos).key == key_val.key) {
+    if (!pos.leaf().iterator.is_end() && pos->key == key_val.key) {
       // key already exists
       return false;
     }
@@ -1061,7 +1065,7 @@ class PTree : public Allocator {
       header->tree_depth = 0;
       return true;
     }
-    auto leaf_pos_to_insert = key_val.key < (*pos).key ? pos.leaf().iterator : pos.leaf().iterator + 1;
+    auto leaf_pos_to_insert = key_val.key < pos->key ? pos.leaf().iterator : pos.leaf().iterator + 1;
     if (!pos.leaf().node->full()) {
       // We have place to add the new key/val
       pos.leaf().node->insert(leaf_pos_to_insert, key_val);
@@ -1112,9 +1116,9 @@ class PTree : public Allocator {
       uint16_t added_items = 0;
       for (; added_items < 5 && it != it_end; ++added_items, ++it) {
       }
-      header->items_count += added_items;
-      std::copy(range_start, it, new_node.begin());
-      current_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
+      new_node.insert(new_node.begin(), range_start, it);
+      header->items_count += static_cast<uint16_t>(new_node.size());
+      current_nodes.push_back({new_node.begin()->key, this->to_offset(node)});
     }
 
     // Create the tree
@@ -1127,8 +1131,8 @@ class PTree : public Allocator {
         new_node.clear(true);
         auto range_start = it;
         it += std::min<size_t>(5, current_nodes.end() - it);
-        std::copy(range_start, it, new_node.begin());
-        new_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
+        new_node.insert(new_node.begin(), range_start, it);
+        new_nodes.push_back({new_node.begin()->key, this->to_offset(node)});
       }
       current_nodes.swap(new_nodes);
     }
@@ -1198,7 +1202,7 @@ class PTree : public Allocator {
       typename iterator::parent_node_info parent{{{this->block(), node_offset}}};
       parent.iterator = parent.node->begin();
       parents.push_back(std::move(parent));
-      node_offset = (*parents.back().iterator).value;
+      node_offset = parents.back().iterator->value;
     }
     typename iterator::leaf_node_info leaf{{{this->block(), node_offset}}};
     leaf.iterator = leaf.node->begin();
@@ -1215,7 +1219,7 @@ class PTree : public Allocator {
       parent.iterator = parent.node->end();
       --parent.iterator;
       parents.push_back(std::move(parent));
-      node_offset = (*parents.back().iterator).value;
+      node_offset = parents.back().iterator->value;
     }
     typename iterator::leaf_node_info leaf{{{this->block(), node_offset}}};
     leaf.iterator = leaf.node->end();
@@ -1232,7 +1236,7 @@ class PTree : public Allocator {
       parent.iterator = parent.node->find(key, false);
       assert(!parent.iterator.is_end());
       parents.push_back(std::move(parent));
-      node_offset = (*parents.back().iterator).value;
+      node_offset = parents.back().iterator->value;
     }
     typename iterator::leaf_node_info leaf{{{this->block(), node_offset}}};
     leaf.iterator = leaf.node->find(key, exact_match);
@@ -1279,18 +1283,50 @@ class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
   size_t block_size_index_;
 };
 
+class FreeBlocksExtent {
+ public:
+  FreeBlocksExtent() = default;
+  FreeBlocksExtent(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
+      : key_value_(std::move(key_value)), bucket_index_(bucket_index) {}
+
+  uint32_t block_number() const { return key_value_.key; }
+  uint32_t blocks_count() const {
+    return (static_cast<uint32_t>(static_cast<nibble>(key_value_.value)) + 1) << kSizeBuckets[bucket_index_];
+  }
+  uint32_t end_block_number() const { return block_number() + blocks_count(); }
+  size_t bucket_index() const { return bucket_index_; }
+  const PTreeNodeIteratorValue<FTreeLeaf_details>& key_value() const { return key_value_; }
+
+  operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index()}; }
+
+ protected:
+  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value_;
+  size_t bucket_index_;
+};
+
+class FreeBlocksExtentRef : public FreeBlocksExtent {
+ public:
+  FreeBlocksExtentRef() = default;
+  FreeBlocksExtentRef(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
+      : FreeBlocksExtent(std::move(key_value), bucket_index) {}
+
+  PTreeNodeIteratorValueRef<FTreeLeaf_details>& key_value() { return key_value_; }
+};
+
 template <typename ftree_info_type>
 class FTreesConstIteratorBase {
  public:
   using iterator_category = std::forward_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
 
   using value_type = FreeBlocksExtent;
   using ref_type = FreeBlocksExtentRef;
 
   using const_reference = value_type;
+  using const_pointer = const ref_type*;
 
   using reference = const_reference;
+  using pointer = const_pointer;
 
   using ftree_info = ftree_info_type;
 
@@ -1299,8 +1335,12 @@ class FTreesConstIteratorBase {
       : ftrees_(std::move(ftrees)), index_(index) {}
 
   reference operator*() const {
-    auto key_val = *ftrees_[index_].iterator;
-    return {key_val.key, key_val.value, index_};
+    update_extent();
+    return extent_;
+  }
+  pointer operator->() const {
+    update_extent();
+    return &extent_;
   }
 
   FTreesConstIteratorBase& operator++() {
@@ -1317,13 +1357,13 @@ class FTreesConstIteratorBase {
   }
 
   bool operator==(const FTreesConstIteratorBase& other) const {
-    return index_ == other.index_ && ftrees_[index_].iterator == other.ftrees_[other.index_].iterator;
+    return index() == other.index() && ftrees_[index()].iterator == other.ftrees_[other.index()].iterator;
   }
 
   bool is_begin() const {
     return std::ranges::all_of(ftrees_, [](const ftree_info& ftree) { return ftree.iterator.is_begin(); });
   }
-  bool is_end() const { return ftrees_[index_].iterator.is_end(); }
+  bool is_end() const { return ftrees_[index()].iterator.is_end(); }
 
   template <typename Range, typename Compare>
   static auto find_extent(Range& range, Compare comp) {
@@ -1337,9 +1377,8 @@ class FTreesConstIteratorBase {
   static size_t find_next_extent_index(const std::array<ftree_info, kSizeBucketsCount>& ftrees) {
     auto iterated_ftrees =
         ftrees | std::views::filter([](const ftree_info& ftree) { return !ftree.iterator.is_end(); });
-    auto res = find_extent(iterated_ftrees, [](const ftree_info& a, const ftree_info& b) {
-      return (*a.iterator).key < (*b.iterator).key;
-    });
+    auto res = find_extent(iterated_ftrees,
+                           [](const ftree_info& a, const ftree_info& b) { return a.iterator->key < b.iterator->key; });
     return res != std::ranges::end(iterated_ftrees) ? res->node->index() : 0;
   }
 
@@ -1347,9 +1386,15 @@ class FTreesConstIteratorBase {
   const std::array<ftree_info, kSizeBucketsCount>& ftrees() const { return ftrees_; }
   size_t index() const { return index_; }
 
+  void update_extent() const {
+    const_cast<FTreesConstIteratorBase*>(this)->extent_ = {*ftrees_[index_].iterator, index_};
+  }
+
  private:
   std::array<ftree_info, kSizeBucketsCount> ftrees_;
   size_t index_{0};
+
+  FreeBlocksExtentRef extent_;
 };
 
 template <typename ftree_info_type>
@@ -1358,24 +1403,21 @@ class FTreesIteratorBase : public FTreesConstIteratorBase<ftree_info_type> {
   using base = FTreesConstIteratorBase<ftree_info_type>;
 
   using iterator_category = std::forward_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
 
   using value_type = base::value_type;
   using ref_type = base::ref_type;
 
-  using const_reference = base::const_reference;
-
   using reference = ref_type;
+  using pointer = ref_type*;
 
   using ftree_info = ftree_info_type;
 
   FTreesIteratorBase() = default;
   FTreesIteratorBase(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index) : base(std::move(ftrees), index) {}
 
-  reference operator*() const {
-    auto key_val = *base::ftrees()[base::index()].iterator;
-    return {key_val.key, key_val.value, base::index()};
-  }
+  reference operator*() const { return *base::operator->(); }
+  pointer operator->() const { return const_cast<pointer>(base::operator->()); }
 
   FTreesIteratorBase& operator++() {
     base::operator++();
@@ -1466,7 +1508,7 @@ class FTrees {
                        return {ftree, FTree::reverse_iterator{std::move(it)}};
                      } else {
                        // We want the iterator to be AFTER the search point
-                       if (!it.is_end() && (*it).key != key)
+                       if (!it.is_end() && it->key != key)
                          ++it;
                        return {ftree, std::move(it)};
                      }
@@ -1499,7 +1541,7 @@ class FTrees {
     auto max_ftree_it = std::ranges::max_element(ftrees_, [](const FTree& a, const FTree& b) {
       return a.header()->items_count.value() < b.header()->items_count.value();
     });
-    split_point_key = (*max_ftree_it->middle()).key;
+    split_point_key = max_ftree_it->middle()->key;
     for (auto [old_ftree, left_ftree, right_ftree] : std::views::zip(ftrees_, left.ftrees_, right.ftrees_)) {
       old_ftree.split_compact(left_ftree, right_ftree, old_ftree.find(split_point_key, false));
     }
@@ -1522,12 +1564,14 @@ class FTrees {
 class EPTreeConstIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
   using value_type = RTree::iterator::value_type;
 
   using const_reference = RTree::iterator::const_reference;
+  using const_pointer = RTree::iterator::const_pointer;
 
   using reference = RTree::const_iterator::reference;
+  using pointer = RTree::const_iterator::const_pointer;
 
   using node_info = node_iterator_info<RTree>;
 
@@ -1537,6 +1581,7 @@ class EPTreeConstIterator {
       : allocator_(allocator), nodes_(std::move(nodes)) {}
 
   reference operator*() const { return *nodes_.back().iterator; }
+  pointer operator->() const { return nodes_.back().iterator.operator->(); }
 
   EPTreeConstIterator& operator++() {
     assert(!is_end());
@@ -1548,11 +1593,11 @@ class EPTreeConstIterator {
         return *this;  // end
       }
     }
-    uint32_t node_block_number = (*rnode->iterator).value;
+    uint32_t node_block_number = rnode->iterator->value;
     for (auto node = rnode.base(); node != nodes_.end(); ++node) {
       *node = {allocator_->LoadAllocatorBlock(node_block_number)};
       node->iterator = node->node->begin();
-      node_block_number = (*node->iterator).value;
+      node_block_number = node->iterator->value;
     }
     return *this;
   }
@@ -1564,11 +1609,11 @@ class EPTreeConstIterator {
       if (rnode == nodes_.rend())
         return *this;  // begin
     }
-    uint32_t node_block_number = (*--rnode->iterator).value;
+    uint32_t node_block_number = (--rnode->iterator)->value;
     for (auto node = rnode.base(); node != nodes_.end(); ++node) {
       *node = {allocator_->LoadAllocatorBlock(node_block_number)};
       node->iterator = node->node->end();
-      node_block_number = (*--node->iterator).value;
+      node_block_number = (--node->iterator)->value;
     }
     return *this;
   }
@@ -1612,9 +1657,8 @@ class EPTreeIterator : public EPTreeConstIterator {
   using difference_type = base::difference_type;
   using value_type = base::value_type;
 
-  using const_reference = base::const_reference;
-
   using reference = RTree::iterator::reference;
+  using pointer = RTree::iterator::pointer;
 
   using node_info = base::node_info;
 
@@ -1623,6 +1667,7 @@ class EPTreeIterator : public EPTreeConstIterator {
   EPTreeIterator(FreeBlocksAllocator* allocator, std::vector<node_info> nodes) : base(allocator, std::move(nodes)) {}
 
   reference operator*() const { return *nodes().back().iterator; }
+  pointer operator->() const { return nodes().back().iterator.operator->(); }
 
   EPTreeIterator& operator++() {
     base::operator++();
@@ -1690,7 +1735,7 @@ class EPTree : public EPTreeBlock {
       auto depth = node_level->tree_header()->depth.value();
       // Where to split the level
       auto split_point = node_level->middle();
-      auto split_point_key = (*split_point).key;
+      auto split_point_key = split_point->key;
       // Alloc new right side tree
       auto right_block_number = AllocBlockForTree(node_level->block()->BlockNumber(), allocated_extents);
       RTree new_right(allocator_->LoadAllocatorBlock(right_block_number, /*new_block=*/true));
@@ -1769,7 +1814,7 @@ class EPTree : public EPTreeBlock {
     nodes.reserve(tree_header()->depth.value());
     assert(tree_header()->depth.value() >= 1);
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
+      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock(nodes.back().iterator->value)};
       node.iterator = node.node->begin();
       nodes.push_back(std::move(node));
       // Each RTree in EPTree must have leafs
@@ -1783,7 +1828,7 @@ class EPTree : public EPTreeBlock {
     nodes.reserve(tree_header()->depth.value());
     assert(tree_header()->depth.value() >= 1);
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*--nodes.back().iterator).value)};
+      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((--nodes.back().iterator)->value)};
       node.iterator = node.node->end();
       nodes.push_back(std::move(node));
       // Each RTree in EPTree must have leafs
@@ -1796,7 +1841,7 @@ class EPTree : public EPTreeBlock {
     std::vector<iterator::node_info> nodes;
     nodes.reserve(tree_header()->depth.value());
     for (int i = 0; i < tree_header()->depth.value(); i++) {
-      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
+      iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((nodes.back().iterator)->value)};
       node.iterator = node.node->find(key, exact_match && i + 1 == tree_header()->depth.value());
       nodes.push_back(std::move(node));
       assert(!nodes.back().iterator.is_end());
@@ -1821,14 +1866,16 @@ class EPTree : public EPTreeBlock {
 class FreeBlocksTreeBucketConstIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = std::ptrdiff_t;
+  using difference_type = int;
 
   using value_type = FreeBlocksExtent;
   using ref_type = FreeBlocksExtentRef;
 
   using const_reference = value_type;
+  using const_pointer = const ref_type*;
 
   using reference = const_reference;
+  using pointer = const_pointer;
 
   using eptree_node_info = node_iterator_info<EPTree>;
   using ftree_node_info = node_iterator_info<FTree>;
@@ -1840,12 +1887,17 @@ class FreeBlocksTreeBucketConstIterator {
                                     ftree_node_info ftree)
       : allocator_(allocator),
         block_size_index_(block_size_index),
+        extent_(*ftree_.iterator, block_size_index),
         eptree_(std::move(eptree)),
         ftree_(std::move(ftree)) {}
 
   reference operator*() const {
-    auto key_val = *ftree_.iterator;
-    return {key_val.key, key_val.value, block_size_index_};
+    update_extent();
+    return extent_;
+  }
+  pointer operator->() const {
+    update_extent();
+    return &extent_;
   }
 
   FreeBlocksTreeBucketConstIterator& operator++() {
@@ -1857,7 +1909,7 @@ class FreeBlocksTreeBucketConstIterator {
         return *this;  // end
       }
 
-      ftree_ = {{allocator_->LoadAllocatorBlock((*eptree_.iterator).value), block_size_index_}};
+      ftree_ = {{allocator_->LoadAllocatorBlock(eptree_.iterator->value), block_size_index_}};
       ftree_.iterator = ftree_.node->begin();
     }
     return *this;
@@ -1870,7 +1922,7 @@ class FreeBlocksTreeBucketConstIterator {
         return *this;  // begin
       }
 
-      ftree_ = {{allocator_->LoadAllocatorBlock((*--eptree_.iterator).value), block_size_index_}};
+      ftree_ = {{allocator_->LoadAllocatorBlock((--eptree_.iterator)->value), block_size_index_}};
       ftree_.iterator = ftree_.node->end();
     }
     --ftree_.iterator;
@@ -1903,9 +1955,16 @@ class FreeBlocksTreeBucketConstIterator {
   bool is_begin() const { return eptree_.iterator.is_begin() && ftree_.iterator.is_begin(); }
   bool is_end() const { return ftree_.iterator.is_end(); }
 
+ protected:
+  void update_extent() const {
+    const_cast<FreeBlocksTreeBucketConstIterator*>(this)->extent_ = {*ftree_.iterator, block_size_index_};
+  }
+
  private:
   FreeBlocksAllocator* allocator_;
   size_t block_size_index_;
+
+  FreeBlocksExtentRef extent_;
 
   eptree_node_info eptree_;
   ftree_node_info ftree_;
@@ -1922,9 +1981,8 @@ class FreeBlocksTreeBucketIterator : public FreeBlocksTreeBucketConstIterator {
   using value_type = base::value_type;
   using ref_type = base::ref_type;
 
-  using const_reference = base::const_reference;
-
   using reference = ref_type;
+  using pointer = ref_type*;
 
   using eptree_node_info = base::eptree_node_info;
   using ftree_node_info = base::ftree_node_info;
@@ -1936,10 +1994,8 @@ class FreeBlocksTreeBucketIterator : public FreeBlocksTreeBucketConstIterator {
                                ftree_node_info ftree)
       : base(allocator, block_size_index, std::move(eptree), std::move(ftree)) {}
 
-  reference operator*() const {
-    auto key_val = *ftree().iterator;
-    return {key_val.key, key_val.value, block_size_index()};
-  }
+  reference operator*() const { return *base::operator->(); }
+  pointer operator->() const { return const_cast<pointer>(base::operator->()); }
 
   FreeBlocksTreeBucketIterator& operator++() {
     base::operator++();
@@ -1971,8 +2027,8 @@ class FreeBlocksTreeBucket {
  public:
   using iterator = FreeBlocksTreeBucketIterator;
   using const_iterator = FreeBlocksTreeBucketConstIterator;
-  using reverse_iterator = std::reverse_iterator<iterator>;
-  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+  using reverse_iterator = TreeReverseIterator<iterator>;
+  using const_reverse_iterator = TreeReverseIterator<const_iterator>;
 
   FreeBlocksTreeBucket(FreeBlocksAllocator* allocator, size_t block_size_index)
       : allocator_(allocator), block_size_index_(block_size_index) {}
@@ -1993,19 +2049,9 @@ class FreeBlocksTreeBucket {
   iterator find(key_type key, bool exact_match = true) { return find_impl(key, exact_match); }
   const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
 
-  bool update(const iterator::value_type& key_val) {
-    auto pos = find(key_val.key);
-    if (pos.is_end()) {
-      return false;
-    }
-    (*pos).value = key_val.value;
-
-    return true;
-  }
-
   bool insert(FTree::iterator::value_type key_val) {
     auto pos = find_for_insert(key_val.key);
-    if (!pos.is_end() && (*pos).key == key_val.key) {
+    if (!pos.is_end() && pos->key_value().key == key_val.key) {
       // already in tree
       return false;
     }
@@ -2031,13 +2077,12 @@ class FreeBlocksTreeBucket {
       for (const auto& ftree : old_ftrees.ftrees()) {
         if (ftree.size() > 0) {
           auto first = ftree.begin();
-          *allocated_extent = FreeBlocksExtent{(*first).key, (*first).value, ftree.index()};
+          *allocated_extent = {first->key, 1, ftree.index()};
           break;
         }
       }
       if (!allocated_extent)
         return false;
-      allocated_extent->blocks_count = 1;
       right_block_number = allocated_extent->block_number;
     }
     auto right_block = allocator_->LoadAllocatorBlock(right_block_number, true);
@@ -2061,12 +2106,12 @@ class FreeBlocksTreeBucket {
 
   void erase(iterator pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete) {
     pos.ftree().node->erase(pos.ftree().iterator);
-    if (!pos.ftree().node->empty() || !(*pos.eptree().iterator).key) {
+    if (!pos.ftree().node->empty() || !pos.eptree().iterator->key) {
       return;
     }
     if (FTrees(pos.ftree().node->block()).empty()) {
       // The FTRee is the first block for deletion
-      blocks_to_delete.push_back({(*pos.eptree().iterator).value, 1});
+      blocks_to_delete.push_back({pos.eptree().iterator->value, 1});
       pos.eptree().node->erase(pos.eptree().iterator, blocks_to_delete);
     }
   }
@@ -2084,7 +2129,7 @@ class FreeBlocksTreeBucket {
     iterator::eptree_node_info eptree{{allocator_}};
     eptree.iterator = eptree.node->begin();
     assert(!eptree.iterator.is_end());
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
     ftree.iterator = ftree.node->begin();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
@@ -2094,7 +2139,7 @@ class FreeBlocksTreeBucket {
     eptree.iterator = eptree.node->end();
     assert(!eptree.iterator.is_begin());
     --eptree.iterator;  // EPTree size should always be >= 1
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
     ftree.iterator = ftree.node->end();
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
@@ -2104,15 +2149,15 @@ class FreeBlocksTreeBucket {
     eptree.iterator = eptree.node->find(key, exact_match);
     if (exact_match && eptree.iterator.is_end())
       return end_impl();
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
     ftree.iterator = ftree.node->find(key, exact_match);
     // If FTree is empty or our key is smaller than the first key, go to previous node with value
-    if (ftree.iterator.is_end() || key < (*ftree.iterator).key) {
+    if (ftree.iterator.is_end() || key < ftree.iterator->key) {
       if (exact_match)
         return end_impl();
       while (!eptree.iterator.is_begin()) {
         iterator::ftree_node_info nftree{
-            {allocator_->LoadAllocatorBlock((*--eptree.iterator).value), block_size_index_}};
+            {allocator_->LoadAllocatorBlock((--eptree.iterator)->value), block_size_index_}};
         nftree.iterator = nftree.node->end();
         if (!nftree.iterator.is_begin()) {
           ftree = std::move(nftree);
@@ -2127,7 +2172,7 @@ class FreeBlocksTreeBucket {
     iterator::eptree_node_info eptree{{allocator_}};
     eptree.iterator = eptree.node->find(key, false);
     assert(eptree.iterator != eptree.node->begin());
-    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((*eptree.iterator).value), block_size_index_}};
+    iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((eptree.iterator)->value), block_size_index_}};
     ftree.iterator = ftree.node->find(key, false);
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
@@ -2148,8 +2193,10 @@ class FreeBlocksTreeConstIteratorBase {
   using ref_type = typename FTrees::iterator::ref_type;
 
   using const_reference = value_type;
+  using const_pointer = ref_type*;
 
   using reference = const_reference;
+  using pointer = const_pointer;
 
   using eptree_node_info = eptree_node_info_type;
   using ftrees_node_info = ftrees_node_info_type;
@@ -2159,6 +2206,7 @@ class FreeBlocksTreeConstIteratorBase {
       : allocator_(allocator), eptree_(std::move(eptree)), ftrees_(std::move(ftrees)) {}
 
   reference operator*() const { return *ftrees_.iterator; }
+  pointer operator->() const { return ftrees_.iterator.operator->(); }
 
   FreeBlocksTreeConstIteratorBase& operator++() {
     assert(!is_end());
@@ -2170,7 +2218,7 @@ class FreeBlocksTreeConstIteratorBase {
         return *this;  // end
       }
 
-      ftrees_ = {allocator_->LoadAllocatorBlock((*eptree_.iterator).value)};
+      ftrees_ = {allocator_->LoadAllocatorBlock(eptree_.iterator->value)};
       ftrees_.iterator = ftrees_.node->template tbegin<decltype(ftrees_node_info::iterator)>();
     }
     return *this;
@@ -2212,9 +2260,8 @@ class FreeBlocksTreeIteratorBase
   using value_type = base::value_type;
   using ref_type = base::ref_type;
 
-  using const_reference = base::const_reference;
-
   using reference = ref_type;
+  using pointer = ref_type*;
 
   using eptree_node_info = eptree_node_info_type;
   using ftrees_node_info = ftrees_node_info_type;
@@ -2224,6 +2271,7 @@ class FreeBlocksTreeIteratorBase
       : base(allocator, std::move(eptree), std::move(ftrees)) {}
 
   reference operator*() const { return *base::ftrees().iterator; }
+  pointer operator->() const { return base::ftrees().iterator.operator->(); }
 
   FreeBlocksTreeIteratorBase& operator++() {
     base::operator++();
@@ -2290,7 +2338,7 @@ class FreeBlocksTree {
       eptree.iterator = eptree.node->begin();
     }
     assert(!eptree.iterator.is_end());
-    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
+    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
     ftrees.iterator = ftrees.node->template tbegin<decltype(Iterator::ftrees_node_info::iterator)>();
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
@@ -2306,7 +2354,7 @@ class FreeBlocksTree {
     }
     assert(!eptree.iterator.is_begin());
     --eptree.iterator;  // EPTree size should always be >= 1
-    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
+    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
     ftrees.iterator = ftrees.node->template tend<decltype(Iterator::ftrees_node_info::iterator)>();
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
@@ -2320,7 +2368,7 @@ class FreeBlocksTree {
     } else {
       eptree.iterator = eptree.node->find(key, false);
     }
-    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock((*eptree.iterator).value)}};
+    typename Iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
     ftrees.iterator = ftrees.node->template tfind<decltype(Iterator::ftrees_node_info::iterator)>(key);
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }

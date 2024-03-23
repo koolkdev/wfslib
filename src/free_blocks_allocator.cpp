@@ -107,9 +107,9 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     // 1. It ends exactly at this range start.
     // 2. This range start isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    if ((*pos).end_block_number() == range_in_size.block_number &&
+    if (pos->end_block_number() == range_in_size.block_number &&
         (!is_aligned_pow2(range_in_size.block_number, next_size_pow2) ||
-         (*pos).blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
+         pos->blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
       join_before = *pos;
       join_before_iter = pos;
       range_in_size.block_number = join_before->block_number;
@@ -119,12 +119,12 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     // 1. It start  exactly at this range end.
     // 2. This range end isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    if ((*pos).block_number() < range_in_size.block_number)  // We could be at begin() before
+    if (pos->block_number() < range_in_size.block_number)  // We could be at begin() before
       ++pos;
-    assert(pos.is_end() || (*pos).block_number() > range_in_size.block_number);
-    if (!pos.is_end() && (*pos).block_number() == range_in_size.end_block_number() &&
+    assert(pos.is_end() || pos->block_number() > range_in_size.block_number);
+    if (!pos.is_end() && pos->block_number() == range_in_size.end_block_number() &&
         (!is_aligned_pow2(range_in_size.end_block_number(), next_size_pow2) ||
-         (*pos).blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
+         pos->blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
       FreeBlocksExtentInfo join_after = *pos;
       range_in_size.block_number = join_after.block_number;
       range_in_size.blocks_count += join_after.blocks_count;
@@ -152,7 +152,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
              sub_range.blocks_count / size_blocks_count <= 0x10);
       auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
       if (join_before && sub_range.block_number == range_in_size.block_number) {
-        (*join_before_iter).value = new_value;
+        join_before_iter->key_value().value = new_value;
       } else {
         // Don't use pos to insert because:
         // 1. Our find may go back so it isn't the exact location to insert it.
@@ -210,7 +210,7 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
     return;
   }
   auto last = eptree.rbegin();
-  if ((*last).key || (*last).value != 2)
+  if (last->key || last->value != 2)
     return;
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   // eptree is empty (aka have only initial FTreee), resize it to one eptree
@@ -233,11 +233,11 @@ bool FreeBlocksAllocator::IsRangeIsFree(FreeBlocksRangeInfo range) {
   if (pos.is_end())
     return false;
   // Ensure that previous allocated block is before us
-  if ((*pos).end_block_number() > range.block_number)
+  if (pos->end_block_number() > range.block_number)
     return true;
   ++pos;
   // Ensure that previous allocated block is after us
-  if (!pos.is_end() && (*pos).block_number() < range.end_block_number())
+  if (!pos.is_end() && pos->block_number() < range.end_block_number())
     return true;
   return false;
 }
@@ -337,9 +337,8 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   FreeBlocksTree tree{this};
   std::vector<range_and_extents> ranges;
   std::optional<range_and_extents> selected_range;
-  for (auto it = tree.rbegin(); !it.is_end(); ++it) {
-    auto extent = *it;
-    if (extent.bucket_index < size_index)
+  for (const auto& extent : std::ranges::subrange(tree.rbegin(), tree.rend())) {
+    if (extent.bucket_index() < size_index)
       continue;
     if (!ranges.empty() && ranges.back().first.block_number == extent.end_block_number()) {
       ranges.back().first.blocks_count += extent.blocks_count();
