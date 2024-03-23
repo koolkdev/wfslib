@@ -1334,12 +1334,9 @@ class FTreesConstIteratorBase {
   FTreesConstIteratorBase(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index)
       : ftrees_(std::move(ftrees)), index_(index) {}
 
-  reference operator*() const {
-    update_extent();
-    return extent_;
-  }
+  reference operator*() const { return {*ftrees_[index_].iterator, index_}; }
   pointer operator->() const {
-    update_extent();
+    const_cast<FTreesConstIteratorBase*>(this)->extent_ = {*ftrees_[index_].iterator, index_};
     return &extent_;
   }
 
@@ -1385,10 +1382,6 @@ class FTreesConstIteratorBase {
  protected:
   const std::array<ftree_info, kSizeBucketsCount>& ftrees() const { return ftrees_; }
   size_t index() const { return index_; }
-
-  void update_extent() const {
-    const_cast<FTreesConstIteratorBase*>(this)->extent_ = {*ftrees_[index_].iterator, index_};
-  }
 
  private:
   std::array<ftree_info, kSizeBucketsCount> ftrees_;
@@ -1891,12 +1884,9 @@ class FreeBlocksTreeBucketConstIterator {
         eptree_(std::move(eptree)),
         ftree_(std::move(ftree)) {}
 
-  reference operator*() const {
-    update_extent();
-    return extent_;
-  }
+  reference operator*() const { return {*ftree_.iterator, block_size_index_}; }
   pointer operator->() const {
-    update_extent();
+    const_cast<FreeBlocksTreeBucketConstIterator*>(this)->extent_ = {*ftree_.iterator, block_size_index_};
     return &extent_;
   }
 
@@ -1954,11 +1944,6 @@ class FreeBlocksTreeBucketConstIterator {
 
   bool is_begin() const { return eptree_.iterator.is_begin() && ftree_.iterator.is_begin(); }
   bool is_end() const { return ftree_.iterator.is_end(); }
-
- protected:
-  void update_extent() const {
-    const_cast<FreeBlocksTreeBucketConstIterator*>(this)->extent_ = {*ftree_.iterator, block_size_index_};
-  }
 
  private:
   FreeBlocksAllocator* allocator_;
