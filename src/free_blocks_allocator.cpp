@@ -418,6 +418,7 @@ std::shared_ptr<MetadataBlock> FreeBlocksAllocator::LoadAllocatorBlock(uint32_t 
 const FreeBlocksAllocatorHeader* FreeBlocksAllocator::header() {
   return block_->get_object<FreeBlocksAllocatorHeader>(sizeof(MetadataBlockHeader));
 }
+
 FreeBlocksAllocatorHeader* FreeBlocksAllocator::mutable_header() {
   return block_->get_mutable_object<FreeBlocksAllocatorHeader>(sizeof(MetadataBlockHeader));
 }
