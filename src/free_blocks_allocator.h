@@ -52,6 +52,7 @@ class FreeBlocksAllocator {
 
   // Remove blocks from the tree
   bool RemoveFreeBlocksExtent(FreeBlocksExtentInfo info);
+  bool RemoveSpecificFreeBlocksExtent(FreeBlocksExtentInfo info);
 
   // Return whether any part of the block is freed
   bool IsRangeIsFree(FreeBlocksRangeInfo range);

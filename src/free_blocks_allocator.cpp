@@ -50,6 +50,8 @@ uint32_t FreeBlocksAllocator::AllocFreeBlockFromCache() {
 }
 
 uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated) {
+  // Since we are releasing everything only at the end we need to track the allocated blocks so far which makes this
+  // logic bit more complex than original.
   for (size_t i = 0; i < kSizeBucketsCount; ++i) {
     FreeBlocksTreeBucket bucket(this, i);
     for (auto it = bucket.find(near); it != bucket.end(); ++it) {
@@ -179,28 +181,43 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
 }
 
 bool FreeBlocksAllocator::RemoveFreeBlocksExtent(FreeBlocksExtentInfo extent) {
-  // TODO: More aggresive variation
-  FreeBlocksTreeBucket bucket{this, extent.bucket_index};
-  auto res = bucket.find(extent.block_number, false);
-  if (res.is_end())
-    return false;
-  FreeBlocksExtentInfo full_extent = *res;
-  if (full_extent.end_block_number() < extent.end_block_number())
-    return false;  // out of extent
-  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
-  if (extent.block_number)
-    bucket.erase(res, blocks_to_delete);
-  std::ranges::for_each(blocks_to_delete, std::bind(&FreeBlocksAllocator::AddFreeBlocks, this, std::placeholders::_1));
-  if (!blocks_to_delete.empty()) {
-    // We deleted some FTrees, check if the tree is trivial and need to be recreated.
-    RecreateEPTreeIfNeeded();
+  if (RemoveSpecificFreeBlocksExtent(extent))
+    return true;
+  // Fallback to slow removal
+  for (auto block_number = extent.block_number; block_number < extent.end_block_number(); ++block_number) {
+    if (!RemoveSpecificFreeBlocksExtent({block_number, 1, 0}))
+      return false;
   }
-  if (extent.block_number > full_extent.block_number)
-    AddFreeBlocks({full_extent.block_number, extent.block_number - full_extent.block_number});
-  if (extent.end_block_number() < full_extent.end_block_number())
-    AddFreeBlocks({extent.end_block_number(), full_extent.end_block_number() - extent.end_block_number()});
-  mutable_header()->free_blocks_count -= extent.blocks_count;
   return true;
+}
+
+bool FreeBlocksAllocator::RemoveSpecificFreeBlocksExtent(FreeBlocksExtentInfo extent) {
+  // Iterator over higher bucket sizes in case it merged into one.
+  for (auto bucket_index = extent.bucket_index; bucket_index < kSizeBucketsCount; ++bucket_index) {
+    FreeBlocksTreeBucket bucket{this, bucket_index};
+    auto res = bucket.find(extent.block_number, false);
+    if (res.is_end())
+      continue;
+    FreeBlocksExtentInfo full_extent = *res;
+    if (full_extent.end_block_number() < extent.end_block_number())
+      continue;  // out of extent
+    std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+    if (extent.block_number)
+      bucket.erase(res, blocks_to_delete);
+    std::ranges::for_each(blocks_to_delete,
+                          std::bind(&FreeBlocksAllocator::AddFreeBlocks, this, std::placeholders::_1));
+    if (!blocks_to_delete.empty()) {
+      // We deleted some FTrees, check if the tree is trivial and need to be recreated.
+      RecreateEPTreeIfNeeded();
+    }
+    if (extent.block_number > full_extent.block_number)
+      AddFreeBlocks({full_extent.block_number, extent.block_number - full_extent.block_number});
+    if (extent.end_block_number() < full_extent.end_block_number())
+      AddFreeBlocks({extent.end_block_number(), full_extent.end_block_number() - extent.end_block_number()});
+    mutable_header()->free_blocks_count -= extent.blocks_count;
+    return true;
+  }
+  return false;
 }
 
 void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
