@@ -215,9 +215,9 @@ void node_set_full_key(T& node, size_t index, key_type key) {
   return node_set_key(node, index, key);
 }
 
-static_assert(std::is_same_v<uint16_t, node_value_type<RTreeNode_details>::type>);
-static_assert(node_keys_capacity<RTreeNode_details>::value == 5);
-static_assert(node_values_capacity<RTreeNode_details>::value == 6);
+static_assert(std::is_same_v<uint16_t, node_value_type<PTreeNode_details>::type>);
+static_assert(node_keys_capacity<PTreeNode_details>::value == 5);
+static_assert(node_values_capacity<PTreeNode_details>::value == 6);
 static_assert(std::is_same_v<uint32_t, node_value_type<RTreeLeaf_details>::type>);
 static_assert(node_keys_capacity<RTreeLeaf_details>::value == 4);
 static_assert(node_values_capacity<RTreeLeaf_details>::value == 4);

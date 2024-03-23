@@ -18,13 +18,19 @@
 
 class FreeBlocksAllocator;
 
-static_assert(sizeof(RTreeNode_details) == sizeof(RTreeLeaf_details));
-using EPTreeBlock = TreeNodesAllocator<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(RTreeNode_details)>;
+template <>
+PTreeNode<RTreeLeaf_details>::const_iterator split_point(
+    const PTreeNode<RTreeLeaf_details>& node,
+    const typename PTreeNode<RTreeLeaf_details>::const_iterator& pos,
+    key_type& split_key);
 
-class RTree : public PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
+static_assert(sizeof(PTreeNode_details) == sizeof(RTreeLeaf_details));
+using EPTreeBlock = TreeNodesAllocator<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(PTreeNode_details)>;
+
+class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
  public:
   RTree(std::shared_ptr<MetadataBlock> block)
-      : PTree<RTreeNode_details, RTreeLeaf_details, EPTreeBlock>(std::move(block)) {}
+      : PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlock>(std::move(block)) {}
 
   PTreeHeader* mutable_header() override { return &mutable_tree_header()->current_tree; }
   const PTreeHeader* header() const override { return &tree_header()->current_tree; }

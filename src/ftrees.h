@@ -20,13 +20,19 @@
 #include "structs.h"
 #include "tree_nodes_allocator.h"
 
-static_assert(sizeof(RTreeNode_details) == sizeof(FTreeLeaf_details));
-using FTreesBlock = TreeNodesAllocator<FTreesBlockHeader, FTreesFooter, sizeof(RTreeNode_details)>;
+template <>
+PTreeNode<FTreeLeaf_details>::const_iterator split_point(
+    const PTreeNode<FTreeLeaf_details>& node,
+    const typename PTreeNode<FTreeLeaf_details>::const_iterator& pos,
+    key_type& split_key);
 
-class FTree : public PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock> {
+static_assert(sizeof(PTreeNode_details) == sizeof(FTreeLeaf_details));
+using FTreesBlock = TreeNodesAllocator<FTreesBlockHeader, FTreesFooter, sizeof(PTreeNode_details)>;
+
+class FTree : public PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlock> {
  public:
   FTree(std::shared_ptr<MetadataBlock> block, size_t block_size_index)
-      : PTree<RTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)),
+      : PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)),
         block_size_index_(block_size_index) {}
 
   PTreeHeader* mutable_header() override { return &mutable_tree_header()->trees[block_size_index_]; }

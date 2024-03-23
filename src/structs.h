@@ -276,11 +276,11 @@ static_assert(sizeof(HeapFreelistEntry) == 0xA, "Incorrect sizeof HeapFreelistEn
 // The nodes represent ranges. There may between 1 and 6 sub-nodes.
 // The key represent the split point. So there can be between 0-5 keys (they end with zero keys)
 // so x < keys[0] go to node[0], keys[0] <= x < keys[1] go to node[1] and etc..
-struct RTreeNode_details {
+struct PTreeNode_details {
   uint32_be_t keys[5];
   uint16_be_t values[6];
 };
-static_assert(sizeof(RTreeNode_details) == 0x20);
+static_assert(sizeof(PTreeNode_details) == 0x20);
 
 struct RTreeLeaf_details {
   uint32_be_t keys[4];

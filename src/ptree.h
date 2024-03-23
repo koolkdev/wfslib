@@ -35,6 +35,17 @@ concept nodes_allocator_construct = std::constructible_from<T, std::shared_ptr<M
 template <typename T, typename U>
 concept nodes_allocator = nodes_allocator_methods<T, U> && nodes_allocator_construct<T>;
 
+template <typename T>
+PTreeNode<T>::const_iterator split_point(const PTreeNode<T>& node,
+                                         const typename PTreeNode<T>::const_iterator& pos,
+                                         key_type& split_key);
+
+template <>
+PTreeNode<PTreeNode_details>::const_iterator split_point(
+    const PTreeNode<PTreeNode_details>& node,
+    const typename PTreeNode<PTreeNode_details>::const_iterator& pos,
+    key_type& split_key);
+
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
 class PTreeConstIterator {
  public:
@@ -263,10 +274,10 @@ class PTree : public Allocator {
     auto child_node_offset = this->to_offset(&nodes[0]);
     auto child_split_key = split_key;
     for (parent = pos.parents().rbegin(); parent != pos.parents().rend() && parent->node->full(); ++node, ++parent) {
-      auto parent_split_pos = parent->node->split_point(parent->iterator, split_key);
+      auto parent_split_pos = split_point(*parent->node, parent->iterator, split_key);
       parent_node new_node{{this->block(), this->to_offset(node)}, 0};
       new_node.clear(true);
-      new_node.insert(new_node.begin(), parent_split_pos, parent->node->end());
+      new_node.insert(new_node.begin(), parent_split_pos, parent->node->cend());
       parent->node->erase(parent_split_pos, parent->node->end());
       if (child_split_key >= split_key) {
         new_node.insert(new_node.begin() + ((parent->iterator - parent_split_pos) + 1),
@@ -328,13 +339,13 @@ class PTree : public Allocator {
       return true;
     }
     auto split_key = key_val.key;
-    auto split_pos = pos.leaf().node->split_point(leaf_pos_to_insert, split_key);
+    auto split_pos = split_point(*pos.leaf().node, leaf_pos_to_insert, split_key);
     auto* node = grow_tree(pos, split_key);
     if (!node)
       return false;
     leaf_node new_node{{this->block(), this->to_offset(node)}, 0};
     new_node.clear(true);
-    new_node.insert(new_node.begin(), split_pos, pos.leaf().node->end());
+    new_node.insert(new_node.begin(), split_pos, pos.leaf().node->cend());
     pos.leaf().node->erase(split_pos, pos.leaf().node->end());
     if (key_val.key >= split_key) {
       new_node.insert(new_node.begin() + (leaf_pos_to_insert - split_pos), key_val);

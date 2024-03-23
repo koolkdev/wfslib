@@ -38,9 +38,10 @@ add_library(${PROJECT_NAME}
     src/ftrees.cpp
     src/key_file.cpp
     src/metadata_block.cpp
+    src/ptree.cpp
+    src/recovery.cpp
     src/structs.cpp
     src/sub_block_allocator.cpp
-    src/recovery.cpp
     src/wfs.cpp
     src/wfs_item.cpp
 )

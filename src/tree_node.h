@@ -258,6 +258,7 @@ class PTreeNodeIterator : public PTreeNodeConstIterator<T> {
   PTreeNodeIterator operator+(difference_type n) const { return PTreeNodeIterator<T>(base::node(), base::index() + n); }
   PTreeNodeIterator operator-(difference_type n) const { return PTreeNodeIterator<T>(base::node(), base::index() - n); }
   difference_type operator-(const PTreeNodeIterator& other) const { return base::operator-(other); }
+  difference_type operator-(const PTreeNodeConstIterator<T>& other) const { return base::operator-(other); }
 
   reference operator[](difference_type n) const { return *(*this + n); }
 };
@@ -271,6 +272,12 @@ PTreeNodeConstIterator<T> operator+(typename PTreeNodeConstIterator<T>::differen
 template <is_node_details T>
 PTreeNodeIterator<T> operator+(typename PTreeNodeIterator<T>::difference_type n, const PTreeNodeIterator<T>& iter) {
   return iter + n;
+}
+
+template <is_node_details T>
+PTreeNodeConstIterator<T>::difference_type operator-(const PTreeNodeConstIterator<T>& a,
+                                                     const PTreeNodeIterator<T>& b) {
+  return a.operator-(b);
 }
 
 template <is_node_details T>
@@ -300,8 +307,8 @@ class PTreeNode {
   const_reverse_iterator crbegin() const { return rbegin(); }
   const_reverse_iterator crend() const { return rend(); }
 
-  bool full() { return size_ == node_keys_capacity<T>::value; }
-  bool empty() { return size_ == 0; }
+  bool full() const { return size_ == node_keys_capacity<T>::value; }
+  bool empty() const { return size_ == 0; }
 
   iterator find(key_type key, bool exact_match) {
     auto it = std::upper_bound(begin(), end(), key);
@@ -366,79 +373,6 @@ class PTreeNode {
   void clear(bool full = false) {
     std::fill(begin(), full ? (begin() + node_keys_capacity<T>::value) : end(), 0);
     size_ = 0;
-  }
-
-  // TODO: Out from this class
-  iterator split_point(iterator pos, key_type& split_key)
-    requires std::same_as<T, FTreeLeaf_details>
-  {
-    assert(cbegin() <= pos && pos <= cend());
-    assert(full());
-    auto res = pos;
-    switch (pos - begin()) {
-      case 0:
-      case 1:
-      case 2:
-      case 3:
-        res = begin() + 3;
-        break;
-      case 4:
-        return pos;
-      case 5:
-      case 6:
-      case 7:
-        res = begin() + 4;
-        break;
-    }
-    split_key = res->key;
-    return res;
-  }
-
-  iterator split_point(iterator pos, key_type& split_key)
-    requires std::same_as<T, RTreeLeaf_details>
-  {
-    assert(cbegin() <= pos && pos <= cend());
-    assert(full());
-    auto res = pos;
-    switch (pos - begin()) {
-      case 0:
-      case 1:
-        res = begin() + 1;
-        break;
-      case 2:
-        res = begin() + 2;
-        break;
-      case 3:
-        return pos;
-      case 4:
-        res = begin() + 3;
-        break;
-    }
-    split_key = res->key;
-    return res;
-  }
-
-  iterator split_point(iterator pos, key_type& split_key)
-    requires std::same_as<T, RTreeNode_details>
-  {
-    assert(cbegin() <= pos && pos <= cend());
-    assert(full());
-    auto res = pos;
-    switch (pos - begin()) {
-      case 0:
-      case 1:
-      case 2:
-        res = begin() + 3;
-        break;
-      case 3:
-        return pos + 1;
-      case 4:
-      case 5:
-        res = begin() + 4;
-        break;
-    }
-    split_key = res->key;
-    return res;
   }
 
   bool operator==(const PTreeNode& other) const { return node_ == other.node_; }

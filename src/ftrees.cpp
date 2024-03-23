@@ -7,6 +7,33 @@
 
 #include "ftrees.h"
 
+template <>
+PTreeNode<FTreeLeaf_details>::const_iterator split_point(
+    const PTreeNode<FTreeLeaf_details>& node,
+    const typename PTreeNode<FTreeLeaf_details>::const_iterator& pos,
+    key_type& split_key) {
+  assert(node.begin() <= pos && pos <= node.end());
+  assert(node.full());
+  auto res = pos;
+  switch (pos - node.begin()) {
+    case 0:
+    case 1:
+    case 2:
+    case 3:
+      res = node.begin() + 3;
+      break;
+    case 4:
+      return pos;
+    case 5:
+    case 6:
+    case 7:
+      res = node.begin() + 4;
+      break;
+  }
+  split_key = res->key;
+  return res;
+}
+
 void FTrees::split(FTrees& left, FTrees& right, key_type& split_point_key) {
   // Find the ftree with most items
   auto max_ftree_it = std::ranges::max_element(ftrees_, [](const FTree& a, const FTree& b) {
