@@ -23,7 +23,7 @@ struct MetadataBlockHeader {
   // 0x20000000 - leaf directory tree
   // 0x40000000 - ?
   // 0x80000000 - Directory?
-  enum Flags {
+  enum Flags : uint32_t {
     AREA = 0x00400000,
     ROOT_AREA = 0x00800000,
     EXTERNAL_DIRECTORY_TREE = 0x20000000,
@@ -59,7 +59,7 @@ static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 
 // sizeof 0x2c
 struct Attributes {
-  enum Flags {
+  enum Flags : uint32_t {
     UNENCRYPTED_FILE = 0x2000000,
     LINK = 0x4000000,
     AREA_SIZE_BASIC = 0x10000000,
@@ -243,6 +243,7 @@ struct FreeBlocksAllocatorHeader {
   // When createa a new area, a fixed amount of blocks are allocated for metadata blocks for quick allocation. When
   // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
   // When no more availabe blocks are avaialbe, it will allocate them regulary.
+  // TODO: This is not metadata specific blocks, so rename this, this is just quick alloc cache
   uint32_be_t free_metadata_block;
   uint32_be_t free_metadata_blocks_count;
 };
@@ -275,11 +276,11 @@ static_assert(sizeof(HeapFreelistEntry) == 0xA, "Incorrect sizeof HeapFreelistEn
 // The nodes represent ranges. There may between 1 and 6 sub-nodes.
 // The key represent the split point. So there can be between 0-5 keys (they end with zero keys)
 // so x < keys[0] go to node[0], keys[0] <= x < keys[1] go to node[1] and etc..
-struct RTreeNode_details {
+struct PTreeNode_details {
   uint32_be_t keys[5];
   uint16_be_t values[6];
 };
-static_assert(sizeof(RTreeNode_details) == 0x20);
+static_assert(sizeof(PTreeNode_details) == 0x20);
 
 struct RTreeLeaf_details {
   uint32_be_t keys[4];

@@ -25,6 +25,23 @@ class big_endian_type {
     return *this;
   }
 
+  big_endian_type& operator+=(T val) {
+    *this = value() + val;
+    return *this;
+  }
+  big_endian_type& operator-=(T val) {
+    *this = value() - val;
+    return *this;
+  }
+  big_endian_type& operator++(int) {
+    *this += 1;
+    return *this;
+  }
+  big_endian_type& operator--(int) {
+    *this += 1;
+    return *this;
+  }
+
   T value() const { return convert_endian(*data()); }
 
  private:

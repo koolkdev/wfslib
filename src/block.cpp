@@ -26,7 +26,7 @@ Block::Block(const std::shared_ptr<BlocksDevice>& device,
       data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
 Block::~Block() {
-  device_->RemoveFromCache(block_number_);
+  Detach();
 }
 
 void Block::Resize(uint32_t data_size) {
@@ -42,13 +42,21 @@ void Block::Resize(uint32_t data_size) {
   }
 }
 
+void Block::Detach() {
+  if (detached_)
+    return;
+  device_->RemoveFromCache(block_number_);
+  detached_ = true;
+}
+
 bool Block::Fetch(bool check_hash) {
+  assert(!detached_);
   return device_->ReadBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, Hash(), iv_, encrypted_,
                             check_hash);
 }
 
 void Block::Flush() {
-  if (!dirty_)
+  if (detached_ || !dirty_)
     return;
   device_->WriteBlock(block_number_, 1 << (size_category_ - BlockSize::Basic), data_, MutableHash(), iv_, encrypted_,
                       /*recalculate_hash=*/true);

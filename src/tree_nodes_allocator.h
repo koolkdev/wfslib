@@ -30,10 +30,11 @@ class TreeNodesAllocator {
     header->start_offset = header_size();
     header->total_bytes = total_bytes();
     auto* freelist_entry = get_mutable_entry<HeapFreelistEntry>(header->freelist_head.value());
-    freelist_entry->size = entries_count();
+    freelist_entry->count = entries_count();
     freelist_entry->init_zero = 0;
     freelist_entry->next = entries_count();
-    std::fill(mutable_tree_header(), mutable_tree_header() + 1, std::byte{0});
+    std::fill(reinterpret_cast<std::byte*>(mutable_tree_header()),
+              reinterpret_cast<std::byte*>(mutable_tree_header() + 1), std::byte{0});
   }
 
   template <typename T>
@@ -47,16 +48,19 @@ class TreeNodesAllocator {
          current_index = current->next.value()) {
       current = get_freelist_entry(current_index);
       if (count <= current->count.value()) {
-        auto* prev_next = (current_index == heap_header()->freelist_head.value())
-                              ? &mutable_heap_header()->freelist_head
-                              : &get_mutable_freelist_entry(prev_index)->next;
         if (count == current->count.value()) {
-          *prev_next = current->next;
+          if (current_index == heap_header()->freelist_head.value())
+            mutable_heap_header()->freelist_head = static_cast<uint16_t>(current->next.value());
+          else
+            get_mutable_freelist_entry(prev_index)->next = current->next;
         } else {
           auto* new_free = get_mutable_freelist_entry(current_index + count);
           new_free->next = current->next.value();
           new_free->count = new_free->count.value() - count;
-          *prev_next = current_index + count;
+          if (current_index == heap_header()->freelist_head.value())
+            mutable_heap_header()->freelist_head = static_cast<uint16_t>(current_index + count);
+          else
+            get_mutable_freelist_entry(prev_index)->next = current_index + count;
         }
         return get_mutable_entry<T>(current_index);
       }
@@ -105,6 +109,13 @@ class TreeNodesAllocator {
     }
   }
 
+  template <typename T>
+  uint16_t to_offset(const T* node) const
+    requires check_node_size<T, entry_size>
+  {
+    return static_cast<uint16_t>(reinterpret_cast<const uint8_t*>(node) - block()->template get_object<uint8_t>(0));
+  }
+
   extra_header_type* mutable_extra_header() {
     return block()->template get_mutable_object<extra_header_type>(extra_header_offset());
   }
@@ -112,31 +123,30 @@ class TreeNodesAllocator {
     return block()->template get_object<extra_header_type>(extra_header_offset());
   }
 
-  MetadataBlock* block() { return block_.get(); }
-  const MetadataBlock* block() const { return block_.get(); }
+  std::shared_ptr<MetadataBlock> block() const { return block_; }
 
   template <typename T>
-  T* get_mutable_object(uint16_t offset)
+  T* get_mutable_object(uint16_t offset) const
     requires check_node_size<T, entry_size>
   {
-    return block()->template get_mutable_object<T>(offset);
+    return block_->template get_mutable_object<T>(offset);
   }
   template <typename T>
   const T* get_object(uint16_t offset) const
     requires check_node_size<T, entry_size>
   {
-    return block()->template get_object<T>(offset);
+    return block_->template get_object<T>(offset);
   }
 
   tree_header_type* mutable_tree_header() {
-    return block()->template get_mutable_object<tree_header_type>(tree_header_offset());
+    return block_->template get_mutable_object<tree_header_type>(tree_header_offset());
   }
   const tree_header_type* tree_header() const {
-    return block()->template get_object<tree_header_type>(tree_header_offset());
+    return block_->template get_object<tree_header_type>(tree_header_offset());
   }
 
  protected:
-  uint16_t initial_entries_total_bytes() const { return block()->size() - footer_size() - header_size(); }
+  uint16_t initial_entries_total_bytes() const { return block_->size() - footer_size() - header_size(); }
   uint16_t initial_entries_count() const { return initial_entries_total_bytes() / entry_size; }
   uint16_t total_bytes() const { return heap_header()->total_bytes.value(); }
   uint16_t entries_count() const { return total_bytes() / entry_size; }
@@ -145,12 +155,12 @@ class TreeNodesAllocator {
   template <typename T>
   T* get_mutable_entry(uint32_t index) {
     assert(index < entries_count());
-    return block()->template get_mutable_object<T>(entries_start_offset() + entry_size * index);
+    return block_->template get_mutable_object<T>(entries_start_offset() + entry_size * index);
   }
   template <typename T>
   const T* get_entry(uint32_t index) const {
     assert(index < entries_count());
-    return block()->template get_object<T>(entries_start_offset() + entry_size * index);
+    return block_->template get_object<T>(entries_start_offset() + entry_size * index);
   }
 
   HeapFreelistEntry* get_mutable_freelist_entry(uint32_t index) { return get_mutable_entry<HeapFreelistEntry>(index); }
@@ -158,15 +168,13 @@ class TreeNodesAllocator {
 
   constexpr uint16_t footer_size() const { return sizeof(tree_header_type) + sizeof(HeapHeader); }
   constexpr uint16_t header_size() const { return sizeof(MetadataBlockHeader) + sizeof(extra_header_type); }
-  uint16_t footer_offset() const { return static_cast<uint16_t>(block()->size() - footer_size()); }
+  uint16_t footer_offset() const { return static_cast<uint16_t>(block_->size() - footer_size()); }
   uint16_t heap_header_offset() const { return footer_offset() + sizeof(extra_header_type); }
   uint16_t tree_header_offset() const { return footer_offset(); }
   uint16_t extra_header_offset() const { return sizeof(MetadataBlockHeader); }
 
-  HeapHeader* mutable_heap_header() { return block()->template get_mutable_object<HeapHeader>(heap_header_offset()); }
-  const HeapHeader* heap_header() const { return block()->template get_object<HeapHeader>(heap_header_offset()); }
-
-  std::shared_ptr<MetadataBlock> original_block() const { return block_; }
+  HeapHeader* mutable_heap_header() { return block_->template get_mutable_object<HeapHeader>(heap_header_offset()); }
+  const HeapHeader* heap_header() const { return block_->template get_object<HeapHeader>(heap_header_offset()); }
 
   std::shared_ptr<MetadataBlock> block_;
 };

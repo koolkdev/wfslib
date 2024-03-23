@@ -26,7 +26,8 @@ std::expected<std::shared_ptr<MetadataBlock>, WfsError> MetadataBlock::LoadBlock
     uint32_t block_number,
     Block::BlockSize size_category,
     uint32_t iv,
-    bool check_hash) {
+    bool check_hash,
+    bool load_data) {
   auto cached_block = device->GetFromCache(block_number);
   if (cached_block) {
     assert(cached_block->BlockNumber() == block_number);
@@ -36,9 +37,11 @@ std::expected<std::shared_ptr<MetadataBlock>, WfsError> MetadataBlock::LoadBlock
     return block;
   }
   auto block = std::make_shared<MetadataBlock>(device, block_number, size_category, iv);
-  device->AddToCache(block_number, block);
-  if (!block->Fetch(check_hash))
-    return std::unexpected(WfsError::kBlockBadHash);
+  if (load_data) {
+    device->AddToCache(block_number, block);
+    if (!block->Fetch(check_hash))
+      return std::unexpected(WfsError::kBlockBadHash);
+  }
   return block;
 }
 
