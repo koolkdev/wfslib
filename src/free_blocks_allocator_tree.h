@@ -1880,7 +1880,6 @@ class FreeBlocksTreeBucketConstIterator {
                                     ftree_node_info ftree)
       : allocator_(allocator),
         block_size_index_(block_size_index),
-        extent_(*ftree_.iterator, block_size_index),
         eptree_(std::move(eptree)),
         ftree_(std::move(ftree)) {}
 
