@@ -292,7 +292,7 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
   bool is_end() const { return this->base().is_begin(); }
 
  private:
-  std::remove_pointer_t<std::remove_cvref_t<typename T::pointer>> val_;
+  std::remove_pointer_t<std::remove_cvref_t<typename T::pointer>> val_{};
 };
 
 template <typename T, typename U>
@@ -1295,7 +1295,7 @@ class FreeBlocksExtent {
   }
   uint32_t end_block_number() const { return block_number() + blocks_count(); }
   size_t bucket_index() const { return bucket_index_; }
-  const PTreeNodeIteratorValue<FTreeLeaf_details>& key_value() const { return key_value_; }
+  const PTreeNodeIteratorValue<FTreeLeaf_details> key_value() const { return key_value_; }
 
   operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index()}; }
 
@@ -1310,7 +1310,7 @@ class FreeBlocksExtentRef : public FreeBlocksExtent {
   FreeBlocksExtentRef(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
       : FreeBlocksExtent(std::move(key_value), bucket_index) {}
 
-  PTreeNodeIteratorValueRef<FTreeLeaf_details>& key_value() { return key_value_; }
+  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value() { return key_value_; }
 };
 
 template <typename ftree_info_type>
