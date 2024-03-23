@@ -29,10 +29,13 @@ add_library(${PROJECT_NAME}
     src/device_encryption.cpp
     src/directory.cpp
     src/directory_items_iterator.cpp
+    src/eptree.cpp
     src/errors.cpp
     src/file.cpp
     src/file_device.cpp
     src/free_blocks_allocator.cpp
+    src/free_blocks_tree_bucket.cpp
+    src/ftrees.cpp
     src/key_file.cpp
     src/metadata_block.cpp
     src/structs.cpp

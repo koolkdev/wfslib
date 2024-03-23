@@ -13,6 +13,10 @@
 
 #include "block.h"
 
+// Log2 of number of block in for each single quanta in each bucket
+constexpr size_t kSizeBuckets[] = {0, 3, 6, 10, 14, 18, 22};
+constexpr size_t kSizeBucketsCount = std::extent<decltype(kSizeBuckets)>::value;
+
 class EPTree;
 class Area;
 class MetadataBlock;

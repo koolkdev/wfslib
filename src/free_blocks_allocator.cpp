@@ -11,7 +11,8 @@
 #include <ranges>
 
 #include "area.h"
-#include "free_blocks_allocator_tree.h"
+#include "free_blocks_tree.h"
+#include "free_blocks_tree_bucket.h"
 #include "structs.h"
 
 namespace {

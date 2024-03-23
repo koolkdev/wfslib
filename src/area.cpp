@@ -10,7 +10,7 @@
 #include "blocks_device.h"
 #include "device.h"
 #include "directory.h"
-#include "free_blocks_allocator_tree.h"
+#include "free_blocks_allocator.h"
 #include "metadata_block.h"
 #include "structs.h"
 #include "wfs.h"
