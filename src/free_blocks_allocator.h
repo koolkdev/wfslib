@@ -40,6 +40,7 @@ struct FreeBlocksRangeInfo {
 class FreeBlocksAllocator {
  public:
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
+  virtual ~FreeBlocksAllocator() = default;
 
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);

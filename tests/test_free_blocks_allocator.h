@@ -14,6 +14,7 @@ class TestBlocksDevice;
 class TestFreeBlocksAllocator : public FreeBlocksAllocator {
  public:
   TestFreeBlocksAllocator(std::shared_ptr<MetadataBlock> block, std::shared_ptr<TestBlocksDevice> device);
+  ~TestFreeBlocksAllocator() override = default;
 
   void Init(int blocks);
 
