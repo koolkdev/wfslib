@@ -160,6 +160,7 @@ bool EPTree::insert(const iterator::value_type& key_value) {
     } else {
       inserted = new_left.insert(key_val_to_add);
     }
+    std::ignore = inserted;  // for release debug
     assert(inserted);
     key_val_to_add = iterator::value_type{split_point_key, right_block_number};
   }
