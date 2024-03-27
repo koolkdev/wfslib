@@ -9,7 +9,7 @@ add_executable(${PROJECT_NAME}
   eptree_tests.cpp
   rtree_tests.cpp
   test_blocks_device.cpp
-  test_free_Blocks_allocator.cpp
+  test_free_blocks_allocator.cpp
   test_metadata_block.cpp
   tree_nodes_allocator_tests.cpp
 )
