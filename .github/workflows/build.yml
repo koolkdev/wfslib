@@ -27,6 +27,8 @@ jobs:
             compiler: msvc
           - platform: macos-13
             compiler: gcc
+          - platform: ubuntu-latest # TEMP
+            compiler: gcc # TEMP
     runs-on: ${{matrix.platform}}
 
     steps:
@@ -41,8 +43,8 @@ jobs:
 
       - name: Set gcc
         run: |
-          echo "CC=gcc-13" >> $GITHUB_ENV
-          echo "CXX=g++-13" >> $GITHUB_ENV
+          echo "CC=gcc-14" >> $GITHUB_ENV
+          echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
 

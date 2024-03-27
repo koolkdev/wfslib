@@ -154,13 +154,12 @@ bool EPTree::insert(const iterator::value_type& key_value) {
       new_right.Init(depth);
       node_level->split(new_right, split_point);
     }
-    bool inserted;
+    [[maybe_unused]] bool inserted;
     if (key_val_to_add.key >= split_point_key) {
       inserted = new_right.insert(key_val_to_add);
     } else {
       inserted = new_left.insert(key_val_to_add);
     }
-    std::ignore = inserted;  // for release debug
     assert(inserted);
     key_val_to_add = iterator::value_type{split_point_key, right_block_number};
   }
