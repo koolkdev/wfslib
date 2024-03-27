@@ -122,6 +122,8 @@ class EPTree : public EPTreeBlock {
 
   EPTree(FreeBlocksAllocator* allocator) : EPTreeBlock(allocator->root_block()), allocator_(allocator) {}
 
+  void Init();
+
   iterator begin() { return begin_impl(); }
   iterator end() { return end_impl(); }
   const_iterator begin() const { return begin_impl(); }

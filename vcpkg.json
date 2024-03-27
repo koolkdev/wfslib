@@ -4,6 +4,7 @@
   "dependencies": [
     "boost-dynamic-bitset",
     "boost-iostreams",
+    "catch2",
     "cryptopp"
   ]
 }

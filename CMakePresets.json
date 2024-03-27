@@ -34,6 +34,15 @@
       "cacheVariables": {
         "VCPKG_TARGET_TRIPLET": "$env{Platform}-windows-static"
       }
+    },
+    {
+      "name": "tests",
+      "inherits": [
+        "default"
+      ],
+      "cacheVariables": {
+        "BUILD_TESTS": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -55,6 +64,28 @@
     {
       "name": "windows-static-release",
       "configurePreset": "windows-static",
+      "configuration": "Release"
+    },
+    {
+      "name": "debug-tests",
+      "configurePreset": "tests",
+      "configuration": "Debug"
+    },
+    {
+      "name": "release-tests",
+      "configurePreset": "tests",
+      "configuration": "Release"
+    }
+  ],
+  "testPresets": [
+    {
+      "name": "run-debug-tests",
+      "configurePreset": "tests",
+      "configuration": "Debug"
+    },
+    {
+      "name": "run-release-tests",
+      "configurePreset": "tests",
       "configuration": "Release"
     }
   ]

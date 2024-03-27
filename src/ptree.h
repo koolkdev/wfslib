@@ -20,7 +20,7 @@
 class MetadataBlock;
 
 template <typename T, typename U>
-concept nodes_allocator_methods = requires(T& allocator, U* node_type) {
+concept nodes_allocator_methods = requires(T& allocator, const U* node_type) {
                                     { allocator.template get_mutable_object<U>(uint16_t{0}) } -> std::same_as<U*>;
                                     { allocator.template Alloc<U>(uint16_t{0}) } -> std::same_as<U*>;
                                     allocator.template Free<U>(node_type, uint16_t{0});
@@ -257,40 +257,50 @@ class PTree : public Allocator {
   const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
 
   LeafNodeDetails* grow_tree(const const_iterator& pos, key_type split_key) {
-    uint16_t nodes_to_alloc = 2;
+    uint16_t nodes_to_alloc = 1;
     auto parent = pos.parents().rbegin();
     while (parent != pos.parents().rend() && parent->node->full()) {
       ++nodes_to_alloc;
       ++parent;
     }
-    if (parent == pos.parents().rend() && pos.parents().size() == 4) {
-      // can't grow anymore in depth
-      return nullptr;
+    if (parent == pos.parents().rend()) {
+      if (pos.parents().size() == 4) {
+        // can't grow anymore in depth
+        return nullptr;
+      }
+      // New root
+      ++nodes_to_alloc;
     }
     auto* nodes = this->template Alloc<ParentNodeDetails>(nodes_to_alloc);
     if (!nodes)
       return nullptr;
+    auto* new_child_node = &nodes[0];
     auto* node = &nodes[1];
-    auto child_node_offset = this->to_offset(&nodes[0]);
+    auto child_node_offset = this->to_offset(new_child_node);
     auto child_split_key = split_key;
-    for (parent = pos.parents().rbegin(); parent != pos.parents().rend() && parent->node->full(); ++node, ++parent) {
+    for (parent = pos.parents().rbegin(); parent != pos.parents().rend() && parent->node->full(); ++parent) {
       auto parent_split_pos = split_point(*parent->node, parent->iterator, split_key);
-      parent_node new_node{{this->block(), this->to_offset(node)}, 0};
+      uint16_t node_offset = this->to_offset(node++);
+      parent_node new_node{{this->block(), node_offset}, 0};
       new_node.clear(true);
-      new_node.insert(new_node.begin(), parent_split_pos, parent->node->cend());
+      if (child_split_key == split_key) {
+        // We need to insert it first or we will loose the the key. (since we don't store the key for [0])
+        new_node.insert(new_node.begin(), {child_split_key, child_node_offset});
+      }
+      new_node.insert(new_node.end(), parent_split_pos, parent->node->cend());
       parent->node->erase(parent_split_pos, parent->node->end());
-      if (child_split_key >= split_key) {
+      if (child_split_key > split_key) {
         new_node.insert(new_node.begin() + ((parent->iterator - parent_split_pos) + 1),
                         {child_split_key, child_node_offset});
-      } else {
+      } else if (child_split_key < split_key) {
         parent->node->insert(parent->iterator + 1, {child_split_key, child_node_offset});
       }
-      child_node_offset = this->to_offset(node);
+      child_node_offset = node_offset;
       child_split_key = split_key;
     }
     if (parent == pos.parents().rend()) {
       // new root
-      uint16_t node_offset = this->to_offset(node);
+      uint16_t node_offset = this->to_offset(node++);
       parent_node new_node{{this->block(), node_offset}, 0};
       new_node.clear(true);
       new_node.insert(new_node.end(), {0, header()->root_offset.value()});
@@ -300,12 +310,13 @@ class PTree : public Allocator {
     } else {
       parent->node->insert(parent->iterator + 1, {child_split_key, child_node_offset});
     }
-    return reinterpret_cast<LeafNodeDetails*>(&nodes[0]);
+    assert(node - new_child_node == nodes_to_alloc);
+    return reinterpret_cast<LeafNodeDetails*>(new_child_node);
   }
 
   bool insert(const typename iterator::value_type& key_val) {
     auto pos = find(key_val.key, false);
-    if (!pos.leaf().iterator.is_end() && pos->key == key_val.key) {
+    if (!pos.is_end() && pos->key == key_val.key) {
       // key already exists
       return false;
     }
@@ -414,11 +425,13 @@ class PTree : public Allocator {
   void erase(const const_iterator& pos) {
     pos.leaf().node->erase(pos.leaf().iterator);
     if (pos.leaf().node->empty()) {
+      this->Free(pos.leaf().node->node(), 1);
       auto parent = pos.parents().rbegin();
       for (; parent != pos.parents().rend(); parent++) {
         parent->node->erase(parent->iterator);
         if (!parent->node->empty())
           break;
+        this->Free(parent->node->node(), 1);
       }
       if (parent == pos.parents().rend()) {
         mutable_header()->tree_depth = 0;
@@ -437,8 +450,11 @@ class PTree : public Allocator {
   }
 
   void erase(const const_iterator& it_start, const const_iterator& it_end) {
-    for (auto it = it_start; it != it_end; ++it) {
-      erase(it);
+    // Iterating from last to first is safe as the iterator will always be valid after operator--. It isn't true in the
+    // other direction.
+    auto it = it_end;
+    while (!empty() && it != it_start) {
+      erase(--it);
     }
   }
 

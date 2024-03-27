@@ -307,7 +307,7 @@ class PTreeNode {
   const_reverse_iterator crbegin() const { return rbegin(); }
   const_reverse_iterator crend() const { return rend(); }
 
-  bool full() const { return size_ == node_keys_capacity<T>::value; }
+  bool full() const { return size_ == node_values_capacity<T>::value; }
   bool empty() const { return size_ == 0; }
 
   iterator find(key_type key, bool exact_match) {
@@ -320,11 +320,11 @@ class PTreeNode {
   }
 
   iterator insert(const const_iterator& pos, const typename iterator::value_type& key_val) {
-    if (size_ >= node_keys_capacity<T>::value)
+    if (size_ >= node_values_capacity<T>::value)
       return end();
     assert(cbegin() <= pos && pos <= cend());
     iterator res = begin() + (pos - cbegin());
-    std::copy(pos, cend(), res + 1);
+    std::copy_backward<const_iterator, iterator>(res, cend(), end() + 1);
     *res = key_val;
     size_++;
     return res;
@@ -338,11 +338,11 @@ class PTreeNode {
   template <typename InputIt>
   iterator insert(const const_iterator& pos, const InputIt& start_it, const InputIt& end_it) {
     auto items = static_cast<typename iterator::difference_type>(std::distance(start_it, end_it));
-    if (size_ + items > node_keys_capacity<T>::value)
+    if (size_ + items > node_values_capacity<T>::value)
       return end();
     assert(cbegin() <= pos && pos <= cend());
     iterator res = begin() + (pos - cbegin());
-    std::copy(pos, cend(), res + items);
+    std::copy_backward<const_iterator, iterator>(res, cend(), end() + items);
     std::copy(start_it, end_it, res);
     size_ += items;
     return res;
@@ -371,11 +371,13 @@ class PTreeNode {
   }
 
   void clear(bool full = false) {
-    std::fill(begin(), full ? (begin() + node_keys_capacity<T>::value) : end(), 0);
+    std::fill(begin(), full ? (begin() + node_values_capacity<T>::value) : end(), 0);
     size_ = 0;
   }
 
   bool operator==(const PTreeNode& other) const { return node_ == other.node_; }
+
+  const T* node() { return node_.get(); }
 
  private:
   node_ref<T> node_;

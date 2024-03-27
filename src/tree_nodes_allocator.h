@@ -20,15 +20,17 @@ concept check_node_size = (sizeof(T) == N);
 template <typename extra_header_type, typename tree_header_type, std::size_t entry_size>
 class TreeNodesAllocator {
  public:
+  static_assert(entry_size >= sizeof(HeapFreelistEntry));
+
   TreeNodesAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
 
   void Init() {
     auto* header = mutable_heap_header();
     header->start_offset = header_size();
     header->freelist_head = 0;
-    header->allocated_blocks = 0;
+    header->allocated_entries = 0;
     header->start_offset = header_size();
-    header->total_bytes = total_bytes();
+    header->total_bytes = initial_entries_total_bytes();
     auto* freelist_entry = get_mutable_entry<HeapFreelistEntry>(header->freelist_head.value());
     freelist_entry->count = entries_count();
     freelist_entry->init_zero = 0;
@@ -56,12 +58,13 @@ class TreeNodesAllocator {
         } else {
           auto* new_free = get_mutable_freelist_entry(current_index + count);
           new_free->next = current->next.value();
-          new_free->count = new_free->count.value() - count;
+          new_free->count = current->count.value() - count;
           if (current_index == heap_header()->freelist_head.value())
             mutable_heap_header()->freelist_head = static_cast<uint16_t>(current_index + count);
           else
             get_mutable_freelist_entry(prev_index)->next = current_index + count;
         }
+        mutable_heap_header()->allocated_entries += count;
         return get_mutable_entry<T>(current_index);
       }
       prev_index = current_index;
@@ -74,20 +77,20 @@ class TreeNodesAllocator {
     requires check_node_size<T, entry_size>
   {
     assert(count > 0 && node >= get_entry<T>(0) && (node + count - 1) <= get_entry<T>(entries_count() - 1));
-    uint32_t index = node - get_entry<T>(0);
+    mutable_heap_header()->allocated_entries -= count;
+    uint32_t index = static_cast<uint16_t>(node - get_entry<T>(0));
     uint32_t next_index;
     if (index < heap_header()->freelist_head.value()) {
       // our entry is before the freelist, so no prev
       next_index = heap_header()->freelist_head.value();
-      mutable_heap_header()->freelist_head = index;
+      mutable_heap_header()->freelist_head = static_cast<uint16_t>(index);
     } else {
       // try coallese with prev
-      uint32_t prev_index = 0;
-      for (uint32_t prev_index = heap_header()->freelist_head.value();
-           get_freelist_entry(prev_index)->next.value() < index;
+      uint32_t prev_index;
+      for (prev_index = heap_header()->freelist_head.value(); get_freelist_entry(prev_index)->next.value() < index;
            prev_index = get_freelist_entry(prev_index)->next.value())
         ;
-      auto* prev = get_mutable_freelist_entry(index);
+      auto* prev = get_mutable_freelist_entry(prev_index);
       next_index = prev->next.value();
       if (prev_index + prev->count.value() == index) {
         count += prev->count.value();
@@ -102,7 +105,7 @@ class TreeNodesAllocator {
     if (next_index != entries_count() && next_index == index + count) {
       auto* next = get_freelist_entry(next_index);
       new_freelist_entry->next = next->next.value();
-      new_freelist_entry->count = count + next->count.vlaue();
+      new_freelist_entry->count = count + next->count.value();
     } else {
       new_freelist_entry->count = count;
       new_freelist_entry->next = next_index;
@@ -146,7 +149,9 @@ class TreeNodesAllocator {
   }
 
  protected:
-  uint16_t initial_entries_total_bytes() const { return block_->size() - footer_size() - header_size(); }
+  uint16_t initial_entries_total_bytes() const {
+    return static_cast<uint16_t>(block_->size()) - footer_size() - header_size();
+  }
   uint16_t initial_entries_count() const { return initial_entries_total_bytes() / entry_size; }
   uint16_t total_bytes() const { return heap_header()->total_bytes.value(); }
   uint16_t entries_count() const { return total_bytes() / entry_size; }
@@ -169,7 +174,7 @@ class TreeNodesAllocator {
   constexpr uint16_t footer_size() const { return sizeof(tree_header_type) + sizeof(HeapHeader); }
   constexpr uint16_t header_size() const { return sizeof(MetadataBlockHeader) + sizeof(extra_header_type); }
   uint16_t footer_offset() const { return static_cast<uint16_t>(block_->size() - footer_size()); }
-  uint16_t heap_header_offset() const { return footer_offset() + sizeof(extra_header_type); }
+  uint16_t heap_header_offset() const { return footer_offset() + sizeof(tree_header_type); }
   uint16_t tree_header_offset() const { return footer_offset(); }
   uint16_t extra_header_offset() const { return sizeof(MetadataBlockHeader); }
 
