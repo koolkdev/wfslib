@@ -20,6 +20,7 @@ else()
 endif()
 
 option(BUILD_STATIC "Build static" OFF)
+option(BUILD_TESTS "Build the unit tests" OFF)
 
 add_library(${PROJECT_NAME}
     src/area.cpp
@@ -51,7 +52,7 @@ if(BUILD_STATIC AND MSVC)
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
-target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
@@ -82,4 +83,9 @@ endif()
 
 if(BUILD_STATIC AND NOT MSVC AND NOT APPLE)
     target_link_libraries(${PROJECT_NAME} PUBLIC -static-libstdc++ -static-libgcc)
+endif()
+
+if(BUILD_TESTS)
+    enable_testing()
+    add_subdirectory(tests)
 endif()

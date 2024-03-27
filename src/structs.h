@@ -250,19 +250,11 @@ struct FreeBlocksAllocatorHeader {
 static_assert(sizeof(FreeBlocksAllocatorHeader) == 0x10, "Incorrect sizeof FreeBLocksAllocatorHeader");
 
 // Header at the end of the block. Contains an array of entries of a constant size
-struct TreeSubBlockAllocatorHeader {
-  uint16_be_t freelist;      // Index of the freelist head entry
-  uint16_be_t allocated;     // How many entries are allocated
-  uint16_be_t start_offset;  // Where the array start in the bock
-  uint16_be_t total_bytse;   // The size of the array in bytes
-};
-static_assert(sizeof(TreeSubBlockAllocatorHeader) == 0x8, "Incorrect sizeof TreeSubBlockAllocatorHeader");
-
 struct HeapHeader {
-  uint16_be_t freelist_head;
-  uint16_be_t allocated_blocks;
-  uint16_be_t start_offset;
-  uint16_be_t total_bytes;
+  uint16_be_t freelist_head;      // Index of the freelist head entry
+  uint16_be_t allocated_entries;  // How many entries are allocated
+  uint16_be_t start_offset;       // Where the array start in the bock
+  uint16_be_t total_bytes;        // The size of the array in bytes
 };
 static_assert(sizeof(HeapHeader) == 0x8, "Incorrect sizeof HeapHeader");
 
