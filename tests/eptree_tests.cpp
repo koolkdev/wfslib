@@ -27,21 +27,26 @@ TEST_CASE("EPTree tests") {
   eptree.Init();
 
   SECTION("insert items sorted") {
-    for (uint32_t i = 0; i < 600 * 300; ++i) {
+    constexpr int kItemsCount = 600 * 300;
+    for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(eptree.insert({i, i + 1}));
     }
 
     REQUIRE(eptree.tree_header()->depth.value() == 3);
 
-    // Check the values
-    for (auto [i, extent] : std::views::enumerate(eptree)) {
-      REQUIRE(extent.key == static_cast<uint32_t>(i));
-      REQUIRE(extent.value == static_cast<uint32_t>(i + 1));
-    }
+    REQUIRE(std::ranges::equal(
+        std::views::transform(eptree,
+                              [](const RTree::iterator::value_type& extent) -> std::pair<uint32_t, uint32_t> {
+                                return {extent.key, extent.value};
+                              }),
+        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
+          return {i, i + 1};
+        })));
   }
 
   SECTION("insert items unsorted") {
-    auto unsorted_keys = createShuffledKeysArray<600 * 300>();
+    constexpr int kItemsCount = 600 * 300;
+    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
     for (auto key : unsorted_keys) {
       REQUIRE(eptree.insert({key, key + 1}));
     }
@@ -51,14 +56,20 @@ TEST_CASE("EPTree tests") {
         std::views::transform(eptree, [](const RTree::iterator::value_type& extent) -> uint32_t { return extent.key; });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
-    std::vector<uint32_t> sorted_keys2 = keys | std::ranges::to<std::vector>();
-    std::ranges::sort(sorted_keys2);
     REQUIRE(std::ranges::equal(sorted_keys, keys));
 
     // Check the values
-    for (auto [i, extent] : std::views::enumerate(eptree)) {
-      REQUIRE(extent.key == static_cast<uint32_t>(i));
-      REQUIRE(extent.value == static_cast<uint32_t>(i + 1));
+    REQUIRE(std::ranges::equal(
+        std::views::transform(eptree,
+                              [](const RTree::iterator::value_type& extent) -> std::pair<uint32_t, uint32_t> {
+                                return {extent.key, extent.value};
+                              }),
+        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
+          return {i, i + 1};
+        })));
+
+    for (uint32_t i = 0; i < kItemsCount; ++i) {
+      REQUIRE(eptree.find(i, true)->key == i);
     }
   }
 
