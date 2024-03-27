@@ -72,7 +72,13 @@ jobs:
         shell: bash
         if: matrix.platform == 'macos-13'
 
-      - name: Run cmake
+      - name: Build
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "tests"
+          buildPreset: "${{matrix.config}}-tests"
+
+      - name: Run tests
         uses: lukka/run-cmake@v10
         with:
           configurePreset: "tests"
