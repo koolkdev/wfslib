@@ -75,5 +75,5 @@ jobs:
       - name: Run cmake
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "default"
+          configurePreset: "tests"
           testPreset: "run-${{matrix.config}}-tests"
