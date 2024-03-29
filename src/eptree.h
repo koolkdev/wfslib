@@ -12,31 +12,7 @@
 #include <vector>
 
 #include "free_blocks_allocator.h"
-#include "ptree.h"
-#include "structs.h"
-#include "tree_nodes_allocator.h"
-
-class FreeBlocksAllocator;
-
-template <>
-PTreeNode<RTreeLeaf_details>::const_iterator split_point(
-    const PTreeNode<RTreeLeaf_details>& node,
-    const typename PTreeNode<RTreeLeaf_details>::const_iterator& pos,
-    key_type& split_key);
-
-static_assert(sizeof(PTreeNode_details) == sizeof(RTreeLeaf_details));
-using EPTreeBlock = TreeNodesAllocator<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(PTreeNode_details)>;
-
-class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlock> {
- public:
-  RTree(std::shared_ptr<MetadataBlock> block)
-      : PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlock>(std::move(block)) {}
-
-  PTreeHeader* mutable_header() override { return &mutable_tree_header()->current_tree; }
-  const PTreeHeader* header() const override { return &tree_header()->current_tree; }
-
-  void Init(uint8_t depth);
-};
+#include "rtree.h"
 
 class EPTreeConstIterator {
  public:
@@ -140,9 +116,6 @@ class EPTree : public EPTreeBlock {
   iterator find(key_type key, bool exact_match = true) { return find_impl(key, exact_match); }
   const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
 
-  reverse_iterator rfind(key_type key, bool exact_match = true) { return rfind_impl(key, exact_match); }
-  const_reverse_iterator rfind(key_type key, bool exact_match = true) const { return rfind_impl(key, exact_match); }
-
   bool insert(const iterator::value_type& key_value);
   bool insert(const RTree::const_iterator& it_start, const RTree::const_iterator& it_end);
   void erase(const const_iterator& pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete);
@@ -154,7 +127,6 @@ class EPTree : public EPTreeBlock {
   iterator begin_impl() const;
   iterator end_impl() const;
   iterator find_impl(key_type key, bool exact_match = true) const;
-  reverse_iterator rfind_impl(key_type key, bool exact_match = true) const;
 
   FreeBlocksAllocator* allocator_;
 };

@@ -16,33 +16,7 @@
 #include <type_traits>
 
 #include "free_blocks_allocator.h"
-#include "ptree.h"
-#include "structs.h"
-#include "tree_nodes_allocator.h"
-
-template <>
-PTreeNode<FTreeLeaf_details>::const_iterator split_point(
-    const PTreeNode<FTreeLeaf_details>& node,
-    const typename PTreeNode<FTreeLeaf_details>::const_iterator& pos,
-    key_type& split_key);
-
-static_assert(sizeof(PTreeNode_details) == sizeof(FTreeLeaf_details));
-using FTreesBlock = TreeNodesAllocator<FTreesBlockHeader, FTreesFooter, sizeof(PTreeNode_details)>;
-
-class FTree : public PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlock> {
- public:
-  FTree(std::shared_ptr<MetadataBlock> block, size_t block_size_index)
-      : PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlock>(std::move(block)),
-        block_size_index_(block_size_index) {}
-
-  PTreeHeader* mutable_header() override { return &mutable_tree_header()->trees[block_size_index_]; }
-  const PTreeHeader* header() const override { return &tree_header()->trees[block_size_index_]; }
-
-  size_t index() const { return block_size_index_; }
-
- private:
-  size_t block_size_index_;
-};
+#include "ftree.h"
 
 class FreeBlocksExtent {
  public:
@@ -71,7 +45,8 @@ class FreeBlocksExtentRef : public FreeBlocksExtent {
   FreeBlocksExtentRef(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
       : FreeBlocksExtent(std::move(key_value), bucket_index) {}
 
-  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value() { return key_value_; }
+  PTreeNodeIteratorValueRef<FTreeLeaf_details>& key_value() & { return key_value_; }
+  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value() && { return key_value_; }
 };
 
 template <typename ftree_info_type>
@@ -216,79 +191,23 @@ class FTrees {
 
   bool empty() const { return size() == 0; }
 
-  template <typename Iterator>
-    requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, reverse_iterator>
-  Iterator tbegin() const {
-    std::array<typename Iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-    std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                   [](const FTree& cftree) -> typename Iterator::ftree_info {
-                     // We will convert the iterator back to const iterator if needed
-                     auto& ftree = const_cast<FTree&>(cftree);
-                     if constexpr (std::is_same_v<Iterator, reverse_iterator>) {
-                       return {ftree, ftree.rbegin()};
-                     } else {
-                       return {ftree, ftree.begin()};
-                     }
-                   });
-    auto index = Iterator::find_next_extent_index(ftrees_info);
-    return {std::move(ftrees_info), index};
-  }
-
-  template <typename Iterator>
-    requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, reverse_iterator>
-  Iterator tend() const {
-    std::array<typename Iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-    std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                   [](const FTree& cftree) -> typename Iterator::ftree_info {
-                     auto& ftree = const_cast<FTree&>(cftree);
-                     if constexpr (std::is_same_v<Iterator, reverse_iterator>) {
-                       return {ftree, ftree.rend()};
-                     } else {
-                       return {ftree, ftree.end()};
-                     }
-                   });
-    return {std::move(ftrees_info), 0};
-  }
-
-  template <typename Iterator>
-    requires std::is_same_v<Iterator, iterator> || std::is_same_v<Iterator, reverse_iterator>
-  Iterator tfind(key_type key) const {
-    std::array<typename Iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-    std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                   [key](const FTree& cftree) -> typename Iterator::ftree_info {
-                     auto& ftree = const_cast<FTree&>(cftree);
-                     auto it = ftree.find(key, false);
-                     if constexpr (std::is_same_v<Iterator, reverse_iterator>) {
-                       return {ftree, FTree::reverse_iterator{std::move(it)}};
-                     } else {
-                       // We want the iterator to be AFTER the search point
-                       if (!it.is_end() && it->key != key)
-                         ++it;
-                       return {ftree, std::move(it)};
-                     }
-                   });
-    // Finding the minimum will give us the closest point above the key
-    auto index = Iterator::find_next_extent_index(ftrees_info);
-    return {std::move(ftrees_info), index};
-  }
-
-  iterator begin() { return tbegin<iterator>(); }
-  iterator end() { return tend<iterator>(); }
-  const_iterator begin() const { return tbegin<iterator>(); }
-  const_iterator end() const { return tend<iterator>(); }
+  iterator begin() { return begin_impl(); }
+  iterator end() { return end_impl(); }
+  const_iterator begin() const { return begin_impl(); }
+  const_iterator end() const { return end_impl(); }
 
   auto cbegin() const { return begin(); }
   auto cend() const { return end(); }
 
-  reverse_iterator rbegin() { return tbegin<reverse_iterator>(); }
-  reverse_iterator rend() { return tend<reverse_iterator>(); }
-  const_reverse_iterator rbegin() const { return tbegin<reverse_iterator>(); }
-  const_reverse_iterator rend() const { return tend<reverse_iterator>(); }
+  reverse_iterator rbegin() { return rbegin_impl(); }
+  reverse_iterator rend() { return rend_impl(); }
+  const_reverse_iterator rbegin() const { return rbegin_impl(); }
+  const_reverse_iterator rend() const { return rend_impl(); }
 
-  auto find(key_type key) { return tfind<iterator>(key); }
-  auto rfind(key_type key) { return tfind<reverse_iterator>(key); }
-  auto find(key_type key) const { return tfind<iterator>(key); }
-  auto rfind(key_type key) const { return tfind<reverse_iterator>(key); }
+  auto find(key_type key) { return find_impl(key); }
+  auto rfind(key_type key) { return rfind_impl(key); }
+  auto find(key_type key) const { return find_impl(key); }
+  auto rfind(key_type key) const { return rfind_impl(key); }
 
   void split(FTrees& left, FTrees& right, key_type& split_point_key);
 
@@ -300,6 +219,13 @@ class FTrees {
                                                                std::index_sequence<Is...>) {
     return {{{block, Is}...}};
   }
+
+  iterator begin_impl() const;
+  reverse_iterator rbegin_impl() const;
+  iterator end_impl() const;
+  reverse_iterator rend_impl() const;
+  iterator find_impl(key_type key) const;
+  reverse_iterator rfind_impl(key_type key) const;
 
   std::array<FTree, kSizeBucketsCount> ftrees_;
 };

@@ -35,12 +35,15 @@ add_library(${PROJECT_NAME}
     src/file.cpp
     src/file_device.cpp
     src/free_blocks_allocator.cpp
+    src/free_blocks_tree.cpp
     src/free_blocks_tree_bucket.cpp
+    src/ftree.cpp
     src/ftrees.cpp
     src/key_file.cpp
     src/metadata_block.cpp
     src/ptree.cpp
     src/recovery.cpp
+    src/rtree.cpp
     src/structs.cpp
     src/sub_block_allocator.cpp
     src/wfs.cpp
