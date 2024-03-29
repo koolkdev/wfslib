@@ -40,6 +40,7 @@ struct FreeBlocksRangeInfo {
 class FreeBlocksAllocator {
  public:
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
+  virtual ~FreeBlocksAllocator() = default;
 
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);
@@ -57,11 +58,11 @@ class FreeBlocksAllocator {
   // Return whether any part of the block is freed
   bool IsRangeIsFree(FreeBlocksRangeInfo range);
 
-  std::shared_ptr<MetadataBlock> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
+  virtual std::shared_ptr<MetadataBlock> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
 
   std::shared_ptr<MetadataBlock> root_block() const { return block_; }
 
- private:
+ protected:
   bool AllocBlocksOfSpecificSize(uint32_t blocks_count,
                                  size_t size_index,
                                  size_t max_size_index,
@@ -80,6 +81,7 @@ class FreeBlocksAllocator {
   const FreeBlocksAllocatorHeader* header();
   FreeBlocksAllocatorHeader* mutable_header();
 
+ private:
   std::shared_ptr<Area> area_;
   std::shared_ptr<MetadataBlock> block_;
 };

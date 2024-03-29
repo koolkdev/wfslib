@@ -27,6 +27,9 @@ jobs:
             compiler: msvc
           - platform: macos-13
             compiler: gcc
+          # Temporary until gcc-14
+          - platform: ubuntu-latest
+            compiler: gcc
     runs-on: ${{matrix.platform}}
 
     steps:
@@ -41,8 +44,8 @@ jobs:
 
       - name: Set gcc
         run: |
-          echo "CC=gcc-13" >> $GITHUB_ENV
-          echo "CXX=g++-13" >> $GITHUB_ENV
+          echo "CC=gcc-14" >> $GITHUB_ENV
+          echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
 
@@ -72,8 +75,15 @@ jobs:
         shell: bash
         if: matrix.platform == 'macos-13'
 
-      - name: Run cmake
+      - name: Build
         uses: lukka/run-cmake@v10
         with:
-          configurePreset: "default"
-          buildPreset: "${{matrix.config}}"
+          configurePreset: "tests"
+          buildPreset: "${{matrix.config}}-tests"
+
+      - name: Run tests
+        uses: lukka/run-cmake@v10
+        with:
+          configurePreset: "tests"
+          testPreset: "run-${{matrix.config}}-tests"
+        if: matrix.config == 'release'
