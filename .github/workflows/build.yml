@@ -27,8 +27,9 @@ jobs:
             compiler: msvc
           - platform: macos-13
             compiler: gcc
-          - platform: ubuntu-latest # TEMP
-            compiler: gcc # TEMP
+          # Temporary until gcc-14
+          - platform: ubuntu-latest
+            compiler: gcc
     runs-on: ${{matrix.platform}}
 
     steps:
