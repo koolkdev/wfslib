@@ -81,8 +81,7 @@ struct PTreeNodeIteratorValue {
   typename node_value_type<T>::type value;
 
   auto operator<=>(const PTreeNodeIteratorValue& other) const {
-    auto res = key <=> other.key;
-    if (res != 0)
+    if (const auto res = key <=> other.key; res != 0)
       return res;
     return value <=> other.value;
   }
@@ -187,8 +186,7 @@ class PTreeNodeConstIterator {
   }
 
   auto operator<=>(const PTreeNodeConstIterator& other) const {
-    const auto res = node() <=> other.node();
-    if (res != 0)
+    if (const auto res = node() <=> other.node(); res != 0)
       return res;
     return index() <=> other.index();
   }
