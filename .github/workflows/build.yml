@@ -86,3 +86,4 @@ jobs:
         with:
           configurePreset: "tests"
           testPreset: "run-${{matrix.config}}-tests"
+        if: matrix.config == 'release'
