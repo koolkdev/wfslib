@@ -19,8 +19,8 @@ concept check_node_size = (sizeof(T) == N);
 
 template <typename ExtraHeaderType, typename TreeHeaderType, std::size_t EntrySize>
 struct TreeNodesAllocatorArgs {
-  using extra_header_type = typename ExtraHeaderType;
-  using tree_header_type = typename TreeHeaderType;
+  using extra_header_type = ExtraHeaderType;
+  using tree_header_type = TreeHeaderType;
   constexpr static std::size_t entry_size = EntrySize;
 };
 

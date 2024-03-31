@@ -124,6 +124,10 @@ struct node_item_ref {
     node_value_ref<T> value;
   };
 
+  node_item_ref() = default;
+  node_item_ref(const node_item_ref& other) = default;
+  node_item_ref(node_item_ref&& other) = default;
+
   node_item_ref& operator=(const node_item_ref& other) {
     key = other.key;
     value = other.value;
@@ -180,7 +184,7 @@ class PTreeNodeConstIterator {
 
   PTreeNodeConstIterator() = default;
   PTreeNodeConstIterator(node_ref node, size_t index)
-      : PTreeNodeConstIterator({node.block, node.offset, node.extra_info, index}) {}
+      : PTreeNodeConstIterator(node_item_ref_base{node.block, node.offset, node.extra_info, index}) {}
   PTreeNodeConstIterator(node_item_ref_base node_item) : node_item_(node_item) {
     assert(node_item_.index <= node_values_capacity<T>::value);
   }
@@ -233,12 +237,12 @@ class PTreeNodeConstIterator {
   }
 
   difference_type operator-(const PTreeNodeConstIterator& other) const {
-    assert(node_item_.get<T>() == other.node_item_.get<T>());
+    assert(node_item_.get<T>() == other.node_item_.template get<T>());
     return static_cast<difference_type>(node_item_.index) - static_cast<difference_type>(other.node_item_.index);
   }
 
   auto operator<=>(const PTreeNodeConstIterator& other) const {
-    if (const auto res = node_item_.get<T>() <=> other.node_item_.get<T>(); res != 0)
+    if (const auto res = node_item_.get<T>() <=> other.node_item_.template get<T>(); res != 0)
       return res;
     return node_item_.index <=> other.node_item_.index;
   }
