@@ -183,8 +183,7 @@ class PTreeNodeConstIterator {
   using pointer = const_pointer;
 
   PTreeNodeConstIterator() = default;
-  PTreeNodeConstIterator(node_ref node, size_t index)
-      : PTreeNodeConstIterator(node_item_ref_base{node.block, node.offset, node.extra_info, index}) {}
+  PTreeNodeConstIterator(node_ref node, size_t index) : PTreeNodeConstIterator(node_item_ref_base{node, index}) {}
   PTreeNodeConstIterator(node_item_ref_base node_item) : node_item_(node_item) {
     assert(node_item_.index <= node_values_capacity<T>::value);
   }
