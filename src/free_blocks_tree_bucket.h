@@ -19,11 +19,11 @@ class FreeBlocksTreeBucketConstIterator {
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = int;
 
-  using value_type = FreeBlocksExtent;
-  using ref_type = FreeBlocksExtentRef;
+  using value_type = FTrees::const_iterator::value_type;
+  using ref_type = FTrees::const_iterator::ref_type;
 
-  using const_reference = value_type;
-  using const_pointer = const ref_type*;
+  using const_reference = FTrees::const_iterator::const_reference;
+  using const_pointer = FTrees::const_iterator::const_pointer;
 
   using reference = const_reference;
   using pointer = const_pointer;
@@ -41,11 +41,8 @@ class FreeBlocksTreeBucketConstIterator {
         eptree_(std::move(eptree)),
         ftree_(std::move(ftree)) {}
 
-  reference operator*() const { return {*ftree_.iterator, block_size_index_}; }
-  pointer operator->() const {
-    const_cast<FreeBlocksTreeBucketConstIterator*>(this)->extent_ = {*ftree_.iterator, block_size_index_};
-    return &extent_;
-  }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return reinterpret_cast<pointer>(ftree_.iterator.operator->()); }
 
   FreeBlocksTreeBucketConstIterator& operator++();
   FreeBlocksTreeBucketConstIterator& operator--();
@@ -69,8 +66,6 @@ class FreeBlocksTreeBucketConstIterator {
  private:
   FreeBlocksAllocator* allocator_;
   size_t block_size_index_;
-
-  FreeBlocksExtentRef extent_;
 
   eptree_node_info eptree_;
   ftree_node_info ftree_;
@@ -100,8 +95,8 @@ class FreeBlocksTreeBucketIterator : public FreeBlocksTreeBucketConstIterator {
                                ftree_node_info ftree)
       : base(allocator, block_size_index, std::move(eptree), std::move(ftree)) {}
 
-  reference operator*() const { return *base::operator->(); }
-  pointer operator->() const { return const_cast<pointer>(base::operator->()); }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return const_cast<pointer>(base::operator->()); }
 
   FreeBlocksTreeBucketIterator& operator++();
   FreeBlocksTreeBucketIterator& operator--();

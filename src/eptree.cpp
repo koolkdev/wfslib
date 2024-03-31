@@ -79,7 +79,6 @@ EPTreeIterator EPTreeIterator::operator--(int) {
 }
 
 void EPTree::Init() {
-  EPTreeBlock::Init();
   RTree{block()}.Init(1);
 }
 

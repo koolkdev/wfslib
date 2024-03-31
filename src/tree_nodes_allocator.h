@@ -17,9 +17,31 @@ struct SubBlockAllocatorStruct;
 template <typename T, size_t N>
 concept check_node_size = (sizeof(T) == N);
 
+template <typename ExtraHeaderType, typename TreeHeaderType, std::size_t EntrySize>
+struct TreeNodesAllocatorArgs {
+  using extra_header_type = ExtraHeaderType;
+  using tree_header_type = TreeHeaderType;
+  constexpr static std::size_t entry_size = EntrySize;
+};
+
+template <typename T>
+struct is_tree_nodes_allocator_args : std::false_type {};
+
 template <typename extra_header_type, typename tree_header_type, std::size_t entry_size>
+struct is_tree_nodes_allocator_args<TreeNodesAllocatorArgs<extra_header_type, tree_header_type, entry_size>>
+    : std::true_type {};
+
+template <typename T>
+constexpr bool is_tree_nodes_allocator_args_v = is_tree_nodes_allocator_args<T>::value;
+
+template <typename Args>
+  requires is_tree_nodes_allocator_args_v<Args>
 class TreeNodesAllocator {
  public:
+  using extra_header_type = typename Args::extra_header_type;
+  using tree_header_type = typename Args::tree_header_type;
+  constexpr static std::size_t entry_size = Args::entry_size;
+
   static_assert(entry_size >= sizeof(HeapFreelistEntry));
 
   TreeNodesAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
@@ -171,12 +193,13 @@ class TreeNodesAllocator {
   HeapFreelistEntry* get_mutable_freelist_entry(uint32_t index) { return get_mutable_entry<HeapFreelistEntry>(index); }
   const HeapFreelistEntry* get_freelist_entry(uint32_t index) const { return get_entry<HeapFreelistEntry>(index); }
 
+  constexpr std::size_t get_entry_size() const { return entry_size; }
   constexpr uint16_t footer_size() const { return sizeof(tree_header_type) + sizeof(HeapHeader); }
   constexpr uint16_t header_size() const { return sizeof(MetadataBlockHeader) + sizeof(extra_header_type); }
   uint16_t footer_offset() const { return static_cast<uint16_t>(block_->size() - footer_size()); }
-  uint16_t heap_header_offset() const { return footer_offset() + sizeof(tree_header_type); }
-  uint16_t tree_header_offset() const { return footer_offset(); }
-  uint16_t extra_header_offset() const { return sizeof(MetadataBlockHeader); }
+  constexpr uint16_t heap_header_offset() const { return footer_offset() + sizeof(tree_header_type); }
+  constexpr uint16_t tree_header_offset() const { return footer_offset(); }
+  constexpr uint16_t extra_header_offset() const { return sizeof(MetadataBlockHeader); }
 
   HeapHeader* mutable_heap_header() { return block_->template get_mutable_object<HeapHeader>(heap_header_offset()); }
   const HeapHeader* heap_header() const { return block_->template get_object<HeapHeader>(heap_header_offset()); }

@@ -28,9 +28,11 @@ struct DummyEntry {
 
 }  // namespace
 
-class DummyAllocatorBlock : public TreeNodesAllocator<DummyExtraHeader, DummyExtraHeader, sizeof(DummyEntry)> {
+using DummyAllocatorBlockArgs = TreeNodesAllocatorArgs<DummyExtraHeader, DummyExtraHeader, sizeof(DummyEntry)>;
+
+class DummyAllocatorBlock : public TreeNodesAllocator<DummyAllocatorBlockArgs> {
  public:
-  using base = TreeNodesAllocator<DummyExtraHeader, DummyExtraHeader, sizeof(DummyEntry)>;
+  using base = TreeNodesAllocator<DummyAllocatorBlockArgs>;
 
   DummyAllocatorBlock(std::shared_ptr<MetadataBlock> block) : base(std::move(block)) {}
 
@@ -38,7 +40,7 @@ class DummyAllocatorBlock : public TreeNodesAllocator<DummyExtraHeader, DummyExt
   const HeapFreelistEntry* get_freelist_entry(uint32_t index) const { return base::get_freelist_entry(index); }
 };
 
-TEST_CASE("TreeNodesAllocator tests", "[TreeNodesAllocator]") {
+TEST_CASE("TreeNodesAllocatorTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto block = TestMetadataBlock::LoadBlock(test_device, 0);
   DummyAllocatorBlock allocator{block};
