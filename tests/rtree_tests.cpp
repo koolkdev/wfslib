@@ -18,7 +18,7 @@
 #include "test_metadata_block.h"
 #include "test_utils.h"
 
-TEST_CASE("RTree tests") {
+TEST_CASE("RTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto rtree_block = TestMetadataBlock::LoadBlock(test_device, 0);
   RTree rtree{rtree_block};

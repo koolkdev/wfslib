@@ -34,7 +34,7 @@ class EPTreeConstIterator {
       : allocator_(allocator), nodes_(std::move(nodes)) {}
 
   reference operator*() const { return *nodes_.back().iterator; }
-  pointer operator->() const { return nodes_.back().iterator.operator->(); }
+  pointer operator->() const& { return nodes_.back().iterator.operator->(); }
 
   EPTreeConstIterator& operator++();
   EPTreeConstIterator& operator--();
@@ -78,7 +78,7 @@ class EPTreeIterator : public EPTreeConstIterator {
   EPTreeIterator(FreeBlocksAllocator* allocator, std::vector<node_info> nodes) : base(allocator, std::move(nodes)) {}
 
   reference operator*() const { return *nodes().back().iterator; }
-  pointer operator->() const { return nodes().back().iterator.operator->(); }
+  pointer operator->() const& { return nodes().back().iterator.operator->(); }
 
   EPTreeIterator& operator++();
   EPTreeIterator& operator--();

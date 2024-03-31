@@ -18,36 +18,22 @@
 #include "free_blocks_allocator.h"
 #include "ftree.h"
 
-class FreeBlocksExtent {
- public:
-  FreeBlocksExtent() = default;
-  FreeBlocksExtent(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
-      : key_value_(std::move(key_value)), bucket_index_(bucket_index) {}
+struct free_blocks_extent_ref {
+  union {
+    node_key_ref<FTreeLeaf_details> key;
+    node_value_ref<FTreeLeaf_details> value;
+    const extra_info_ref<size_t> bucket_index;
+  };
 
-  uint32_t block_number() const { return key_value_.key; }
+  uint32_t block_number() const { return key; }
   uint32_t blocks_count() const {
-    return (static_cast<uint32_t>(static_cast<nibble>(key_value_.value)) + 1) << kSizeBuckets[bucket_index_];
+    return (static_cast<uint32_t>(static_cast<nibble>(value)) + 1) << kSizeBuckets[bucket_index];
   }
   uint32_t end_block_number() const { return block_number() + blocks_count(); }
-  size_t bucket_index() const { return bucket_index_; }
-  const PTreeNodeIteratorValue<FTreeLeaf_details> key_value() const { return key_value_; }
 
-  operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index()}; }
-
- protected:
-  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value_;
-  size_t bucket_index_;
+  operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index}; }
 };
-
-class FreeBlocksExtentRef : public FreeBlocksExtent {
- public:
-  FreeBlocksExtentRef() = default;
-  FreeBlocksExtentRef(PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value, size_t bucket_index)
-      : FreeBlocksExtent(std::move(key_value), bucket_index) {}
-
-  PTreeNodeIteratorValueRef<FTreeLeaf_details>& key_value() & { return key_value_; }
-  PTreeNodeIteratorValueRef<FTreeLeaf_details> key_value() && { return key_value_; }
-};
+static_assert(sizeof(free_blocks_extent_ref) == sizeof(node_item_ref<FTreeLeaf_details>));
 
 template <typename ftree_info_type>
 class FTreesConstIteratorBase {
@@ -55,10 +41,10 @@ class FTreesConstIteratorBase {
   using iterator_category = std::forward_iterator_tag;
   using difference_type = int;
 
-  using value_type = FreeBlocksExtent;
-  using ref_type = FreeBlocksExtentRef;
+  using value_type = free_blocks_extent_ref;
+  using ref_type = free_blocks_extent_ref;
 
-  using const_reference = value_type;
+  using const_reference = const ref_type;
   using const_pointer = const ref_type*;
 
   using reference = const_reference;
@@ -70,11 +56,8 @@ class FTreesConstIteratorBase {
   FTreesConstIteratorBase(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index)
       : ftrees_(std::move(ftrees)), index_(index) {}
 
-  reference operator*() const { return {*ftrees_[index_].iterator, index_}; }
-  pointer operator->() const {
-    const_cast<FTreesConstIteratorBase*>(this)->extent_ = {*ftrees_[index_].iterator, index_};
-    return &extent_;
-  }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return reinterpret_cast<pointer>(ftrees_[index_].iterator.operator->()); }
 
   FTreesConstIteratorBase& operator++() {
     assert(!is_end());
@@ -122,8 +105,6 @@ class FTreesConstIteratorBase {
  private:
   std::array<ftree_info, kSizeBucketsCount> ftrees_;
   size_t index_{0};
-
-  FreeBlocksExtentRef extent_;
 };
 
 template <typename ftree_info_type>
@@ -134,7 +115,6 @@ class FTreesIteratorBase : public FTreesConstIteratorBase<ftree_info_type> {
   using iterator_category = std::forward_iterator_tag;
   using difference_type = int;
 
-  using value_type = base::value_type;
   using ref_type = base::ref_type;
 
   using reference = ref_type;
@@ -145,8 +125,8 @@ class FTreesIteratorBase : public FTreesConstIteratorBase<ftree_info_type> {
   FTreesIteratorBase() = default;
   FTreesIteratorBase(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index) : base(std::move(ftrees), index) {}
 
-  reference operator*() const { return *base::operator->(); }
-  pointer operator->() const { return const_cast<pointer>(base::operator->()); }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return const_cast<pointer>(base::operator->()); }
 
   FTreesIteratorBase& operator++() {
     base::operator++();

@@ -18,7 +18,7 @@
 #include "test_metadata_block.h"
 #include "test_utils.h"
 
-TEST_CASE("EPTree tests") {
+TEST_CASE("EPTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto allocator_block = TestMetadataBlock::LoadBlock(test_device, 0);
   TestFreeBlocksAllocator allocator{allocator_block, test_device};

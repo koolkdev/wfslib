@@ -38,8 +38,8 @@ class FreeBlocksTreeConstIteratorBase {
   FreeBlocksTreeConstIteratorBase(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
       : allocator_(allocator), eptree_(std::move(eptree)), ftrees_(std::move(ftrees)) {}
 
-  reference operator*() const { return *ftrees_.iterator; }
-  pointer operator->() const { return ftrees_.iterator.operator->(); }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return reinterpret_cast<pointer>(ftrees_.iterator.operator->()); }
 
   FreeBlocksTreeConstIteratorBase& operator++() {
     assert(!is_end());
@@ -109,8 +109,8 @@ class FreeBlocksTreeIteratorBase
   FreeBlocksTreeIteratorBase(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
       : base(allocator, std::move(eptree), std::move(ftrees)) {}
 
-  reference operator*() const { return *base::ftrees().iterator; }
-  pointer operator->() const { return base::ftrees().iterator.operator->(); }
+  reference operator*() const { return *operator->(); }
+  pointer operator->() const& { return const_cast<pointer>(base::operator->()); }
 
   FreeBlocksTreeIteratorBase& operator++() {
     base::operator++();

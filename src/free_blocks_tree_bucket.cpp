@@ -74,7 +74,7 @@ FreeBlocksTreeBucketIterator FreeBlocksTreeBucketIterator::operator--(int) {
 
 bool FreeBlocksTreeBucket::insert(FTree::iterator::value_type key_val) {
   auto pos = find_for_insert(key_val.key);
-  if (!pos.is_end() && pos->key_value().key == key_val.key) {
+  if (!pos.is_end() && pos->key == key_val.key) {
     // already in tree
     return false;
   }
@@ -129,11 +129,12 @@ bool FreeBlocksTreeBucket::insert(iterator& pos, FTree::iterator::value_type key
 
 void FreeBlocksTreeBucket::erase(iterator pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete) {
   pos.ftree().node->erase(pos.ftree().iterator);
+  // Check for FTrees deletion, we never delete the first FTree (key zero)
   if (!pos.ftree().node->empty() || !pos.eptree().iterator->key) {
     return;
   }
   if (FTrees(pos.ftree().node->block()).empty()) {
-    // The FTRee is the first block for deletion
+    // The FTree is the first block for deletion
     blocks_to_delete.push_back({pos.eptree().iterator->value, 1});
     pos.eptree().node->erase(pos.eptree().iterator, blocks_to_delete);
   }

@@ -155,7 +155,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
              sub_range.blocks_count / size_blocks_count <= 0x10);
       auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
       if (join_before && sub_range.block_number == range_in_size.block_number) {
-        join_before_iter->key_value().value = new_value;
+        join_before_iter->value = new_value;
       } else {
         // Don't use pos to insert because:
         // 1. Our find may go back so it isn't the exact location to insert it.
@@ -356,7 +356,7 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   std::vector<range_and_extents> ranges;
   std::optional<range_and_extents> selected_range;
   for (const auto& extent : std::ranges::subrange(tree.rbegin(), tree.rend())) {
-    if (extent.bucket_index() < size_index)
+    if (extent.bucket_index < size_index)
       continue;
     if (!ranges.empty() && ranges.back().first.block_number == extent.end_block_number()) {
       ranges.back().first.blocks_count += extent.blocks_count();

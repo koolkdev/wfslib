@@ -243,7 +243,7 @@ class TreeReverseIterator : public std::reverse_iterator<T> {
     requires std::convertible_to<It, T>
   TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
 
-  typename T::pointer operator->() const {
+  typename T::pointer operator->() const& {
     T tmp(std::reverse_iterator<T>::base());
     --tmp;
     // We need to store the value for the ref.
