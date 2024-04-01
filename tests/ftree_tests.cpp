@@ -36,13 +36,13 @@ TEST_CASE("FTreeTests") {
   SECTION("insert and erase sorted item") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees[0].insert({i, nibble{i % 16}}));
+      REQUIRE(ftrees[0].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     // Tree should fill now
-    int inserted = 0;
+    uint32_t inserted = 0;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      inserted += ftrees[1].insert({i, nibble{i % 16}}) ? 1 : 0;
+      inserted += ftrees[1].insert({i, static_cast<nibble>(i % 16)}) ? 1 : 0;
     }
     REQUIRE(inserted < kItemsCount);
 
@@ -66,7 +66,7 @@ TEST_CASE("FTreeTests") {
                               [](const FTree::iterator::value_type& extent) -> std::pair<uint32_t, nibble> {
                                 return {extent.key, extent.value};
                               }),
-        std::views::transform(std::views::iota(0, inserted), [](int i) -> std::pair<uint32_t, nibble> {
+        std::views::transform(std::views::iota(uint32_t{0}, inserted), [](int i) -> std::pair<uint32_t, nibble> {
           return {i, static_cast<nibble>(i % 16)};
         })));
 
@@ -75,7 +75,7 @@ TEST_CASE("FTreeTests") {
 
     // Should be able to fill ftrees[2] now
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees[2].insert({i, nibble{i % 16}}));
+      REQUIRE(ftrees[2].insert({i, static_cast<nibble>(i % 16)}));
     }
     REQUIRE(ftrees[2].size() == kItemsCount);
   }
@@ -83,7 +83,7 @@ TEST_CASE("FTreeTests") {
   SECTION("insert compact") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees[0].insert({i, nibble{i % 16}}));
+      REQUIRE(ftrees[0].insert({i, static_cast<nibble>(i % 16)}));
     }
     REQUIRE(ftrees[0].size() == kItemsCount);
 
@@ -93,11 +93,11 @@ TEST_CASE("FTreeTests") {
 
     // Check that the tree is completly identical and valid.
     REQUIRE(ftree.size() == kItemsCount);
-    REQUIRE(std::distance(ftree.begin(), ftree.end()) == ftree.size());
+    REQUIRE(std::distance(ftree.begin(), ftree.end()) == kItemsCount);
     REQUIRE(std::ranges::equal(ftrees[0], ftree));
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(ftree.find(i)->key == i);
-      REQUIRE(ftree.find(i)->value == nibble{i % 16});
+      REQUIRE(ftree.find(i)->value == static_cast<nibble>(i % 16));
     }
   }
 }
