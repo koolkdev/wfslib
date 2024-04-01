@@ -29,7 +29,7 @@ TEST_CASE("FTreeTests") {
                 std::ranges::to<std::vector>();
 
   SECTION("Check empty ftree size") {
-    for (int i = 0; i < kSizeBucketsCount; ++i)
+    for (size_t i = 0; i < kSizeBucketsCount; ++i)
       REQUIRE(ftrees[i].size() == 0);
   }
 

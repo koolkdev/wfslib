@@ -184,8 +184,9 @@ TEST_CASE("FTreesTests") {
     REQUIRE(std::ranges::size(new_ftrees[0]) == split_point);
     REQUIRE(std::ranges::size(new_ftrees[1]) == kItemsCount - split_point);
 
-    REQUIRE(std::ranges::distance(new_ftrees[0].begin(), new_ftrees[0].end()) == size_t{split_point});
-    REQUIRE(std::ranges::distance(new_ftrees[1].begin(), new_ftrees[1].end()) == size_t{kItemsCount - split_point});
+    REQUIRE(std::ranges::distance(new_ftrees[0].begin(), new_ftrees[0].end()) == static_cast<int>(split_point));
+    REQUIRE(std::ranges::distance(new_ftrees[1].begin(), new_ftrees[1].end()) ==
+            static_cast<int>(kItemsCount - split_point));
 
     REQUIRE(std::ranges::equal(std::ranges::subrange(ftrees.begin(), ftrees.find(split_point)), new_ftrees[0]));
     REQUIRE(std::ranges::equal(std::ranges::subrange(ftrees.find(split_point), ftrees.end()), new_ftrees[1]));
