@@ -100,6 +100,9 @@ struct node_value_ref : protected node_item_ref_base {
 template <typename extra_info_type>
 struct extra_info_ref : protected node_item_ref_base {
   operator extra_info_type() const { return extra_info; }
+  auto operator==(const extra_info_ref& other) const {
+    return static_cast<extra_info_type>(*this) == static_cast<extra_info_type>(other);
+  }
 };
 
 template <is_node_details T>
@@ -165,6 +168,63 @@ template <is_node_details T>
 auto operator==(key_type key, const node_item<T>& node_value) {
   return key == node_value;
 }
+
+template <typename T>
+concept TreeIterator = requires(const T& iterator) {
+                         { iterator.is_begin() } -> std::same_as<bool>;
+                         { iterator.is_end() } -> std::same_as<bool>;
+                       };
+
+template <typename T>
+  requires TreeIterator<T>
+class TreeReverseIterator : public std::reverse_iterator<T> {
+ public:
+  TreeReverseIterator() = default;
+  explicit TreeReverseIterator(T it) : std::reverse_iterator<T>(std::move(it)) {}
+  TreeReverseIterator(const TreeReverseIterator& other) : std::reverse_iterator<T>(other) {}
+  TreeReverseIterator(TreeReverseIterator&& other) : std::reverse_iterator<T>(other) {}
+  template <typename It>
+    requires std::convertible_to<It, T>
+  TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
+
+  typename T::pointer operator->() const& {
+    T tmp(std::reverse_iterator<T>::base());
+    --tmp;
+    // We need to store the value for the ref.
+    const_cast<TreeReverseIterator*>(this)->val_ = *reinterpret_cast<node_item_ref_base*>(tmp.operator->());
+    return reinterpret_cast<T::pointer>(const_cast<node_item_ref_base*>(&val_));
+  }
+
+  TreeReverseIterator& operator++() {
+    std::reverse_iterator<T>::operator++();
+    return *this;
+  }
+  TreeReverseIterator& operator--() {
+    std::reverse_iterator<T>::operator--();
+    return *this;
+  }
+  TreeReverseIterator operator++(int) {
+    TreeReverseIterator tmp(*this);
+    ++(*this);
+    return tmp;
+  }
+  TreeReverseIterator operator--(int) {
+    TreeReverseIterator tmp(*this);
+    --(*this);
+    return tmp;
+  }
+  TreeReverseIterator& operator=(const TreeReverseIterator& other) {
+    std::reverse_iterator<T>::operator=(other);
+    return *this;
+  }
+
+  bool is_begin() const { return this->base().is_end(); }
+  bool is_end() const { return this->base().is_begin(); }
+
+ private:
+  node_item_ref_base val_;
+  static_assert(sizeof(typename std::remove_pointer_t<typename T::pointer>) == sizeof(val_));
+};
 
 template <is_node_details T>
 class PTreeNodeConstIterator {

@@ -11,7 +11,7 @@
 #include <random>
 #include <ranges>
 
-#include "../src/eptree.h"
+#include "../src/rtree.h"
 
 #include "test_blocks_device.h"
 #include "test_free_blocks_allocator.h"
@@ -24,7 +24,7 @@ TEST_CASE("RTreeTests") {
   RTree rtree{rtree_block};
   rtree.Init(/*depth=*/1);
 
-  SECTION("Check empty eptree size") {
+  SECTION("Check empty rtree size") {
     REQUIRE(rtree.size() == 0);
   }
 
