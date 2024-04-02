@@ -32,6 +32,8 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
 
   FreeBlocksTreeBucket bucket{&allocator, 3};
 
+  using value_type = FreeBlocksTreeBucket::iterator::value_type;
+
   SECTION("insert items sorted") {
     constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
@@ -40,7 +42,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(bucket,
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
@@ -60,8 +62,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(
-        bucket, [](const FTrees::iterator::value_type& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(bucket, [](const value_type& extent) -> uint32_t { return extent.key; });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(sorted_keys, keys));
@@ -69,7 +70,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     // Check the values
     REQUIRE(std::ranges::equal(
         std::views::transform(bucket,
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
@@ -98,8 +99,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
     REQUIRE(std::ranges::equal(
-        std::views::transform(bucket, [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
-        sorted_upper_half));
+        std::views::transform(bucket, [](const value_type& extent) -> int { return extent.key; }), sorted_upper_half));
 
     // Remove the second half
     for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
@@ -144,12 +144,11 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     REQUIRE(bucket.find(150, false) != bucket.end());
     REQUIRE(bucket.find(150, false)->key == 50);
     REQUIRE(bucket.find(25, false)->key == 50);
+    REQUIRE(
+        std::ranges::equal(std::views::transform(bucket, [](const value_type& extent) -> int { return extent.key; }),
+                           std::list<uint32_t>{50}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(bucket, [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
-        std::list<uint32_t>{50}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket),
-                              [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(bucket), [](const value_type& extent) -> int { return extent.key; }),
         std::list<uint32_t>{50}));
 
     REQUIRE(bucket.insert({160, nibble{0}}));
@@ -158,17 +157,15 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     REQUIRE(ftree3.empty());
     REQUIRE(bucket.find(150, false)->key == 50);
     REQUIRE(bucket.find(250, false)->key == 160);
+    REQUIRE(
+        std::ranges::equal(std::views::transform(bucket, [](const value_type& extent) -> int { return extent.key; }),
+                           std::list<uint32_t>{50, 160}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(bucket, [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
-        std::list<uint32_t>{50, 160}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket),
-                              [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(bucket), [](const value_type& extent) -> int { return extent.key; }),
         std::list<uint32_t>{160, 50}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::ranges::subrange(bucket.rbegin(), bucket.rend()),
-                              [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
-        std::list<uint32_t>{160, 50}));
+    REQUIRE(std::ranges::equal(std::views::transform(std::ranges::subrange(bucket.rbegin(), bucket.rend()),
+                                                     [](const value_type& extent) -> int { return extent.key; }),
+                               std::list<uint32_t>{160, 50}));
 
     std::vector<FreeBlocksRangeInfo> blocks_to_delete;
     REQUIRE(bucket.erase(50, blocks_to_delete));
@@ -179,12 +176,11 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     REQUIRE(bucket.find(150, false)->key == 160);
     REQUIRE(bucket.find(250, false)->key == 160);
     REQUIRE(bucket.find(25, false)->key == 160);
+    REQUIRE(
+        std::ranges::equal(std::views::transform(bucket, [](const value_type& extent) -> int { return extent.key; }),
+                           std::list<uint32_t>{160}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(bucket, [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
-        std::list<uint32_t>{160}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket),
-                              [](const FTrees::iterator::value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(bucket), [](const value_type& extent) -> int { return extent.key; }),
         std::list<uint32_t>{160}));
   }
 }
