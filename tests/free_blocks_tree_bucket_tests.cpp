@@ -33,7 +33,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
   FreeBlocksTreeBucket bucket{&allocator, 3};
 
   SECTION("insert items sorted") {
-    constexpr int kItemsCount = 800;  // 600 * 300;
+    constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
     }
