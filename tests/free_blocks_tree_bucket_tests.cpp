@@ -56,7 +56,7 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
     constexpr int kItemsCount = 600 * 300;
     auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
     for (auto key : unsorted_keys) {
-      REQUIRE(bucket.insert({key, nibble{key % 16}}));
+      REQUIRE(bucket.insert({key, static_cast<nibble>(key % 16)}));
     }
 
     // Check that the tree is sorted
