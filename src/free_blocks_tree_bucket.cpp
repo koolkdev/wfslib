@@ -154,6 +154,10 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::begin_impl() const {
   assert(!eptree.iterator.is_end());
   iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
   ftree.iterator = ftree.node->begin();
+  while (ftree.iterator.is_end() && !eptree.iterator.is_end()) {
+    ftree = {{allocator_->LoadAllocatorBlock((++eptree.iterator)->value), block_size_index_}};
+    ftree.iterator = ftree.node->begin();
+  }
   return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
 }
 
@@ -169,22 +173,40 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::end_impl() const {
 
 FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::find_impl(key_type key, bool exact_match) const {
   iterator::eptree_node_info eptree{{allocator_}};
-  eptree.iterator = eptree.node->find(key, exact_match);
+  eptree.iterator = eptree.node->find(key, false);
   if (exact_match && eptree.iterator.is_end())
     return end_impl();
   iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
   ftree.iterator = ftree.node->find(key, exact_match);
+  if (!ftree.iterator.is_end() && key >= ftree.iterator->key) {
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+  }
   // If FTree is empty or our key is smaller than the first key, go to previous node with value
-  if (ftree.iterator.is_end() || key < ftree.iterator->key) {
-    if (exact_match)
-      return end_impl();
-    while (!eptree.iterator.is_begin()) {
-      iterator::ftree_node_info nftree{{allocator_->LoadAllocatorBlock((--eptree.iterator)->value), block_size_index_}};
-      nftree.iterator = nftree.node->end();
-      if (!nftree.iterator.is_begin()) {
-        ftree = std::move(nftree);
-        break;
-      }
+  if (exact_match)
+    return end_impl();
+  auto orig_eptree_it = eptree.iterator;
+  // Go backward to search for value
+  while (!eptree.iterator.is_begin()) {
+    iterator::ftree_node_info nftree{{allocator_->LoadAllocatorBlock((--eptree.iterator)->value), block_size_index_}};
+    nftree.iterator = nftree.node->end();
+    if (!nftree.iterator.is_begin()) {
+      --nftree.iterator;
+      ftree = std::move(nftree);
+      return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+    }
+  }
+  eptree.iterator = orig_eptree_it;
+  // No smaller value, check if we had a value in the original ftree and return it.
+  if (!ftree.iterator.is_end()) {
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+  }
+  // Go forward to search..
+  while (!eptree.iterator.is_end()) {
+    ftree = {{allocator_->LoadAllocatorBlock((++eptree.iterator)->value), block_size_index_}};
+    ftree.iterator = ftree.node->begin();
+    if (!ftree.iterator.is_end()) {
+      // Found value
+      break;
     }
   }
   return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
@@ -193,7 +215,7 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::find_impl(key_type key, boo
 FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::find_for_insert(key_type key) const {
   iterator::eptree_node_info eptree{{allocator_}};
   eptree.iterator = eptree.node->find(key, false);
-  assert(eptree.iterator != eptree.node->begin());
+  assert(!eptree.iterator.is_end());
   iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock((eptree.iterator)->value), block_size_index_}};
   ftree.iterator = ftree.node->find(key, false);
   return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
