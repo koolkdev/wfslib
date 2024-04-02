@@ -32,6 +32,12 @@ struct free_blocks_extent_ref {
   uint32_t end_block_number() const { return block_number() + blocks_count(); }
 
   operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index}; }
+
+  bool operator==(const free_blocks_extent_ref& other) const {
+    uint32_t _key = key;
+    std::ignore = _key;
+    return key == other.key && value == other.value && bucket_index == other.bucket_index;
+  }
 };
 static_assert(sizeof(free_blocks_extent_ref) == sizeof(node_item_ref<FTreeLeaf_details>));
 
@@ -82,19 +88,21 @@ class FTreesConstIteratorBase {
   bool is_end() const { return ftrees_[index()].iterator.is_end(); }
 
   template <typename Range, typename Compare>
-  static auto find_extent(Range& range, Compare comp) {
-    if constexpr (is_reverse_iterator_info<FTree, ftree_info_type>) {
+  static auto find_extent(Range& range, Compare comp, bool reverse) {
+    if (is_reverse_iterator_info<FTree, ftree_info_type> ^ reverse) {
       return std::ranges::max_element(range, comp);
     } else {
       return std::ranges::min_element(range, comp);
     }
   }
 
-  static size_t find_next_extent_index(const std::array<ftree_info, kSizeBucketsCount>& ftrees) {
+  template <typename Range>
+  static size_t find_next_extent_index(Range& ftrees, bool reverse = false) {
     auto iterated_ftrees =
         ftrees | std::views::filter([](const ftree_info& ftree) { return !ftree.iterator.is_end(); });
-    auto res = find_extent(iterated_ftrees,
-                           [](const ftree_info& a, const ftree_info& b) { return a.iterator->key < b.iterator->key; });
+    auto res = find_extent(
+        iterated_ftrees, [](const ftree_info& a, const ftree_info& b) { return a.iterator->key < b.iterator->key; },
+        reverse);
     return res != std::ranges::end(iterated_ftrees) ? res->node->index() : 0;
   }
 
@@ -190,6 +198,8 @@ class FTrees {
   auto rfind(key_type key) const { return rfind_impl(key); }
 
   void split(FTrees& left, FTrees& right, key_type& split_point_key);
+
+  void Init();
 
   std::array<FTree, kSizeBucketsCount>& ftrees() { return ftrees_; }
 

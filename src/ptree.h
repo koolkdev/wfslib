@@ -44,8 +44,8 @@ class PTreeConstIterator {
   using value_type = typename PTreeNodeIterator<LeafNodeDetails>::value_type;
   using ref_type = typename PTreeNodeIterator<LeafNodeDetails>::ref_type;
 
-  using const_reference = typename PTreeNodeIterator<LeafNodeDetails>::const_reference;
-  using const_pointer = typename PTreeNodeIterator<LeafNodeDetails>::const_pointer;
+  using const_reference = typename PTreeNodeConstIterator<LeafNodeDetails>::const_reference;
+  using const_pointer = typename PTreeNodeConstIterator<LeafNodeDetails>::const_pointer;
 
   using reference = const_reference;
   using pointer = const_pointer;
@@ -402,7 +402,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
         auto range_start = it;
         it += std::min<size_t>(5, current_nodes.end() - it);
         new_node.insert(new_node.begin(), range_start, it);
-        new_nodes.push_back({new_node.begin()->key, this->to_offset(node)});
+        new_nodes.push_back({range_start->key, this->to_offset(node)});
       }
       current_nodes.swap(new_nodes);
     }

@@ -225,62 +225,6 @@ static_assert(std::is_same_v<nibble, node_value_type<FTreeLeaf_details>::type>);
 static_assert(node_keys_capacity<FTreeLeaf_details>::value == 7);
 static_assert(node_values_capacity<FTreeLeaf_details>::value == 7);
 
-template <typename T>
-concept TreeIterator = requires(const T& iterator) {
-                         { iterator.is_begin() } -> std::same_as<bool>;
-                         { iterator.is_end() } -> std::same_as<bool>;
-                       };
-
-template <typename T>
-  requires TreeIterator<T>
-class TreeReverseIterator : public std::reverse_iterator<T> {
- public:
-  TreeReverseIterator() = default;
-  explicit TreeReverseIterator(T it) : std::reverse_iterator<T>(std::move(it)) {}
-  TreeReverseIterator(const TreeReverseIterator& other) : std::reverse_iterator<T>(other) {}
-  TreeReverseIterator(TreeReverseIterator&& other) : std::reverse_iterator<T>(other) {}
-  template <typename It>
-    requires std::convertible_to<It, T>
-  TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
-
-  typename T::pointer operator->() const& {
-    T tmp(std::reverse_iterator<T>::base());
-    --tmp;
-    // We need to store the value for the ref.
-    const_cast<TreeReverseIterator*>(this)->val_ = *tmp.operator->();
-    return const_cast<T::pointer>(&val_);
-  }
-
-  TreeReverseIterator& operator++() {
-    std::reverse_iterator<T>::operator++();
-    return *this;
-  }
-  TreeReverseIterator& operator--() {
-    std::reverse_iterator<T>::operator--();
-    return *this;
-  }
-  TreeReverseIterator operator++(int) {
-    TreeReverseIterator tmp(*this);
-    ++(*this);
-    return tmp;
-  }
-  TreeReverseIterator operator--(int) {
-    TreeReverseIterator tmp(*this);
-    --(*this);
-    return tmp;
-  }
-  TreeReverseIterator& operator=(const TreeReverseIterator& other) {
-    std::reverse_iterator<T>::operator=(other);
-    return *this;
-  }
-
-  bool is_begin() const { return this->base().is_end(); }
-  bool is_end() const { return this->base().is_begin(); }
-
- private:
-  std::remove_pointer_t<std::remove_cvref_t<typename T::pointer>> val_{};
-};
-
 template <typename T, typename Iterator>
 struct node_iterator_info_base {
   std::shared_ptr<T> node;
