@@ -13,7 +13,7 @@ FTreesConstIterator& FTreesConstIterator::operator++() {
     ++ftrees_[index_].iterator;
   } else {
     // Switch direction
-    auto key = (*this)->key;
+    key_type key = (*this)->key;
     reverse_end_map_ &= ~(1 << index_);
     // todo: enumrate
     for (auto& ftree : ftrees_) {
@@ -36,7 +36,7 @@ FTreesConstIterator& FTreesConstIterator::operator--() {
     }
   } else {
     // Switch direction
-    auto key = is_end() ? std::numeric_limits<key_type>::max() : (*this)->key;
+    key_type key = is_end() ? std::numeric_limits<key_type>::max() : (*this)->key;
     for (auto& ftree : ftrees_) {
       if (ftree.iterator.is_begin()) {
         if (ftree.iterator->key >= key) {
