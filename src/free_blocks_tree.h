@@ -14,11 +14,8 @@
 #include "ftrees.h"
 #include "tree_utils.h"
 
-template <typename eptree_node_info_type, typename ftrees_node_info_type>
-class FreeBlocksTreeConstIteratorBase {
+class FreeBlocksTreeConstIterator {
  public:
-  constexpr static bool always_false = false;
-
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = int;
 
@@ -31,47 +28,23 @@ class FreeBlocksTreeConstIteratorBase {
   using reference = const_reference;
   using pointer = const_pointer;
 
-  using eptree_node_info = eptree_node_info_type;
-  using ftrees_node_info = ftrees_node_info_type;
+  using eptree_node_info = node_iterator_info<EPTree>;
+  using ftrees_node_info = node_iterator_info<FTrees>;
 
-  FreeBlocksTreeConstIteratorBase() = default;
-  FreeBlocksTreeConstIteratorBase(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
+  FreeBlocksTreeConstIterator() = default;
+  FreeBlocksTreeConstIterator(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
       : allocator_(allocator), eptree_(std::move(eptree)), ftrees_(std::move(ftrees)) {}
 
   reference operator*() const { return *operator->(); }
   pointer operator->() const& { return reinterpret_cast<pointer>(ftrees_.iterator.operator->()); }
 
-  FreeBlocksTreeConstIteratorBase& operator++() {
-    assert(!is_end());
-    ++ftrees_.iterator;
-    // support empty ftrees?
-    while (ftrees_.iterator.is_end()) {
-      if ((++eptree_.iterator).is_end()) {
-        --eptree_.iterator;
-        return *this;  // end
-      }
+  FreeBlocksTreeConstIterator& operator++();
+  FreeBlocksTreeConstIterator& operator--();
 
-      ftrees_ = {allocator_->LoadAllocatorBlock(eptree_.iterator->value)};
-      if constexpr (std::is_same_v<decltype(ftrees_node_info::iterator), FTrees::iterator>) {
-        ftrees_.iterator = ftrees_.node->begin();
-      } else if constexpr (std::is_same_v<decltype(ftrees_node_info::iterator), FTrees::reverse_iterator>) {
-        ftrees_.iterator = ftrees_.node->rbegin();
-      } else {
-        static_assert(always_false);
-      }
-    }
-    return *this;
-  }
+  FreeBlocksTreeConstIterator operator++(int);
+  FreeBlocksTreeConstIterator operator--(int);
 
-  FreeBlocksTreeConstIteratorBase operator++(int) {
-    FreeBlocksTreeConstIteratorBase tmp(*this);
-    ++(*this);
-    return tmp;
-  }
-
-  bool operator==(const FreeBlocksTreeConstIteratorBase& other) const {
-    return ftrees_.iterator == other.ftrees_.iterator;
-  }
+  bool operator==(const FreeBlocksTreeConstIterator& other) const { return ftrees_.iterator == other.ftrees_.iterator; }
 
   eptree_node_info& eptree() { return eptree_; }
   const eptree_node_info& eptree() const { return eptree_; }
@@ -88,63 +61,45 @@ class FreeBlocksTreeConstIteratorBase {
   ftrees_node_info ftrees_;
 };
 
-template <typename eptree_node_info_type, typename ftrees_node_info_type>
-class FreeBlocksTreeIteratorBase
-    : public FreeBlocksTreeConstIteratorBase<eptree_node_info_type, ftrees_node_info_type> {
+class FreeBlocksTreeIterator : public FreeBlocksTreeConstIterator {
  public:
-  using base = FreeBlocksTreeConstIteratorBase<eptree_node_info_type, ftrees_node_info_type>;
-
   using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = base::difference_type;
-  using value_type = base::value_type;
-  using ref_type = base::ref_type;
+  using difference_type = FreeBlocksTreeConstIterator::difference_type;
+
+  using value_type = FreeBlocksTreeConstIterator::value_type;
+  using ref_type = FreeBlocksTreeConstIterator::ref_type;
 
   using reference = ref_type;
   using pointer = ref_type*;
 
-  using eptree_node_info = eptree_node_info_type;
-  using ftrees_node_info = ftrees_node_info_type;
+  using eptree_node_info = FreeBlocksTreeConstIterator::eptree_node_info;
+  using ftrees_node_info = FreeBlocksTreeConstIterator::ftrees_node_info;
 
-  FreeBlocksTreeIteratorBase() = default;
-  FreeBlocksTreeIteratorBase(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
-      : base(allocator, std::move(eptree), std::move(ftrees)) {}
+  FreeBlocksTreeIterator() = default;
+  FreeBlocksTreeIterator(FreeBlocksAllocator* allocator, eptree_node_info eptree, ftrees_node_info ftrees)
+      : FreeBlocksTreeConstIterator(allocator, std::move(eptree), std::move(ftrees)) {}
 
   reference operator*() const { return *operator->(); }
-  pointer operator->() const& { return const_cast<pointer>(base::operator->()); }
+  pointer operator->() const& { return const_cast<pointer>(FreeBlocksTreeConstIterator::operator->()); }
 
-  FreeBlocksTreeIteratorBase& operator++() {
-    base::operator++();
-    return *this;
-  }
+  FreeBlocksTreeIterator& operator++();
+  FreeBlocksTreeIterator& operator--();
 
-  FreeBlocksTreeIteratorBase operator++(int) {
-    FreeBlocksTreeIteratorBase tmp(*this);
-    ++(*this);
-    return tmp;
-  }
+  FreeBlocksTreeIterator operator++(int);
+  FreeBlocksTreeIterator operator--(int);
 
-  bool operator==(const FreeBlocksTreeIteratorBase& other) const { return base::operator==(other); }
+  bool operator==(const FreeBlocksTreeIterator& other) const { return FreeBlocksTreeConstIterator::operator==(other); }
 };
 
-using FreeBlocksTreeForwardIterator =
-    FreeBlocksTreeIteratorBase<node_iterator_info<EPTree>, node_iterator_info<FTrees>>;
-using FreeBlocksTreeBackwardIterator =
-    FreeBlocksTreeIteratorBase<node_reverse_iterator_info<EPTree>, node_reverse_iterator_info<FTrees>>;
-using FreeBlocksTreeConstForwardIterator =
-    FreeBlocksTreeConstIteratorBase<node_iterator_info<EPTree>, node_iterator_info<FTrees>>;
-using FreeBlocksTreeConstBackwardIterator =
-    FreeBlocksTreeConstIteratorBase<node_reverse_iterator_info<EPTree>, node_reverse_iterator_info<FTrees>>;
-static_assert(std::forward_iterator<FreeBlocksTreeForwardIterator>);
-static_assert(std::forward_iterator<FreeBlocksTreeBackwardIterator>);
-static_assert(std::forward_iterator<FreeBlocksTreeConstForwardIterator>);
-static_assert(std::forward_iterator<FreeBlocksTreeConstBackwardIterator>);
+static_assert(std::bidirectional_iterator<FreeBlocksTreeConstIterator>);
+static_assert(std::bidirectional_iterator<FreeBlocksTreeIterator>);
 
 class FreeBlocksTree {
  public:
-  using iterator = FreeBlocksTreeForwardIterator;
-  using const_iterator = FreeBlocksTreeConstForwardIterator;
-  using reverse_iterator = FreeBlocksTreeBackwardIterator;
-  using const_reverse_iterator = FreeBlocksTreeConstBackwardIterator;
+  using iterator = FreeBlocksTreeConstIterator;
+  using const_iterator = FreeBlocksTreeConstIterator;
+  using reverse_iterator = TreeReverseIterator<iterator>;
+  using const_reverse_iterator = TreeReverseIterator<const_iterator>;
 
   FreeBlocksTree(FreeBlocksAllocator* allocator) : allocator_(allocator) {}
 
@@ -153,26 +108,21 @@ class FreeBlocksTree {
   const_iterator begin() const { return begin_impl(); }
   const_iterator end() const { return end_impl(); }
 
-  auto cbegin() const { return begin(); }
-  auto cend() const { return end(); }
+  reverse_iterator rbegin() { return reverse_iterator{end()}; }
+  reverse_iterator rend() { return reverse_iterator{begin()}; }
+  const_reverse_iterator rbegin() const { return const_reverse_iterator{end()}; }
+  const_reverse_iterator rend() const { return const_reverse_iterator{begin()}; }
 
-  reverse_iterator rbegin() { return rbegin_impl(); }
-  reverse_iterator rend() { return rend_impl(); }
-  const_reverse_iterator rbegin() const { return rbegin_impl(); }
-  const_reverse_iterator rend() const { return rend_impl(); }
+  const_iterator cbegin() const { return begin(); }
+  const_iterator cend() const { return end(); }
 
-  auto find(key_type key) { return find_impl(key); }
-  auto rfind(key_type key) { return rfind_impl(key); }
-  auto find(key_type key) const { return find_impl(key); }
-  auto rfind(key_type key) const { return rfind_impl(key); }
+  iterator find(key_type key, bool exact_match = true) { return find_impl(key, exact_match); }
+  const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
 
  private:
   iterator begin_impl() const;
-  reverse_iterator rbegin_impl() const;
   iterator end_impl() const;
-  reverse_iterator rend_impl() const;
-  iterator find_impl(key_type key) const;
-  reverse_iterator rfind_impl(key_type key) const;
+  iterator find_impl(key_type key, bool exact_match = true) const;
 
   FreeBlocksAllocator* allocator_;
 };

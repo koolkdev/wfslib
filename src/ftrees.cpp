@@ -7,6 +7,97 @@
 
 #include "ftrees.h"
 
+FTreesConstIterator& FTreesConstIterator::operator++() {
+  assert(!is_end());
+  if (is_forward_) {
+    ++ftrees_[index_].iterator;
+  } else {
+    // Switch direction
+    auto key = (*this)->key;
+    reverse_end_map_ &= ~(1 << index_);
+    // todo: enumrate
+    for (auto& ftree : ftrees_) {
+      while (!(reverse_end_map_ & (1 << ftree.node->index())) && !ftree.iterator.is_end() &&
+             (++ftree.iterator)->key < key) {
+      }
+    }
+    is_forward_ = true;
+    reverse_end_map_ = 0;
+  }
+  index_ = find_next_extent_index(ftrees_, /*max=*/false, reverse_end_map_);
+  return *this;
+}
+
+FTreesConstIterator& FTreesConstIterator::operator--() {
+  assert(!is_begin());
+  if (!is_forward_) {
+    if (!(reverse_end_map_ & (1 << index_))) {
+      --ftrees_[index_].iterator;
+    }
+  } else {
+    // Switch direction
+    auto key = is_end() ? std::numeric_limits<key_type>::max() : (*this)->key;
+    for (auto& ftree : ftrees_) {
+      if (ftree.iterator.is_begin()) {
+        if (ftree.iterator->key >= key) {
+          reverse_end_map_ |= 1 << ftree.node->index();
+        }
+      } else {
+        while (!ftree.iterator.is_begin() && (--ftree.iterator)->key > key) {
+        }
+      }
+    }
+    is_forward_ = false;
+  }
+  index_ = find_next_extent_index(ftrees_, /*max=*/true, reverse_end_map_);
+  if (ftrees_[index_].iterator.is_begin()) {
+    reverse_end_map_ |= 1 << index_;
+  }
+  return *this;
+}
+
+FTreesConstIterator FTreesConstIterator::operator++(int) {
+  FTreesConstIterator tmp(*this);
+  ++(*this);
+  return tmp;
+}
+
+FTreesConstIterator FTreesConstIterator::operator--(int) {
+  FTreesConstIterator tmp(*this);
+  --(*this);
+  return tmp;
+}
+
+bool FTreesConstIterator::is_begin() const {
+  if (is_forward_) {
+    return std::ranges::all_of(ftrees_, [](const ftree_info& ftree) { return ftree.iterator.is_begin(); });
+  } else {
+    return reverse_end_map_ == (1 << ftrees_.size()) - 1;
+  }
+}
+
+FTreesIterator& FTreesIterator::operator++() {
+  FTreesConstIterator::operator++();
+  return *this;
+}
+
+FTreesIterator& FTreesIterator::operator--() {
+  FTreesConstIterator::operator--();
+  return *this;
+}
+
+FTreesIterator FTreesIterator::operator++(int) {
+  FTreesIterator tmp(*this);
+  ++(*this);
+  return tmp;
+}
+
+FTreesIterator FTreesIterator::operator--(int) {
+  FTreesIterator tmp(*this);
+  --(*this);
+  return tmp;
+}
+
 void FTrees::split(FTrees& left, FTrees& right, key_type& split_point_key) {
   // Find the ftree with most items
   auto max_ftree_it = std::ranges::max_element(ftrees_, [](const FTree& a, const FTree& b) {
@@ -33,18 +124,7 @@ FTrees::iterator FTrees::begin_impl() const {
                    auto& ftree = const_cast<FTree&>(cftree);
                    return {ftree, ftree.begin()};
                  });
-  auto index = iterator::find_next_extent_index(ftrees_info);
-  return {std::move(ftrees_info), index};
-}
-
-FTrees::reverse_iterator FTrees::rbegin_impl() const {
-  std::array<typename reverse_iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-  std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                 [](const FTree& cftree) -> typename reverse_iterator::ftree_info {
-                   auto& ftree = const_cast<FTree&>(cftree);
-                   return {ftree, ftree.rbegin()};
-                 });
-  auto index = reverse_iterator::find_next_extent_index(ftrees_info);
+  auto index = iterator::find_next_extent_index(ftrees_info, /*max=*/false);
   return {std::move(ftrees_info), index};
 }
 
@@ -58,17 +138,7 @@ FTrees::iterator FTrees::end_impl() const {
   return {std::move(ftrees_info), 0};
 }
 
-FTrees::reverse_iterator FTrees::rend_impl() const {
-  std::array<typename reverse_iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-  std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                 [](const FTree& cftree) -> typename reverse_iterator::ftree_info {
-                   auto& ftree = const_cast<FTree&>(cftree);
-                   return {ftree, ftree.rend()};
-                 });
-  return {std::move(ftrees_info), 0};
-}
-
-FTrees::iterator FTrees::find_impl(key_type key) const {
+FTrees::iterator FTrees::find_impl(key_type key, bool exact_match) const {
   std::array<typename iterator::ftree_info, kSizeBucketsCount> ftrees_info;
   std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
                  [key](const FTree& cftree) -> typename iterator::ftree_info {
@@ -76,12 +146,17 @@ FTrees::iterator FTrees::find_impl(key_type key) const {
                    return {ftree, ftree.find(key, false)};
                  });
   size_t index = 0;
+  if (exact_match && !std::ranges::any_of(ftrees_info, [key](const iterator::ftree_info& ftree) {
+        return !ftree.iterator.is_end() && ftree.iterator->key == key;
+      })) {
+    return end_impl();
+  }
   auto before_keys = ftrees_info | std::views::filter([key](const iterator::ftree_info& ftree) {
                        return !ftree.iterator.is_end() && ftree.iterator->key <= key;
                      });
   if (!std::ranges::empty(before_keys)) {
     // take max key before or key
-    index = iterator::find_next_extent_index(before_keys, true);
+    index = iterator::find_next_extent_index(before_keys, /*max=*/true);
     for (auto& before_it : before_keys) {
       // The rest of the before items should need to be after
       if (before_it.node->index() != index)
@@ -92,39 +167,7 @@ FTrees::iterator FTrees::find_impl(key_type key) const {
                         return !ftree.iterator.is_end() && ftree.iterator->key > key;
                       });
     if (!std::ranges::empty(after_keys)) {
-      index = iterator::find_next_extent_index(before_keys);
-    }
-  }
-  return {std::move(ftrees_info), index};
-}
-
-FTrees::reverse_iterator FTrees::rfind_impl(key_type key) const {
-  std::array<typename reverse_iterator::ftree_info, kSizeBucketsCount> ftrees_info;
-  std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
-                 [key](const FTree& cftree) -> typename reverse_iterator::ftree_info {
-                   auto& ftree = const_cast<FTree&>(cftree);
-                   auto it = ftree.find(key, false);
-                   if (!it.is_end())
-                     ++it;
-                   return {ftree, FTree::reverse_iterator{std::move(it)}};
-                 });
-  size_t index = 0;
-  auto before_keys = ftrees_info | std::views::filter([key](const reverse_iterator::ftree_info& ftree) {
-                       return !ftree.iterator.is_end() && ftree.iterator->key <= key;
-                     });
-  auto after_keys = ftrees_info | std::views::filter([key](const reverse_iterator::ftree_info& ftree) {
-                      return !ftree.iterator.is_end() && ftree.iterator->key > key;
-                    });
-  if (!std::ranges::empty(before_keys)) {
-    index = reverse_iterator::find_next_extent_index(before_keys);
-  } else if (!std::ranges::empty(after_keys)) {
-    index = reverse_iterator::find_next_extent_index(before_keys, true);
-  }
-  if (!std::ranges::empty(after_keys)) {
-    for (auto& after_it : after_keys) {
-      // The rest of the after items should need to be before
-      if (after_it.node->index() != index)
-        ++after_it.iterator;
+      index = iterator::find_next_extent_index(before_keys, /*max=*/false);
     }
   }
   return {std::move(ftrees_info), index};
