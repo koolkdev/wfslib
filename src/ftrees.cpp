@@ -39,7 +39,7 @@ FTreesConstIterator& FTreesConstIterator::operator--() {
     key_type key = is_end() ? std::numeric_limits<key_type>::max() : (*this)->key;
     for (auto& ftree : ftrees_) {
       if (ftree.iterator.is_begin()) {
-        if (ftree.iterator->key >= key) {
+        if (!ftree.iterator.is_end() && ftree.iterator->key >= key) {
           reverse_end_map_ |= 1 << ftree.node->index();
         }
       } else {
@@ -72,7 +72,9 @@ bool FTreesConstIterator::is_begin() const {
   if (is_forward_) {
     return std::ranges::all_of(ftrees_, [](const ftree_info& ftree) { return ftree.iterator.is_begin(); });
   } else {
-    return reverse_end_map_ == (1 << ftrees_.size()) - 1;
+    return std::ranges::all_of(ftrees_, [&](const ftree_info& ftree) {
+      return reverse_end_map_ & (1 << ftree.node->index()) || ftree.iterator.is_end();
+    });
   }
 }
 
@@ -167,7 +169,7 @@ FTrees::iterator FTrees::find_impl(key_type key, bool exact_match) const {
                         return !ftree.iterator.is_end() && ftree.iterator->key > key;
                       });
     if (!std::ranges::empty(after_keys)) {
-      index = iterator::find_next_extent_index(before_keys, /*max=*/false);
+      index = iterator::find_next_extent_index(after_keys, /*max=*/false);
     }
   }
   return {std::move(ftrees_info), index};

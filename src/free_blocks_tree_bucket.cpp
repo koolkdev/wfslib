@@ -201,14 +201,15 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::find_impl(key_type key, boo
     return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
   }
   // Go forward to search..
-  while (!eptree.iterator.is_end()) {
-    ftree = {{allocator_->LoadAllocatorBlock((++eptree.iterator)->value), block_size_index_}};
+  while (!(++eptree.iterator).is_end()) {
+    ftree = {{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
     ftree.iterator = ftree.node->begin();
     if (!ftree.iterator.is_end()) {
       // Found value
-      break;
+      return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
     }
   }
+  --eptree.iterator;
   return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
 }
 

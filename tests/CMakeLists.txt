@@ -8,6 +8,7 @@ enable_testing()
 add_executable(${PROJECT_NAME}
   eptree_tests.cpp
   free_blocks_tree_bucket_tests.cpp
+  free_blocks_tree_tests.cpp
   ftree_tests.cpp
   ftrees_tests.cpp
   test_blocks_device.cpp
