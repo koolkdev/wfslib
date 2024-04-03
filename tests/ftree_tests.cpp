@@ -115,12 +115,14 @@ TEST_CASE("FTreeTests") {
       ++steps;
     }
     REQUIRE(steps == kItemsCount);
+    REQUIRE(it.is_end());
     while (it != ftrees[0].begin()) {
       --it;
       --steps;
       REQUIRE(it->key == steps);
     }
     REQUIRE(steps == 0);
+    REQUIRE(it.is_begin());
 
     for (int i = 0; i < 4; ++i) {
       ++it;

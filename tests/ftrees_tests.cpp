@@ -76,12 +76,14 @@ TEST_CASE("FTreesTests") {
       ++steps;
     }
     REQUIRE(steps == kItemsCount);
+    REQUIRE(it.is_end());
     while (it != ftrees.begin()) {
       --it;
       --steps;
       REQUIRE(it->key == steps);
     }
     REQUIRE(steps == 0);
+    REQUIRE(it.is_begin());
 
     for (int i = 0; i < 40; ++i) {
       UNSCOPED_INFO(it->key);

@@ -194,12 +194,14 @@ TEST_CASE("FreeBlocksTreeTests") {
       ++steps;
     }
     REQUIRE(steps == kItemsCount);
+    REQUIRE(it.is_end());
     while (it != tree.begin()) {
       --it;
       --steps;
       REQUIRE(it->key == steps);
     }
     REQUIRE(steps == 0);
+    REQUIRE(it.is_begin());
 
     for (int i = 0; i < 40; ++i) {
       ++it;

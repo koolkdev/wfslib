@@ -355,7 +355,7 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   FreeBlocksTree tree{this};
   std::vector<range_and_extents> ranges;
   std::optional<range_and_extents> selected_range;
-  for (const auto& extent : std::ranges::subrange(tree.rbegin(), tree.rend())) {
+  for (const auto& extent : std::views::reverse(tree)) {
     if (extent.bucket_index < size_index)
       continue;
     if (!ranges.empty() && ranges.back().first.block_number == extent.end_block_number()) {
