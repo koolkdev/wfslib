@@ -65,7 +65,7 @@ TEST_CASE("FTreesTests") {
   SECTION("check backward/forward iterator") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % kSizeBucketsCount].insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % (kSizeBucketsCount - 2)].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     auto it = ftrees.begin();
