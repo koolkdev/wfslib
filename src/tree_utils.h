@@ -225,33 +225,25 @@ static_assert(std::is_same_v<nibble, node_value_type<FTreeLeaf_details>::type>);
 static_assert(node_keys_capacity<FTreeLeaf_details>::value == 7);
 static_assert(node_values_capacity<FTreeLeaf_details>::value == 7);
 
-template <typename T, typename Iterator>
-struct node_iterator_info_base {
+template <typename T>
+struct node_iterator_info {
   std::shared_ptr<T> node;
-  Iterator iterator;
+  typename T::iterator iterator;
 
-  node_iterator_info_base() = default;
-  node_iterator_info_base(const node_iterator_info_base& other) : node(other.node), iterator(other.iterator) {}
-  node_iterator_info_base(node_iterator_info_base&& other)
-      : node(std::move(other.node)), iterator(std::move(other.iterator)) {}
-  node_iterator_info_base(std::shared_ptr<T> n, Iterator it) : node(std::move(n)), iterator(std::move(it)) {}
-  node_iterator_info_base(const T& n, Iterator it) : node(std::make_shared<T>(n)), iterator(std::move(it)) {}
-  node_iterator_info_base(T&& n, Iterator it) : node(std::make_shared<T>(std::move(n))), iterator(std::move(it)) {}
-  node_iterator_info_base(const T& n) : node(std::make_shared<T>(n)) {}
-  node_iterator_info_base(T&& n) : node(std::make_shared<T>(std::move(n))) {}
+  node_iterator_info() = default;
+  node_iterator_info(const node_iterator_info& other) : node(other.node), iterator(other.iterator) {}
+  node_iterator_info(node_iterator_info&& other) : node(std::move(other.node)), iterator(std::move(other.iterator)) {}
+  node_iterator_info(std::shared_ptr<T> n, typename T::iterator it) : node(std::move(n)), iterator(std::move(it)) {}
+  node_iterator_info(const T& n, typename T::iterator it) : node(std::make_shared<T>(n)), iterator(std::move(it)) {}
+  node_iterator_info(T&& n, typename T::iterator it)
+      : node(std::make_shared<T>(std::move(n))), iterator(std::move(it)) {}
+  node_iterator_info(const T& n) : node(std::make_shared<T>(n)) {}
+  node_iterator_info(T&& n) : node(std::make_shared<T>(std::move(n))) {}
   // template <typename... Args>
-  // node_iterator_info_base(Args&&... args) : node(std::make_shared<T>(std::forward<Args>(args)...)) {}
-  node_iterator_info_base& operator=(const node_iterator_info_base& other) {
+  // node_iterator_info(Args&&... args) : node(std::make_shared<T>(std::forward<Args>(args)...)) {}
+  node_iterator_info& operator=(const node_iterator_info& other) {
     node = other.node;
     iterator = other.iterator;
     return *this;
   }
 };
-
-template <typename T>
-using node_iterator_info = node_iterator_info_base<T, typename T::iterator>;
-template <typename T>
-using node_reverse_iterator_info = node_iterator_info_base<T, typename T::reverse_iterator>;
-
-template <typename T, typename U>
-concept is_reverse_iterator_info = std::same_as<node_reverse_iterator_info<T>, U>;

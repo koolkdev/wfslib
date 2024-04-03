@@ -72,6 +72,7 @@ class PTreeConstIterator {
         if (++rparent == parents_.rend()) {
           while (--rparent != parents_.rbegin())
             --rparent->iterator;
+          --rparent->iterator;
           return *this;  // end
         }
       }

@@ -7,6 +7,71 @@
 
 #include "free_blocks_tree.h"
 
+FreeBlocksTreeConstIterator& FreeBlocksTreeConstIterator::operator++() {
+  assert(!is_end());
+  ++ftrees_.iterator;
+  // support empty ftrees?
+  while (ftrees_.iterator.is_end()) {
+    if ((++eptree_.iterator).is_end()) {
+      --eptree_.iterator;
+      return *this;  // end
+    }
+
+    ftrees_ = {allocator_->LoadAllocatorBlock(eptree_.iterator->value)};
+    ftrees_.iterator = ftrees_.node->begin();
+  }
+  return *this;
+}
+
+FreeBlocksTreeConstIterator& FreeBlocksTreeConstIterator::operator--() {
+  assert(!is_begin());
+  // support empty ftrees?
+  while (ftrees_.iterator.is_begin()) {
+    if (eptree_.iterator.is_begin()) {
+      return *this;  // begin
+    }
+
+    ftrees_ = {allocator_->LoadAllocatorBlock((--eptree_.iterator)->value)};
+    ftrees_.iterator = ftrees_.node->begin();
+  }
+  --ftrees_.iterator;
+  return *this;
+}
+
+FreeBlocksTreeConstIterator FreeBlocksTreeConstIterator::operator++(int) {
+  FreeBlocksTreeConstIterator tmp(*this);
+  ++(*this);
+  return tmp;
+}
+
+FreeBlocksTreeConstIterator FreeBlocksTreeConstIterator::operator--(int) {
+  FreeBlocksTreeConstIterator tmp(*this);
+  --(*this);
+  return tmp;
+}
+
+FreeBlocksTreeIterator& FreeBlocksTreeIterator::operator++() {
+  FreeBlocksTreeConstIterator::operator++();
+  return *this;
+}
+
+FreeBlocksTreeIterator& FreeBlocksTreeIterator::operator--() {
+  FreeBlocksTreeConstIterator::operator--();
+  return *this;
+}
+
+FreeBlocksTreeIterator FreeBlocksTreeIterator::operator++(int) {
+  FreeBlocksTreeIterator tmp(*this);
+  ++(*this);
+  return tmp;
+}
+
+FreeBlocksTreeIterator FreeBlocksTreeIterator::operator--(int) {
+  FreeBlocksTreeIterator tmp(*this);
+  --(*this);
+  return tmp;
+}
+
 FreeBlocksTree::iterator FreeBlocksTree::begin_impl() const {
   iterator::eptree_node_info eptree{{allocator_}};
   eptree.iterator = eptree.node->begin();
@@ -20,15 +85,6 @@ FreeBlocksTree::iterator FreeBlocksTree::begin_impl() const {
   return {allocator_, std::move(eptree), std::move(ftrees)};
 }
 
-FreeBlocksTree::reverse_iterator FreeBlocksTree::rbegin_impl() const {
-  reverse_iterator::eptree_node_info eptree{{allocator_}};
-  eptree.iterator = eptree.node->rbegin();
-  assert(!eptree.iterator.is_end());
-  reverse_iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
-  ftrees.iterator = ftrees.node->rbegin();
-  return {allocator_, std::move(eptree), std::move(ftrees)};
-}
-
 FreeBlocksTree::iterator FreeBlocksTree::end_impl() const {
   iterator::eptree_node_info eptree{{allocator_}};
   eptree.iterator = eptree.node->end();
@@ -39,27 +95,16 @@ FreeBlocksTree::iterator FreeBlocksTree::end_impl() const {
   return {allocator_, std::move(eptree), std::move(ftrees)};
 }
 
-FreeBlocksTree::reverse_iterator FreeBlocksTree::rend_impl() const {
-  reverse_iterator::eptree_node_info eptree{{allocator_}};
-  eptree.iterator = eptree.node->rend();
-  assert(!eptree.iterator.is_begin());
-  --eptree.iterator;  // EPTree size should always be >= 1
-  reverse_iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
-  ftrees.iterator = ftrees.node->rend();
-  while (ftrees.iterator.is_begin() && !eptree.iterator.is_begin()) {
-    ftrees = {{allocator_->LoadAllocatorBlock((--eptree.iterator)->value)}};
-    ftrees.iterator = ftrees.node->rend();
-  }
-  return {allocator_, std::move(eptree), std::move(ftrees)};
-}
-
-FreeBlocksTree::iterator FreeBlocksTree::find_impl(key_type key) const {
+FreeBlocksTree::iterator FreeBlocksTree::find_impl(key_type key, bool exact_match) const {
   iterator::eptree_node_info eptree{{allocator_}};
   eptree.iterator = eptree.node->find(key, false);
   if (eptree.iterator.is_end())
     return end_impl();
   iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
   ftrees.iterator = ftrees.node->find(key);
+  if (exact_match && (ftrees.iterator.is_end() || key != ftrees.iterator->key)) {
+    return end_impl();
+  }
   if (!ftrees.iterator.is_end() && key >= ftrees.iterator->key) {
     return {allocator_, std::move(eptree), std::move(ftrees)};
   }
@@ -68,7 +113,7 @@ FreeBlocksTree::iterator FreeBlocksTree::find_impl(key_type key) const {
   // Go backward to search for value
   while (!eptree.iterator.is_begin()) {
     iterator::ftrees_node_info nftrees{{allocator_->LoadAllocatorBlock((--eptree.iterator)->value)}};
-    nftrees.iterator = nftrees.node->find(key);
+    nftrees.iterator = nftrees.node->find(key, exact_match);
     if (!nftrees.iterator.is_end()) {
       ftrees = std::move(nftrees);
       return {allocator_, std::move(eptree), std::move(ftrees)};
@@ -88,16 +133,5 @@ FreeBlocksTree::iterator FreeBlocksTree::find_impl(key_type key) const {
       break;
     }
   }
-  return {allocator_, std::move(eptree), std::move(ftrees)};
-}
-
-FreeBlocksTree::reverse_iterator FreeBlocksTree::rfind_impl(key_type key) const {
-  reverse_iterator::eptree_node_info eptree{{allocator_}};
-  auto it = eptree.node->find(key, false);
-  if (it.is_end())
-    return rend_impl();
-  eptree.iterator = EPTree::reverse_iterator{std::move(++it)};
-  reverse_iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
-  ftrees.iterator = ftrees.node->rfind(key);
   return {allocator_, std::move(eptree), std::move(ftrees)};
 }
