@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <array>
+#include <bitset>
 #include <iterator>
 #include <memory>
 #include <numeric>
@@ -79,9 +80,9 @@ class FTreesConstIterator {
   bool is_end() const { return ftrees_[index_].iterator.is_end(); }
 
   template <typename Range>
-  static size_t find_next_extent_index(Range& ftrees, bool max, uint8_t reverse_end_map = 0) {
-    auto iterated_ftrees = ftrees | std::views::filter([reverse_end_map](const ftree_info& ftree) {
-                             return !ftree.iterator.is_end() && !(reverse_end_map & (1 << ftree.node->index()));
+  static size_t find_next_extent_index(Range& ftrees, bool max, std::bitset<kSizeBucketsCount> reverse_end = {}) {
+    auto iterated_ftrees = ftrees | std::views::filter([&reverse_end](const ftree_info& ftree) {
+                             return !ftree.iterator.is_end() && !reverse_end.test(ftree.node->index());
                            });
     auto res = std::ranges::max_element(iterated_ftrees, [max](const ftree_info& a, const ftree_info& b) {
       return max ^ (a.iterator->key > b.iterator->key);
@@ -97,7 +98,7 @@ class FTreesConstIterator {
   size_t index_{0};
 
   bool is_forward_{true};
-  uint8_t reverse_end_map_{0};
+  std::bitset<kSizeBucketsCount> reverse_end_;
 };
 
 class FTreesIterator : public FTreesConstIterator {

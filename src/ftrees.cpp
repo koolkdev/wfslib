@@ -14,24 +14,23 @@ FTreesConstIterator& FTreesConstIterator::operator++() {
   } else {
     // Switch direction
     key_type key = (*this)->key;
-    reverse_end_map_ &= ~(1 << index_);
+    reverse_end_.reset(index_);
     // todo: enumrate
     for (auto& ftree : ftrees_) {
-      while (!(reverse_end_map_ & (1 << ftree.node->index())) && !ftree.iterator.is_end() &&
-             (++ftree.iterator)->key < key) {
+      while (!reverse_end_.test(ftree.node->index()) && !ftree.iterator.is_end() && (++ftree.iterator)->key < key) {
       }
     }
     is_forward_ = true;
-    reverse_end_map_ = 0;
+    reverse_end_.reset();
   }
-  index_ = find_next_extent_index(ftrees_, /*max=*/false, reverse_end_map_);
+  index_ = find_next_extent_index(ftrees_, /*max=*/false, reverse_end_);
   return *this;
 }
 
 FTreesConstIterator& FTreesConstIterator::operator--() {
   assert(!is_begin());
   if (!is_forward_) {
-    if (!(reverse_end_map_ & (1 << index_))) {
+    if (!reverse_end_.test(index_)) {
       --ftrees_[index_].iterator;
     }
   } else {
@@ -40,7 +39,7 @@ FTreesConstIterator& FTreesConstIterator::operator--() {
     for (auto& ftree : ftrees_) {
       if (ftree.iterator.is_begin()) {
         if (ftree.iterator.is_end() || ftree.iterator->key >= key) {
-          reverse_end_map_ |= 1 << ftree.node->index();
+          reverse_end_.set(ftree.node->index());
         }
       } else {
         while (!ftree.iterator.is_begin() && (--ftree.iterator)->key > key) {
@@ -49,9 +48,9 @@ FTreesConstIterator& FTreesConstIterator::operator--() {
     }
     is_forward_ = false;
   }
-  index_ = find_next_extent_index(ftrees_, /*max=*/true, reverse_end_map_);
+  index_ = find_next_extent_index(ftrees_, /*max=*/true, reverse_end_);
   if (ftrees_[index_].iterator.is_begin()) {
-    reverse_end_map_ |= 1 << index_;
+    reverse_end_.set(index_);
   }
   return *this;
 }
@@ -72,7 +71,7 @@ bool FTreesConstIterator::is_begin() const {
   if (is_forward_) {
     return std::ranges::all_of(ftrees_, [](const ftree_info& ftree) { return ftree.iterator.is_begin(); });
   } else {
-    return reverse_end_map_ == (1 << ftrees_.size()) - 1;
+    return reverse_end_.all();
   }
 }
 
