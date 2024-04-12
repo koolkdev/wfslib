@@ -78,8 +78,8 @@ EPTreeIterator EPTreeIterator::operator--(int) {
   return tmp;
 }
 
-void EPTree::Init() {
-  RTree{block()}.Init(1);
+void EPTree::Init(uint32_t block_number) {
+  RTree{block()}.Init(1, block_number);
 }
 
 bool EPTree::insert(const iterator::value_type& key_value) {
@@ -98,7 +98,7 @@ bool EPTree::insert(const iterator::value_type& key_value) {
     auto split_point = node_level->middle();
     key_type split_point_key = split_point->key;
     // Alloc new right side tree
-    auto right_block_number = AllocBlockForTree(node_level->block()->BlockNumber(), allocated_extents);
+    auto right_block_number = AllocBlockForTree(node_level->tree_header()->block_number.value(), allocated_extents);
     RTree new_right(allocator_->LoadAllocatorBlock(right_block_number, /*new_block=*/true));
     RTree new_left{node_level->block()};
     if (depth == tree_header()->depth.value()) {
@@ -108,17 +108,17 @@ bool EPTree::insert(const iterator::value_type& key_value) {
         return false;
       }
       // We need a new left side too
-      auto left_block_number = AllocBlockForTree(node_level->block()->BlockNumber(), allocated_extents);
+      auto left_block_number = AllocBlockForTree(node_level->tree_header()->block_number.value(), allocated_extents);
       new_left = {allocator_->LoadAllocatorBlock(left_block_number, /*new_block=*/true)};
-      new_right.Init(depth);
-      new_left.Init(depth);
+      new_right.Init(depth, right_block_number);
+      new_left.Init(depth, left_block_number);
       node_level->split(new_left, new_right, split_point);
       // Reset the root
-      node_level->Init(depth + 1);
+      node_level->Init(depth + 1, node_level->tree_header()->block_number.value());
       node_level->insert({0, left_block_number});
       node_level->insert({split_point_key, right_block_number});
     } else {
-      new_right.Init(depth);
+      new_right.Init(depth, right_block_number);
       node_level->split(new_right, split_point);
     }
     [[maybe_unused]] bool inserted;
@@ -155,7 +155,7 @@ void EPTree::erase(const const_iterator& pos, std::vector<FreeBlocksRangeInfo>& 
       mutable_tree_header()->depth = 1;
     } else {
       // node is empty, delete parent too
-      blocks_to_delete.push_back({node_level->block()->BlockNumber(), 1});
+      blocks_to_delete.push_back({node_level->tree_header()->block_number.value(), 1});
     }
   }
 }

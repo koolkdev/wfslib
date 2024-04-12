@@ -89,9 +89,9 @@ bool FreeBlocksTreeBucket::insert(iterator& pos, FTree::iterator::value_type key
   auto old_block = pos.ftree().node->block();
   old_block->Detach();
   FTrees old_ftrees{old_block};
-  auto left_block_number = old_block->BlockNumber();
-
+  auto left_block_number = pos.eptree().iterator->value;
   auto left_block = allocator_->LoadAllocatorBlock(left_block_number, true);
+  assert(left_block->BlockNumber() == old_block->BlockNumber());
 
   std::optional<FreeBlocksExtentInfo> allocated_extent;
   auto right_block_number = allocator_->AllocFreeBlockFromCache();

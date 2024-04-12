@@ -33,8 +33,8 @@ PTreeNode<RTreeLeaf_details>::const_iterator split_point(
   return res;
 }
 
-void RTree::Init(uint8_t depth) {
+void RTree::Init(uint8_t depth, uint32_t block_number) {
   EPTreeBlock::Init();
   mutable_tree_header()->depth = depth;
-  mutable_tree_header()->block_number = block_->BlockNumber();
+  mutable_tree_header()->block_number = block_number;
 }

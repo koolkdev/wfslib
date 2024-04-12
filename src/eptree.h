@@ -98,7 +98,7 @@ class EPTree : public EPTreeBlock {
 
   EPTree(FreeBlocksAllocator* allocator) : EPTreeBlock(allocator->root_block()), allocator_(allocator) {}
 
-  void Init();
+  void Init(uint32_t block_number);
 
   iterator begin() { return begin_impl(); }
   iterator end() { return end_impl(); }
