@@ -25,7 +25,7 @@ TEST_CASE("FreeBlocksTreeTests") {
   TestFreeBlocksAllocator allocator{allocator_block, test_device};
   allocator.Init(1000000);
   EPTree eptree{&allocator};
-  eptree.Init();
+  eptree.Init(0);
   auto initial_ftrees_block_number = allocator.AllocFreeBlockFromCache();
   auto initial_ftrees_block = allocator.LoadAllocatorBlock(initial_ftrees_block_number, true);
   FTreesBlock{initial_ftrees_block}.Init();
