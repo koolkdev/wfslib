@@ -29,5 +29,5 @@ class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs
   PTreeHeader* mutable_header() override { return &mutable_tree_header()->current_tree; }
   const PTreeHeader* header() const override { return &tree_header()->current_tree; }
 
-  void Init(uint8_t depth);
+  void Init(uint8_t depth, uint32_t block_number);
 };

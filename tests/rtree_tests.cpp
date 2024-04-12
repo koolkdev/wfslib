@@ -22,7 +22,7 @@ TEST_CASE("RTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto rtree_block = TestMetadataBlock::LoadBlock(test_device, 0);
   RTree rtree{rtree_block};
-  rtree.Init(/*depth=*/1);
+  rtree.Init(/*depth=*/1, /*block_number=*/0);
 
   SECTION("Check empty rtree size") {
     REQUIRE(rtree.size() == 0);

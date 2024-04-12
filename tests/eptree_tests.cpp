@@ -24,7 +24,7 @@ TEST_CASE("EPTreeTests") {
   TestFreeBlocksAllocator allocator{allocator_block, test_device};
   allocator.Init(1000000);
   EPTree eptree{&allocator};
-  eptree.Init();
+  eptree.Init(/*block_number=*/0);
 
   SECTION("insert items sorted") {
     constexpr int kItemsCount = 600 * 300;

@@ -230,16 +230,18 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
   auto last = eptree.rbegin();
   if (last->key || last->value != 2)
     return;
+  uint32_t last_value = last->value;
+  assert(last_value == 2);
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   // eptree is empty (aka have only initial FTreee), resize it to one eptree
   auto nodes = last.base().nodes();
   for (auto& [node_level, node_it] : std::views::reverse(nodes)) {
     if (node_level->header() == &eptree.tree_header()->current_tree) {
       // this is the root, reinitialize it
-      node_level->Init(1);
-      node_level->insert({0, 2});
+      node_level->Init(1, node_level->tree_header()->block_number.value());
+      node_level->insert({0, last_value});
     } else {
-      blocks_to_delete.push_back({node_level->block()->BlockNumber(), 1});
+      blocks_to_delete.push_back({node_level->tree_header()->block_number.value(), 1});
     }
   }
   std::ranges::for_each(blocks_to_delete, std::bind(&FreeBlocksAllocator::AddFreeBlocks, this, std::placeholders::_1));
