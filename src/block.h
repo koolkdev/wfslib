@@ -23,8 +23,8 @@ class Block {
 
   enum BlockSizeType {
     Single = 0,
-    Big = 3,
-    BigCluster = 6,
+    Large = 3,
+    LargeCluster = 6,
   };
 
   bool Fetch(bool check_hash = true);
@@ -50,6 +50,7 @@ class Block {
     return reinterpret_cast<T*>(mutable_data().data() + offset);
   }
 
+  // TODO: Rename to AbsBlockNumber for clarity?
   uint32_t BlockNumber() const { return block_number_; }
   Block::BlockSize log2_size() const { return size_category_; }
 

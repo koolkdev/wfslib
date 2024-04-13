@@ -200,7 +200,7 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   // Set the root directory to be /usr
   area_header.root_directory_block_number =
       kUsrDirectoryBlockNumber >> (Block::BlockSize::Regular - Block::BlockSize::Basic);
-  area_header.log2_block_size = Block::BlockSize::Regular;
+  area_header.block_size_log2 = Block::BlockSize::Regular;
 
   // Now create the block
   std::vector<std::byte> first_wfs_block;
@@ -241,8 +241,9 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   }
   uint32_t sub_area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(
-          device, blocks_device, sub_area->AbsoluteBlockNumber(sub_area->header()->root_directory_block_number.value()),
-          sub_area->AbsoluteBlockNumber(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
+          device, blocks_device,
+          sub_area->ToAbsoluteBlockNumber(sub_area->header()->root_directory_block_number.value()),
+          sub_area->ToAbsoluteBlockNumber(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
   uint32_t wfs_iv = sub_area_xor_wfs_iv ^ sub_area->header()->iv.value();

@@ -22,12 +22,12 @@ bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tre
   initial_frees_block_number_ = initial_ftrees_block_number_ + 1;
 
   if (free_cache_blocks) {
-    mutable_header()->free_metadata_block = initial_frees_block_number_;
-    mutable_header()->free_metadata_blocks_count = free_cache_blocks;
+    mutable_header()->free_blocks_cache = initial_frees_block_number_;
+    mutable_header()->free_blocks_cache_count = free_cache_blocks;
     mutable_header()->free_blocks_count = free_cache_blocks + free_tree_blocks;
   } else {
-    mutable_header()->free_metadata_block = 0;
-    mutable_header()->free_metadata_blocks_count = 0;
+    mutable_header()->free_blocks_cache = 0;
+    mutable_header()->free_blocks_cache_count = 0;
     mutable_header()->free_blocks_count = free_tree_blocks;
   }
 

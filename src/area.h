@@ -30,6 +30,7 @@ class Area : public std::enable_shared_from_this<Area> {
        const AttributesBlock& root_directory_attributes);
 
   static std::expected<std::shared_ptr<Area>, WfsError> LoadRootArea(const std::shared_ptr<BlocksDevice>& device);
+  static std::expected<std::shared_ptr<Area>, WfsError> CreateRootArea(const std::shared_ptr<BlocksDevice>& device);
 
   std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t block_number,
                                                          const std::string& root_directory_name,
@@ -64,15 +65,18 @@ class Area : public std::enable_shared_from_this<Area> {
                                                                  Block::BlockSizeType chunk_size);
   bool DeleteBlocks(uint32_t block_number, uint32_t blocks_count);
 
-  uint32_t RelativeBlockNumber(uint32_t block_number) const;
-  uint32_t AbsoluteBlockNumber(uint32_t block_number) const;
+  uint32_t ToRelativeBlockNumber(uint32_t absolute_block_number) const;
+  uint32_t ToAbsoluteBlockNumber(uint32_t relative_block_number) const;
+  uint32_t ToRelativeBlocksCount(uint32_t absolute_blocks_count) const;
+  uint32_t ToAbsoluteBlocksCount(uint32_t relative_blocks_count) const;
 
-  size_t GetDataBlockLog2Size() const;
+  size_t BlockSizeLog2() const;
 
   uint32_t BlockNumber() const;
   uint32_t BlocksCount() const;
 
-  size_t BlocksCacheSize() const;
+  size_t BlocksCacheSizeLog2() const;
+  uint32_t ReservedBlocksCount() const;
 
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
@@ -81,7 +85,14 @@ class Area : public std::enable_shared_from_this<Area> {
   friend class Recovery;
   friend class FreeBlocksAllocator;
 
-  static constexpr uint32_t FreeBlocksAllocatorBlockNumber = 1;
+  static constexpr uint32_t kFreeBlocksAllocatorBlockNumber = 1;
+  static constexpr uint32_t kFreeBlocksAllocatorInitialFTreeBlockNumber = 2;
+  static constexpr uint32_t kRootDirectoryBlockNumber = 3;
+  static constexpr uint32_t kShadowDirectory1BlockNumber = 4;
+  static constexpr uint32_t kShadowDirectory2BlockNumber = 5;
+  static constexpr uint32_t kReservedAreaBlocks = 6;
+
+  static constexpr uint32_t kTransactionsBlockNumber = 6;
 
   MetadataBlock* block() { return header_block_.get(); }
   const MetadataBlock* block() const { return header_block_.get(); }
@@ -100,7 +111,6 @@ class Area : public std::enable_shared_from_this<Area> {
     return has_wfs_header() ? block()->get_object<WfsHeader>(wfs_header_offset()) : NULL;
   }
 
-  uint32_t ToBasicBlockNumber(uint32_t block_number) const;
   uint32_t IV(uint32_t block_number) const;
 
   std::shared_ptr<BlocksDevice> device_;

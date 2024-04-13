@@ -38,13 +38,58 @@ size_t BlockSizeToIndex(Block::BlockSizeType size) {
 FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block)
     : area_(std::move(area)), block_(std::move(block)) {}
 
+void FreeBlocksAllocator::Init() {
+  uint32_t initial_free_blocks_number = area_->ReservedBlocksCount();
+  uint32_t free_blocks_count = area_->BlocksCount() - initial_free_blocks_number;
+
+  // Init cach info
+  auto* header = mutable_header();
+  header->free_blocks_count = free_blocks_count;
+  header->always_one = 1;
+
+  if (area_->BlocksCacheSizeLog2()) {
+    uint32_t cache_end_block_number = initial_free_blocks_number + (1 << area_->BlocksCacheSizeLog2());
+    cache_end_block_number = area_->ToAbsoluteBlockNumber(cache_end_block_number);
+    cache_end_block_number = align_ceil_pow2(
+        cache_end_block_number, area_->BlocksCacheSizeLog2() + area_->BlockSizeLog2() - Block::BlockSize::Basic);
+    cache_end_block_number = area_->ToRelativeBlockNumber(cache_end_block_number);
+    uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks_number;
+    if (cache_free_blocks_count > free_blocks_count) {
+      cache_free_blocks_count = free_blocks_count;
+    }
+    header->free_blocks_cache = initial_free_blocks_number;
+    header->free_blocks_cache_count = cache_free_blocks_count;
+
+    initial_free_blocks_number += cache_free_blocks_count;
+    free_blocks_count -= cache_free_blocks_count;
+  } else {
+    header->free_blocks_cache = 0;
+    header->free_blocks_cache_count = 0;
+  }
+
+  // TODO: support sparse areas
+  EPTree eptree{this};
+  eptree.Init(area_->ToRelativeBlockNumber(block_->BlockNumber()));
+  // TODO: 2 -> k
+  auto ftree_block = LoadAllocatorBlock(2, true);
+  FTrees ftrees{std::move(ftree_block)};
+  ftrees.Init();
+  eptree.insert({0, 2});
+  if (free_blocks_count)
+    AddFreeBlocks({initial_free_blocks_number, free_blocks_count});
+}
+
+uint32_t FreeBlocksAllocator::FreeBlocksCount() {
+  return header()->free_blocks_count.value();
+}
+
 uint32_t FreeBlocksAllocator::AllocFreeBlockFromCache() {
-  if (header()->free_metadata_blocks_count.value() == 0)
+  if (header()->free_blocks_cache_count.value() == 0)
     return 0;
   auto* header = mutable_header();
-  auto res = header->free_metadata_block.value();
-  header->free_metadata_block++;
-  header->free_metadata_blocks_count--;
+  auto res = header->free_blocks_cache.value();
+  header->free_blocks_cache++;
+  header->free_blocks_cache_count--;
   header->free_blocks_count--;
   return res;
 }
@@ -165,7 +210,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
       }
     }
     sub_range.block_number += sub_range.blocks_count;
-    sub_range.blocks_count = range_in_size.end_block_number() - sub_range.blocks_count;
+    sub_range.blocks_count = range_in_size.end_block_number() - sub_range.block_number;
   }
   if (range_in_size.block_number > range.block_number)
     AddFreeBlocksForSize({range.block_number, range_in_size.block_number - range.block_number}, bucket_index - 1);
@@ -251,7 +296,7 @@ bool FreeBlocksAllocator::IsRangeIsFree(FreeBlocksRangeInfo range) {
   FreeBlocksTree tree{this};
   auto pos = tree.find(range.block_number);
   if (pos.is_end())
-    return false;
+    return true;
   // Ensure that previous allocated block is before us
   if (pos->end_block_number() > range.block_number)
     return true;
@@ -270,13 +315,13 @@ std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t c
   uint32_t need_more_blocks_count = chunks_count << size;
   if (!need_more_blocks_count)
     return result;
-  if (use_cache && size_index == 0 && area_->BlocksCacheSize()) {
+  if (use_cache && size_index == 0 && area_->BlocksCacheSizeLog2()) {
     do {
-      auto blocks_from_cache = std::min(need_more_blocks_count, header()->free_metadata_blocks_count.value());
+      auto blocks_from_cache = std::min(need_more_blocks_count, header()->free_blocks_count.value());
       auto* header = mutable_header();
-      auto cache_block_number = header->free_metadata_block.value();
-      header->free_metadata_block += blocks_from_cache;
-      header->free_metadata_blocks_count -= blocks_from_cache;
+      auto cache_block_number = header->free_blocks_cache.value();
+      header->free_blocks_cache += blocks_from_cache;
+      header->free_blocks_cache_count -= blocks_from_cache;
       header->free_blocks_count -= blocks_from_cache;
       need_more_blocks_count -= blocks_from_cache;
       std::ranges::copy(std::views::iota(cache_block_number, cache_block_number + blocks_from_cache),
@@ -296,11 +341,12 @@ std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t c
   if (AllocBlocksOfSpecificSize(need_more_blocks_count, size_index, kSizeBucketsCount, result))
     return result;
   // Not enough free blocks
+  // TODO: Free cache an try again
   return std::nullopt;
 }
 
 bool FreeBlocksAllocator::ReplanishBlocksCache() {
-  uint32_t blocks_to_alloc = 1 << area_->BlocksCacheSize();
+  uint32_t blocks_to_alloc = 1 << area_->BlocksCacheSizeLog2();
   std::optional<FreeBlocksExtentInfo> selected_extent;
   for (size_t i = 0; i < kSizeBucketsCount; ++i) {
     FreeBlocksTreeBucket bucket(this, i);
@@ -315,10 +361,10 @@ bool FreeBlocksAllocator::ReplanishBlocksCache() {
   if (!selected_extent)
     return false;
   // Round the block number to be aligned to blocks cache in the whole disk
-  auto abs_block_number = area_->AbsoluteBlockNumber(selected_extent->block_number);
+  auto abs_block_number = area_->ToAbsoluteBlockNumber(selected_extent->block_number);
   auto aligned_block_number = align_ceil_pow2(
-      abs_block_number, area_->BlocksCacheSize() + area_->header()->log2_block_size.value() - Block::BlockSize::Basic);
-  selected_extent->block_number = area_->RelativeBlockNumber(aligned_block_number);
+      abs_block_number, area_->BlocksCacheSizeLog2() + area_->BlockSizeLog2() - Block::BlockSize::Basic);
+  selected_extent->block_number = area_->ToRelativeBlockNumber(aligned_block_number);
   selected_extent->blocks_count = blocks_to_alloc;
   return true;
 }

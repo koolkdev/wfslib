@@ -42,6 +42,10 @@ class FreeBlocksAllocator {
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
   virtual ~FreeBlocksAllocator() = default;
 
+  void Init();
+
+  uint32_t FreeBlocksCount();
+
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);
 
