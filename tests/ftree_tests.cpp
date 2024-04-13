@@ -22,14 +22,14 @@ TEST_CASE("FTreeTests") {
   auto ftrees_block = TestMetadataBlock::LoadBlock(test_device, 0);
   FTreesBlock{ftrees_block}.Init();
 
-  auto ftrees = std::ranges::iota_view(size_t{0}, kSizeBucketsCount) |
+  auto ftrees = std::ranges::iota_view(size_t{0}, kSizeBuckets.size()) |
                 std::views::transform([&ftrees_block](size_t i) -> FTree {
                   return FTree{ftrees_block, i};
                 }) |
                 std::ranges::to<std::vector>();
 
   SECTION("Check empty ftree size") {
-    for (size_t i = 0; i < kSizeBucketsCount; ++i)
+    for (size_t i = 0; i < kSizeBuckets.size(); ++i)
       REQUIRE(ftrees[i].size() == 0);
   }
 

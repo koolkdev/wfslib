@@ -60,7 +60,7 @@ class FTreesConstIterator {
   using ftree_info = node_iterator_info<FTree>;
 
   FTreesConstIterator() = default;
-  FTreesConstIterator(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index)
+  FTreesConstIterator(std::array<ftree_info, kSizeBuckets.size()> ftrees, size_t index)
       : ftrees_(std::move(ftrees)), index_(index) {}
 
   reference operator*() const { return *operator->(); }
@@ -80,7 +80,7 @@ class FTreesConstIterator {
   bool is_end() const { return ftrees_[index_].iterator.is_end(); }
 
   template <typename Range>
-  static size_t find_next_extent_index(Range& ftrees, bool max, std::bitset<kSizeBucketsCount> reverse_end = {}) {
+  static size_t find_next_extent_index(Range& ftrees, bool max, std::bitset<kSizeBuckets.size()> reverse_end = {}) {
     auto iterated_ftrees = ftrees | std::views::filter([&reverse_end](const ftree_info& ftree) {
                              return !ftree.iterator.is_end() && !reverse_end.test(ftree.node->index());
                            });
@@ -90,15 +90,15 @@ class FTreesConstIterator {
     return res != std::ranges::end(iterated_ftrees) ? res->node->index() : 0;
   }
 
-  const std::array<ftree_info, kSizeBucketsCount>& ftrees() const { return ftrees_; }
+  const std::array<ftree_info, kSizeBuckets.size()>& ftrees() const { return ftrees_; }
   size_t index() const { return index_; }
 
  private:
-  std::array<ftree_info, kSizeBucketsCount> ftrees_;
+  std::array<ftree_info, kSizeBuckets.size()> ftrees_;
   size_t index_{0};
 
   bool is_forward_{true};
-  std::bitset<kSizeBucketsCount> reverse_end_;
+  std::bitset<kSizeBuckets.size()> reverse_end_;
 };
 
 class FTreesIterator : public FTreesConstIterator {
@@ -112,7 +112,7 @@ class FTreesIterator : public FTreesConstIterator {
   using pointer = ref_type*;
 
   FTreesIterator() = default;
-  FTreesIterator(std::array<ftree_info, kSizeBucketsCount> ftrees, size_t index)
+  FTreesIterator(std::array<ftree_info, kSizeBuckets.size()> ftrees, size_t index)
       : FTreesConstIterator(std::move(ftrees), index) {}
 
   reference operator*() const { return *operator->(); }
@@ -138,7 +138,7 @@ class FTrees {
   using const_reverse_iterator = TreeReverseIterator<const_iterator>;
 
   FTrees(std::shared_ptr<MetadataBlock> block)
-      : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBucketsCount>{})) {}
+      : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBuckets.size()>{})) {}
 
   size_t size() const {
     // TODO: llvm fold support
@@ -170,12 +170,12 @@ class FTrees {
 
   void Init();
 
-  std::array<FTree, kSizeBucketsCount>& ftrees() { return ftrees_; }
+  std::array<FTree, kSizeBuckets.size()>& ftrees() { return ftrees_; }
 
  private:
   template <std::size_t... Is>
-  static std::array<FTree, kSizeBucketsCount> CreateFTreeArray(std::shared_ptr<MetadataBlock> block,
-                                                               std::index_sequence<Is...>) {
+  static std::array<FTree, kSizeBuckets.size()> CreateFTreeArray(std::shared_ptr<MetadataBlock> block,
+                                                                 std::index_sequence<Is...>) {
     return {{{block, Is}...}};
   }
 
@@ -183,5 +183,5 @@ class FTrees {
   iterator end_impl() const;
   iterator find_impl(key_type key, bool exact_match = true) const;
 
-  std::array<FTree, kSizeBucketsCount> ftrees_;
+  std::array<FTree, kSizeBuckets.size()> ftrees_;
 };

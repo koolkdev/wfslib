@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <array>
 #include <memory>
 #include <optional>
 #include <vector>
@@ -14,8 +15,7 @@
 #include "block.h"
 
 // Log2 of number of block in for each single quanta in each bucket
-constexpr size_t kSizeBuckets[] = {0, 3, 6, 10, 14, 18, 22};
-constexpr size_t kSizeBucketsCount = std::extent<decltype(kSizeBuckets)>::value;
+constexpr auto kSizeBuckets = std::to_array({0, 3, 6, 10, 14, 18, 22});
 
 class EPTree;
 class Area;

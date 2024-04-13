@@ -30,7 +30,7 @@ TEST_CASE("FTreesTests") {
   SECTION("insert sorted items") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % kSizeBucketsCount].insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % kSizeBuckets.size()].insert({i, static_cast<nibble>(i % 16)}));
     }
     REQUIRE(!ftrees.empty());
     REQUIRE(ftrees.size() == kItemsCount);
@@ -41,14 +41,14 @@ TEST_CASE("FTreesTests") {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
   }
 
   SECTION("check backward iterator") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % kSizeBucketsCount].insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % kSizeBuckets.size()].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     REQUIRE(std::ranges::equal(
@@ -58,14 +58,14 @@ TEST_CASE("FTreesTests") {
                               }),
         std::views::transform(std::views::reverse(std::views::iota(0, kItemsCount)),
                               [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+                                return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
                               })));
   }
 
   SECTION("check backward/forward iterator") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % (kSizeBucketsCount - 2)].insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % (kSizeBuckets.size() - 2)].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     auto it = ftrees.begin();
@@ -100,7 +100,7 @@ TEST_CASE("FTreesTests") {
   SECTION("check find") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % kSizeBucketsCount].insert({i * 2, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % kSizeBuckets.size()].insert({i * 2, static_cast<nibble>(i % 16)}));
     }
 
     auto it = ftrees.find(523);
@@ -115,17 +115,17 @@ TEST_CASE("FTreesTests") {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, 522 / 2), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+          return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(it, ftrees.end()),
                               [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
-        std::views::transform(std::views::iota(522 / 2, kItemsCount),
-                              [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
-                              })));
+        std::views::transform(
+            std::views::iota(522 / 2, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
+              return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
+            })));
 
     it = ftrees.find(840);
     REQUIRE(it->key == 840);
@@ -136,17 +136,17 @@ TEST_CASE("FTreesTests") {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, 840 / 2), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+          return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(it, ftrees.end()),
                               [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
-        std::views::transform(std::views::iota(840 / 2, kItemsCount),
-                              [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
-                              })));
+        std::views::transform(
+            std::views::iota(840 / 2, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
+              return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
+            })));
 
     REQUIRE(ftrees.find(4, false)->key == 4);
     REQUIRE(ftrees.find(6, false)->key == 6);
@@ -157,7 +157,7 @@ TEST_CASE("FTreesTests") {
   SECTION("test split") {
     constexpr int kItemsCount = 500;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftrees.ftrees()[i % kSizeBucketsCount].insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(ftrees.ftrees()[i % kSizeBuckets.size()].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     key_type split_point;
