@@ -97,7 +97,7 @@ uint32_t FreeBlocksAllocator::AllocFreeBlockFromCache() {
 uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated) {
   // Since we are releasing everything only at the end we need to track the allocated blocks so far which makes this
   // logic bit more complex than original.
-  for (size_t i = 0; i < kSizeBucketsCount; ++i) {
+  for (size_t i = 0; i < kSizeBuckets.size(); ++i) {
     FreeBlocksTreeBucket bucket(this, i);
     for (auto it = bucket.find(near); it != bucket.end(); ++it) {
       FreeBlocksExtentInfo possible_result = *it;
@@ -125,13 +125,13 @@ bool FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
     assert(false);
     return false;
   }
-  AddFreeBlocksForSize(range, kSizeBucketsCount - 1);
+  AddFreeBlocksForSize(range, kSizeBuckets.size() - 1);
   mutable_header()->free_blocks_count += range.blocks_count;
   return true;
 }
 
 void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t bucket_index) {
-  assert(bucket_index < kSizeBucketsCount);
+  assert(bucket_index < kSizeBuckets.size());
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   const uint32_t size_blocks_count = 1 << kSizeBuckets[bucket_index];
   uint32_t range_in_size_start = align_ceil_pow2(range.block_number, kSizeBuckets[bucket_index]);
@@ -143,7 +143,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
   }
   FreeBlocksRangeInfo range_in_size{range_in_size_start, range_in_size_end - range_in_size_start};
   size_t next_size_pow2 =
-      (bucket_index + 1 == kSizeBucketsCount) ? (kSizeBuckets[bucket_index] + 4) : kSizeBuckets[bucket_index + 1];
+      (bucket_index + 1 == kSizeBuckets.size()) ? (kSizeBuckets[bucket_index] + 4) : kSizeBuckets[bucket_index + 1];
   uint32_t next_size_blocks_count = 1 << next_size_pow2;
   FreeBlocksTreeBucket bucket{this, bucket_index};
   std::optional<FreeBlocksExtentInfo> join_before;
@@ -187,7 +187,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
   FreeBlocksRangeInfo sub_range = range_in_size;
   while (sub_range.blocks_count) {
     if (sub_range.blocks_count >= next_size_blocks_count) {
-      if (bucket_index == kSizeBucketsCount - 1) {
+      if (bucket_index == kSizeBuckets.size() - 1) {
         // Maximum bucket, use blocks count until alignment)
         sub_range.blocks_count = align_ceil_pow2(sub_range.block_number, next_size_pow2) - sub_range.block_number;
       } else {
@@ -238,7 +238,7 @@ bool FreeBlocksAllocator::RemoveFreeBlocksExtent(FreeBlocksExtentInfo extent) {
 
 bool FreeBlocksAllocator::RemoveSpecificFreeBlocksExtent(FreeBlocksExtentInfo extent) {
   // Iterator over higher bucket sizes in case it merged into one.
-  for (auto bucket_index = extent.bucket_index; bucket_index < kSizeBucketsCount; ++bucket_index) {
+  for (auto bucket_index = extent.bucket_index; bucket_index < kSizeBuckets.size(); ++bucket_index) {
     FreeBlocksTreeBucket bucket{this, bucket_index};
     auto res = bucket.find(extent.block_number, false);
     if (res.is_end())
@@ -338,7 +338,7 @@ std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t c
     if (AllocBlocksOfSpecificSize(need_more_blocks_count, size_index, 1, result))
       return result;
   }
-  if (AllocBlocksOfSpecificSize(need_more_blocks_count, size_index, kSizeBucketsCount, result))
+  if (AllocBlocksOfSpecificSize(need_more_blocks_count, size_index, kSizeBuckets.size(), result))
     return result;
   // Not enough free blocks
   // TODO: Free cache an try again
@@ -348,7 +348,7 @@ std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t c
 bool FreeBlocksAllocator::ReplanishBlocksCache() {
   uint32_t blocks_to_alloc = 1 << area_->BlocksCacheSizeLog2();
   std::optional<FreeBlocksExtentInfo> selected_extent;
-  for (size_t i = 0; i < kSizeBucketsCount; ++i) {
+  for (size_t i = 0; i < kSizeBuckets.size(); ++i) {
     FreeBlocksTreeBucket bucket(this, i);
     auto it = bucket.begin();
     if (!it.is_end())

@@ -116,7 +116,7 @@ void FTrees::Init() {
 }
 
 FTrees::iterator FTrees::begin_impl() const {
-  std::array<typename iterator::ftree_info, kSizeBucketsCount> ftrees_info;
+  std::array<typename iterator::ftree_info, kSizeBuckets.size()> ftrees_info;
   std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
                  [](const FTree& cftree) -> typename iterator::ftree_info {
                    // We will convert the iterator back to const iterator if needed
@@ -128,7 +128,7 @@ FTrees::iterator FTrees::begin_impl() const {
 }
 
 FTrees::iterator FTrees::end_impl() const {
-  std::array<typename iterator::ftree_info, kSizeBucketsCount> ftrees_info;
+  std::array<typename iterator::ftree_info, kSizeBuckets.size()> ftrees_info;
   std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
                  [](const FTree& cftree) -> typename iterator::ftree_info {
                    auto& ftree = const_cast<FTree&>(cftree);
@@ -138,7 +138,7 @@ FTrees::iterator FTrees::end_impl() const {
 }
 
 FTrees::iterator FTrees::find_impl(key_type key, bool exact_match) const {
-  std::array<typename iterator::ftree_info, kSizeBucketsCount> ftrees_info;
+  std::array<typename iterator::ftree_info, kSizeBuckets.size()> ftrees_info;
   std::transform(ftrees_.begin(), ftrees_.end(), ftrees_info.begin(),
                  [key](const FTree& cftree) -> typename iterator::ftree_info {
                    auto& ftree = const_cast<FTree&>(cftree);

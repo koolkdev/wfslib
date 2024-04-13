@@ -36,7 +36,7 @@ TEST_CASE("FreeBlocksTreeTests") {
   SECTION("insert items sorted") {
     constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBucketsCount}.insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBuckets.size()}.insert({i, static_cast<nibble>(i % 16)}));
     }
 
     REQUIRE(std::ranges::equal(
@@ -45,7 +45,7 @@ TEST_CASE("FreeBlocksTreeTests") {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
@@ -57,7 +57,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     constexpr int kItemsCount = 600 * 300;
     auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
     for (auto key : unsorted_keys) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBucketsCount}.insert({key, static_cast<nibble>(key % 16)}));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBuckets.size()}.insert({key, static_cast<nibble>(key % 16)}));
     }
 
     // Check that the tree is sorted
@@ -73,7 +73,7 @@ TEST_CASE("FreeBlocksTreeTests") {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBucketsCount)};
+          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
@@ -84,14 +84,14 @@ TEST_CASE("FreeBlocksTreeTests") {
   SECTION("erase items randomly") {
     constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBucketsCount}.insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBuckets.size()}.insert({i, static_cast<nibble>(i % 16)}));
     }
     auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
     auto middle = unsorted_keys.begin() + kItemsCount / 2;
     std::vector<FreeBlocksRangeInfo> blocks_to_delete;
     // Remove half the items first
     for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBucketsCount}.erase(key, blocks_to_delete));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBuckets.size()}.erase(key, blocks_to_delete));
     }
 
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
@@ -102,7 +102,7 @@ TEST_CASE("FreeBlocksTreeTests") {
 
     // Remove the second half
     for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBucketsCount}.erase(key, blocks_to_delete));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, key % kSizeBuckets.size()}.erase(key, blocks_to_delete));
     }
 
     // Should be empty
@@ -186,7 +186,7 @@ TEST_CASE("FreeBlocksTreeTests") {
   SECTION("check backward/forward iterator") {
     constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBucketsCount}.insert({i, static_cast<nibble>(i % 16)}));
+      REQUIRE(FreeBlocksTreeBucket{&allocator, i % kSizeBuckets.size()}.insert({i, static_cast<nibble>(i % 16)}));
     }
 
     auto it = tree.begin();

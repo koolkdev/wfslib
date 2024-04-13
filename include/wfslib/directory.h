@@ -39,6 +39,8 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   const std::shared_ptr<Area>& area() const { return area_; }
 
+  static void LoadDirectory(std::shared_ptr<Area> area, AttributesBlock attributes, uint32_t block_number);
+
  private:
   friend DirectoryItemsIterator;
   friend class Recovery;
@@ -48,6 +50,7 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   std::shared_ptr<MetadataBlock> block_;
 
+  // TODO: Remove the name arg
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObjectInternal(const std::string& name,
                                                                       const AttributesBlock& attributes) const;
   std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
