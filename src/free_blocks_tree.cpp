@@ -78,8 +78,14 @@ FreeBlocksTree::iterator FreeBlocksTree::begin_impl() const {
   assert(!eptree.iterator.is_end());
   iterator::ftrees_node_info ftrees{{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
   ftrees.iterator = ftrees.node->begin();
-  while (ftrees.iterator.is_end() && !eptree.iterator.is_end()) {
-    ftrees = {{allocator_->LoadAllocatorBlock((++eptree.iterator)->value)}};
+  while (ftrees.iterator.is_end()) {
+    if ((++eptree.iterator).is_end()) {
+      // end
+      --eptree.iterator;
+      return {allocator_, std::move(eptree), std::move(ftrees)};
+    }
+
+    ftrees = {{allocator_->LoadAllocatorBlock(eptree.iterator->value)}};
     ftrees.iterator = ftrees.node->begin();
   }
   return {allocator_, std::move(eptree), std::move(ftrees)};
