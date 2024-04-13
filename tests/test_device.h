@@ -11,7 +11,7 @@
 
 class TestDevice : public Device {
  public:
-  TestDevice() = default;
+  TestDevice(uint32_t sectors_count) : sectors_count_(sectors_count) {}
   ~TestDevice() override = default;
 
   void ReadSectors(const std::span<std::byte>& /*data*/,
@@ -24,7 +24,10 @@ class TestDevice : public Device {
                     uint32_t /*sectors_count*/) override {
     return;
   }
-  uint32_t SectorsCount() const override { return 0; }
+  uint32_t SectorsCount() const override { return sectors_count_; }
   uint32_t Log2SectorSize() const override { return 9; }
   bool IsReadOnly() const override { return false; }
+
+ private:
+  uint32_t sectors_count_;
 };

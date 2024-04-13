@@ -95,6 +95,11 @@ struct Attributes {
 };
 static_assert(sizeof(Attributes) == 0x2C, "Incorrect sizeof Attributes");
 
+enum class DeviceType : uint16_t {
+  MLC = 0x136a,
+  USB = 0x16a2,
+};
+
 // sizeof 0x48
 struct WfsHeader {
   uint32_be_t iv;           // most 2 bits are device type. 1-mlc/3-usb
@@ -103,7 +108,7 @@ struct WfsHeader {
   uint16_be_t _pad;
   Attributes root_area_attributes;
   uint32_be_t transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
-  uint32_be_t root_area_blocks_count;
+  uint32_be_t transactions_area_blocks_count;
   uint32_be_t unknown[2];  // not used??
 };
 static_assert(sizeof(WfsHeader) == 0x48, "Incorrect sizeof WfsHeader");
@@ -118,24 +123,24 @@ static_assert(sizeof(WfsAreaFragmentInfo) == 0x8, "Incorrect sizeof WfsAreaFragm
 // sizeof 0x60
 struct WfsAreaHeader {
   enum class AreaType : uint8_t {
-    RootArea = 0,
+    TransactionsArea = 0,
     QuotaArea = 1,
   };
   uint32_be_t iv;  // used for blocks  encryption
   uint32_be_t blocks_count;
-  uint32_be_t root_directory_block_number;  // is 6
+  uint32_be_t root_directory_block_number;  // is 3
   // Those two directories are not used. It was supposed to be some kind of refcount mechansism. not really sure.
   // But nothing uses it in the WiiU
   uint32_be_t shadow_directory_block_number_1;  // is 4
   uint32_be_t shadow_directory_block_number_2;  // is 5
   uint8_be_t depth;                             // how many total parents area this area has
-  uint8_be_t log2_block_size;                   // 12/13
-  uint8_be_t log2_mega_block_size;              // mega block - 8 blocks. so 15/16
-  uint8_be_t log2_mega_blocks_cluster_size;     // mega blocks cluster - 8 mega blocks. so 18/19
-  uint8_be_t area_type;                         // 0 - root area, 1 - data (not relavent for transactions area)
+  uint8_be_t block_size_log2;                   // 12/13
+  uint8_be_t large_block_size_log2;             // large block - 8 blocks. so 15/16
+  uint8_be_t large_block_cluster_size_log2;     // large blocks cluster - 8 large blocks. so 18/19
+  uint8_be_t area_type;                         // 0 - transactions area, 1 - quota area
   uint8_be_t maybe_always_zero;                 // init to zero. doesn't seem to be changed by anything
-  uint16_be_t spare_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota.
-                                   // (parent area blocks, so in parent area block size)
+  uint16_be_t remainder_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota.
+                                       // (parent area blocks, so in parent area block size)
   WfsAreaFragmentInfo first_fragments[8];  // On which blocks this area is spread on (if there aren't enough free
                                            // sequentials blocks it will framgnet the area). parent area blocks, so in
                                            // parent area block size. This list contains only the first 8 fragments
@@ -244,8 +249,8 @@ struct FreeBlocksAllocatorHeader {
   // allocating metadata blocks, it will advance |free_metadata_block| and will decrease |free_metadata_blocks_count|.
   // When no more availabe blocks are avaialbe, it will allocate them regulary.
   // TODO: This is not metadata specific blocks, so rename this, this is just quick alloc cache
-  uint32_be_t free_metadata_block;
-  uint32_be_t free_metadata_blocks_count;
+  uint32_be_t free_blocks_cache;
+  uint32_be_t free_blocks_cache_count;
 };
 static_assert(sizeof(FreeBlocksAllocatorHeader) == 0x10, "Incorrect sizeof FreeBLocksAllocatorHeader");
 

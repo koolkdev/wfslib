@@ -7,6 +7,9 @@
 
 #include "area.h"
 
+#include <numeric>
+#include <random>
+
 #include "blocks_device.h"
 #include "device.h"
 #include "directory.h"
@@ -26,6 +29,7 @@ Area::Area(const std::shared_ptr<BlocksDevice>& device,
       root_directory_name_(root_directory_name),
       root_directory_attributes_(root_directory_attributes) {}
 
+// static
 std::expected<std::shared_ptr<Area>, WfsError> Area::LoadRootArea(const std::shared_ptr<BlocksDevice>& device) {
   auto block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
   if (!block.has_value()) {
@@ -36,6 +40,73 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::LoadRootArea(const std::sha
   return std::make_shared<Area>(
       device, nullptr, *block, "",
       AttributesBlock{*block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)});
+}
+
+// static
+std::expected<std::shared_ptr<Area>, WfsError> Area::CreateRootArea(const std::shared_ptr<BlocksDevice>& device) {
+  constexpr uint32_t kTransactionsAreaEnd = 0x1000;
+
+  auto block = MetadataBlock::LoadBlock(device, /*block_number=*/0, Block::BlockSize::Regular, /*iv=*/0,
+                                        /*check_hash=*/false, /*load_data=*/false);
+  if (!block.has_value()) {
+    return std::unexpected(block.error());
+  }
+
+  uint32_t blocks_count =
+      device->device()->SectorsCount() >> (Block::BlockSize::Regular - device->device()->Log2SectorSize());
+
+  AttributesBlock attributes{*block, sizeof(MetadataBlockHeader) + offsetof(WfsHeader, root_area_attributes)};
+  auto area = std::make_shared<Area>(device, nullptr, *block, "", attributes);
+
+  std::random_device rand_device;
+  std::default_random_engine rand_engine{rand_device()};
+  std::uniform_int_distribution<uint32_t> random_iv_generator(std::numeric_limits<uint32_t>::min(),
+                                                              std::numeric_limits<uint32_t>::max());
+
+  auto* header = area->mutable_header();
+  std::fill(reinterpret_cast<std::byte*>(header), reinterpret_cast<std::byte*>(header + 1), std::byte{0});
+  header->iv = random_iv_generator(rand_engine);
+  header->blocks_count = blocks_count;
+  header->root_directory_block_number = kRootDirectoryBlockNumber;
+  header->shadow_directory_block_number_1 = kShadowDirectory1BlockNumber;
+  header->shadow_directory_block_number_2 = kShadowDirectory2BlockNumber;
+  header->depth = 0;
+  header->block_size_log2 = static_cast<uint8_t>(Block::BlockSize::Regular);
+  header->large_block_size_log2 = header->block_size_log2.value() + static_cast<uint8_t>(Block::BlockSizeType::Large);
+  header->large_block_cluster_size_log2 =
+      header->block_size_log2.value() + static_cast<uint8_t>(Block::BlockSizeType::LargeCluster);
+  header->area_type = static_cast<uint8_t>(WfsAreaHeader::AreaType::QuotaArea);
+  header->maybe_always_zero = 0;
+  header->remainder_blocks_count = 0;
+  header->first_fragments[0].block_number = 0;
+  header->first_fragments[0].blocks_count = area->ToAbsoluteBlocksCount(blocks_count);
+  header->fragments_log2_block_size = static_cast<uint32_be_t>(Block::BlockSize::Basic);
+
+  auto* wfs_header = area->mutable_wfs_header();
+  std::fill(reinterpret_cast<std::byte*>(wfs_header), reinterpret_cast<std::byte*>(wfs_header + 1), std::byte{0});
+  wfs_header->iv = random_iv_generator(rand_engine);
+  wfs_header->device_type = static_cast<uint16_t>(DeviceType::USB);  // TODO
+  wfs_header->version = WFS_VERSION;
+  wfs_header->root_area_attributes.flags = Attributes::DIRECTORY | Attributes::AREA_SIZE_REGULAR | Attributes::QUOTA;
+  wfs_header->root_area_attributes.blocks_count = blocks_count;
+  wfs_header->transactions_area_block_number = area->ToAbsoluteBlockNumber(kTransactionsBlockNumber);
+  wfs_header->transactions_area_blocks_count =
+      kTransactionsAreaEnd - wfs_header->transactions_area_block_number.value();
+
+  // Initialize FreeBlocksAllocator:
+  auto free_blocks_allocator_block = area->GetMetadataBlock(kFreeBlocksAllocatorBlockNumber, /*new_block=*/true);
+  if (!free_blocks_allocator_block.has_value()) {
+    return std::unexpected(free_blocks_allocator_block.error());
+  }
+  auto free_blocks_allocator = std::make_unique<FreeBlocksAllocator>(area, std::move(*free_blocks_allocator_block));
+  free_blocks_allocator->Init();
+
+  // TODO: Initialize:
+  // 1. Root directory
+  // 2. shadow directories
+  // 3. Transactions area
+
+  return area;
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetDirectory(uint32_t block_number,
@@ -94,7 +165,7 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t block_numb
 
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
                                                                                bool new_block) const {
-  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(header()->log2_block_size.value()), new_block);
+  return GetMetadataBlock(block_number, static_cast<Block::BlockSize>(BlockSizeLog2()), new_block);
 }
 
 uint32_t Area::IV(uint32_t block_number) const {
@@ -106,8 +177,8 @@ uint32_t Area::IV(uint32_t block_number) const {
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(uint32_t block_number,
                                                                                Block::BlockSize size,
                                                                                bool new_block) const {
-  return MetadataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size,
-                                  IV(ToBasicBlockNumber(block_number)), /*check_hash=*/true, !new_block);
+  return MetadataBlock::LoadBlock(device_, ToAbsoluteBlockNumber(block_number), size,
+                                  IV(ToRelativeBlocksCount(block_number)), /*check_hash=*/true, !new_block);
 }
 
 std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t block_number,
@@ -115,24 +186,28 @@ std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t 
                                                                        uint32_t data_size,
                                                                        const DataBlock::DataBlockHash& data_hash,
                                                                        bool encrypted) const {
-  return DataBlock::LoadBlock(device_, header_block_->BlockNumber() + ToBasicBlockNumber(block_number), size, data_size,
-                              IV(ToBasicBlockNumber(block_number)), data_hash, encrypted);
+  return DataBlock::LoadBlock(device_, ToAbsoluteBlockNumber(block_number), size, data_size,
+                              IV(ToRelativeBlocksCount(block_number)), data_hash, encrypted);
 }
 
-uint32_t Area::ToBasicBlockNumber(uint32_t block_number) const {
-  return block_number << (header()->log2_block_size.value() - Block::BlockSize::Basic);
+size_t Area::BlockSizeLog2() const {
+  return header()->block_size_log2.value();
 }
 
-size_t Area::GetDataBlockLog2Size() const {
-  return header()->log2_block_size.value();
+uint32_t Area::ToRelativeBlockNumber(uint32_t absolute_block_number) const {
+  return ToRelativeBlocksCount(absolute_block_number - header_block_->BlockNumber());
 }
 
-uint32_t Area::RelativeBlockNumber(uint32_t block_number) const {
-  return (block_number - header_block_->BlockNumber()) >> (header()->log2_block_size.value() - Block::BlockSize::Basic);
+uint32_t Area::ToAbsoluteBlockNumber(uint32_t relative_block_number) const {
+  return ToAbsoluteBlocksCount(relative_block_number) + header_block_->BlockNumber();
 }
 
-uint32_t Area::AbsoluteBlockNumber(uint32_t block_number) const {
-  return (block_number << (header()->log2_block_size.value() - Block::BlockSize::Basic)) + header_block_->BlockNumber();
+uint32_t Area::ToRelativeBlocksCount(uint32_t absolute_blocks_count) const {
+  return absolute_blocks_count >> (BlockSizeLog2() - Block::BlockSize::Basic);
+}
+
+uint32_t Area::ToAbsoluteBlocksCount(uint32_t relative_blocks_count) const {
+  return relative_blocks_count << (BlockSizeLog2() - Block::BlockSize::Basic);
 }
 
 uint32_t Area::BlockNumber() const {
@@ -144,18 +219,26 @@ uint32_t Area::BlocksCount() const {
 }
 
 std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlocksAllocator() {
-  auto metadata_block = GetMetadataBlock(FreeBlocksAllocatorBlockNumber);
+  auto metadata_block = GetMetadataBlock(kFreeBlocksAllocatorBlockNumber);
   if (!metadata_block.has_value())
     return std::unexpected(WfsError::kFreeBlocksAllocatorCorrupted);
   return std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(*metadata_block));
 }
 
-size_t Area::BlocksCacheSize() const {
-  auto blocks_count = header()->blocks_count.value();
-  auto log2_block_size = header()->log2_block_size.value();
-  return (blocks_count >> (24 - Block::BlockSize::Basic))
-             ? ((blocks_count >> (30 - log2_block_size) ? 23 : 21) - log2_block_size)
+size_t Area::BlocksCacheSizeLog2() const {
+  return (BlocksCount() >> (24 - Block::BlockSize::Basic))
+             ? ((BlocksCount() >> (30 - BlockSizeLog2()) ? 23 : 21) - BlockSizeLog2())
              : 0;
+}
+
+uint32_t Area::ReservedBlocksCount() const {
+  uint32_t reserved_blocks = kReservedAreaBlocks;
+  if (root_area_) {
+    // Non root area - reserve 6 blocks
+    return reserved_blocks;
+  }
+  reserved_blocks += ToRelativeBlocksCount(wfs_header()->transactions_area_blocks_count.value());
+  return reserved_blocks;
 }
 
 std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::AllocMetadataBlock() {

@@ -156,12 +156,12 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
  protected:
   virtual size_t GetBlocksLog2CountInDataBlock() const = 0;
   virtual Block::BlockSize GetDataBlockSize() const {
-    return static_cast<Block::BlockSize>(file_->area()->GetDataBlockLog2Size() + GetBlocksLog2CountInDataBlock());
+    return static_cast<Block::BlockSize>(file_->area()->BlockSizeLog2() + GetBlocksLog2CountInDataBlock());
   }
   std::shared_ptr<DataBlock> current_data_block;
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
-    if (current_data_block && file_->area()->RelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
+    if (current_data_block && file_->area()->ToRelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
       return;
     auto block =
         file_->area()->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash,
@@ -182,8 +182,8 @@ class File::DataCategory1Reader : public File::RegularDataCategoryReader {
   virtual size_t GetBlocksLog2CountInDataBlock() const { return 0; }
 };
 
-// Category 2 - File data in mega block (8 regular blocks), in the attribute metadata there is a reversed list of block
-// numbers and hashes. Limited to 5 mega blocks. (minimum size of more than 1 regular block)
+// Category 2 - File data in large block (8 regular blocks), in the attribute metadata there is a reversed list of block
+// numbers and hashes. Limited to 5 large blocks. (minimum size of more than 1 regular block)
 class File::DataCategory2Reader : public File::RegularDataCategoryReader {
  public:
   DataCategory2Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
@@ -192,8 +192,9 @@ class File::DataCategory2Reader : public File::RegularDataCategoryReader {
   virtual size_t GetBlocksLog2CountInDataBlock() const { return 3; }
 };
 
-// Category 3 - File data in clusters of mega block (8 mega blocksblocks), in the attribute metadata there is a reversed
-// list of block number and 8 hashes for each cluster. Limited to 4 clusters. (minimum size of more than 1 mega block)
+// Category 3 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is a
+// reversed list of block number and 8 hashes for each cluster. Limited to 4 clusters. (minimum size of more than 1
+// large block)
 class File::DataCategory3Reader : public File::DataCategory2Reader {
  public:
   DataCategory3Reader(const std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
@@ -241,7 +242,7 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
   size_t ClusterDataLog2Size() const { return GetDataBlockSize() + 3; }
 };
 
-// Category 4 - File data in clusters of mega block (8 mega blocksblocks), in the attribute metadata there is list of
+// Category 4 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is list of
 // block numbers of metadata block with lists of block number and 8 hashes for each cluster. Limited to 237 metadata
 // blocks of lists. (max file size) (minumum size of more/equal than 1 cluster)
 class File::DataCategory4Reader : public File::DataCategory3Reader {
@@ -270,7 +271,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   void LoadMetadataBlock(uint32_t block_number) {
     if (current_metadata_block &&
-        file_->area()->RelativeBlockNumber(current_metadata_block->BlockNumber()) == block_number)
+        file_->area()->ToRelativeBlockNumber(current_metadata_block->BlockNumber()) == block_number)
       return;
     auto metadata_block = file_->area()->GetMetadataBlock(block_number);
     if (!metadata_block.has_value())
@@ -280,7 +281,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   size_t ClustersInBlock() const {
     size_t clusters_in_block =
-        (file_->area()->GetDataBlockLog2Size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
+        (file_->area()->BlockSizeLog2() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
     clusters_in_block = std::min(clusters_in_block, static_cast<size_t>(48));
     return clusters_in_block;
   }
@@ -384,5 +385,6 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
 std::streamsize File::file_device::optimal_buffer_size() const {
   // Max block size. TODO: By category
   // TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
-  return 1 << (static_cast<size_t>(Block::BlockSize::Regular) + static_cast<size_t>(Block::BlockSizeType::BigCluster));
+  return 1 << (static_cast<size_t>(Block::BlockSize::Regular) +
+               static_cast<size_t>(Block::BlockSizeType::LargeCluster));
 }

@@ -13,7 +13,7 @@
 
 class TestBlocksDevice : public BlocksDevice {
  public:
-  TestBlocksDevice();
+  TestBlocksDevice(uint32_t blocks_count = 10000);
   ~TestBlocksDevice() override;
 
   void WriteBlock(uint32_t block_number,
