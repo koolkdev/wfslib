@@ -7,6 +7,8 @@
 
 #include "test_free_blocks_allocator.h"
 
+#include "../src/eptree.h"
+#include "../src/ftrees.h"
 #include "../src/structs.h"
 #include "test_blocks_device.h"
 #include "test_metadata_block.h"
@@ -15,10 +17,31 @@ TestFreeBlocksAllocator::TestFreeBlocksAllocator(std::shared_ptr<MetadataBlock> 
                                                  std::shared_ptr<TestBlocksDevice> device)
     : FreeBlocksAllocator(nullptr, std::move(block)), blocks_device_(device) {}
 
-void TestFreeBlocksAllocator::Init(int blocks) {
-  mutable_header()->free_metadata_block = 1;
-  mutable_header()->free_metadata_blocks_count = blocks;
-  mutable_header()->free_blocks_count = blocks;
+bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tree_blocks) {
+  initial_ftrees_block_number_ = root_block()->BlockNumber() + 1;
+  initial_frees_block_number_ = initial_ftrees_block_number_ + 1;
+
+  if (free_cache_blocks) {
+    mutable_header()->free_metadata_block = initial_frees_block_number_;
+    mutable_header()->free_metadata_blocks_count = free_cache_blocks;
+    mutable_header()->free_blocks_count = free_cache_blocks + free_tree_blocks;
+  } else {
+    mutable_header()->free_metadata_block = 0;
+    mutable_header()->free_metadata_blocks_count = 0;
+    mutable_header()->free_blocks_count = free_tree_blocks;
+  }
+
+  EPTree eptree{this};
+  eptree.Init(/*block_number=*/0);
+  auto initial_ftrees_block = LoadAllocatorBlock(initial_ftrees_block_number_, true);
+  FTreesBlock{initial_ftrees_block}.Init();
+  if (!eptree.insert({0, initial_ftrees_block_number_}))
+    return false;
+
+  if (free_tree_blocks) {
+    return AddFreeBlocks({initial_frees_block_number_ + free_cache_blocks, free_tree_blocks});
+  }
+  return true;
 }
 
 std::shared_ptr<MetadataBlock> TestFreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {

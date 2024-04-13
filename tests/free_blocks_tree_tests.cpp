@@ -23,13 +23,7 @@ TEST_CASE("FreeBlocksTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto allocator_block = TestMetadataBlock::LoadBlock(test_device, 0);
   TestFreeBlocksAllocator allocator{allocator_block, test_device};
-  allocator.Init(1000000);
-  EPTree eptree{&allocator};
-  eptree.Init(0);
-  auto initial_ftrees_block_number = allocator.AllocFreeBlockFromCache();
-  auto initial_ftrees_block = allocator.LoadAllocatorBlock(initial_ftrees_block_number, true);
-  FTreesBlock{initial_ftrees_block}.Init();
-  REQUIRE(eptree.insert({0, initial_ftrees_block_number}));
+  REQUIRE(allocator.Init(1000000));
 
   FreeBlocksTree tree{&allocator};
 
@@ -120,11 +114,12 @@ TEST_CASE("FreeBlocksTreeTests") {
 
     std::ranges::sort(blocks_numbers_to_delete);
     // Check deleted blocks, everything beside first ftree should be deleted
-    REQUIRE(std::ranges::equal(blocks_numbers_to_delete,
-                               std::views::iota(initial_ftrees_block_number + 1, allocator.AllocFreeBlockFromCache())));
+    REQUIRE(std::ranges::equal(blocks_numbers_to_delete, std::views::iota(allocator.initial_frees_block_number(),
+                                                                          allocator.AllocFreeBlockFromCache())));
   }
 
   SECTION("empty ftree find") {
+    EPTree eptree{&allocator};
     // Have three empty ftrees, check that items areadded to the correct ones, and check how find works with them.
     FreeBlocksTreeBucket bucket{&allocator, 3};
     auto ftree_100_to_200_block_number = allocator.AllocFreeBlockFromCache();
@@ -136,7 +131,11 @@ TEST_CASE("FreeBlocksTreeTests") {
     FTreesBlock{ftree_200_plus_block}.Init();
     REQUIRE(eptree.insert({200, ftree_200_plus_block_number}));
 
-    FTree ftree1{initial_ftrees_block, 3}, ftree2{ftree_100_to_200_block, 3}, ftree3{ftree_200_plus_block, 3};
+    auto ftree_0_to_100_block = allocator.LoadAllocatorBlock(allocator.initial_ftrees_block_number(), false);
+    FTree ftree1{ftree_0_to_100_block, 3};
+    FTree ftree2{ftree_100_to_200_block, 3};
+    FTree ftree3{ftree_200_plus_block, 3};
+
     REQUIRE(ftree1.empty());
     REQUIRE(ftree2.empty());
     REQUIRE(ftree3.empty());
