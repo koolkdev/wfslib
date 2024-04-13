@@ -34,6 +34,10 @@ TEST_CASE("FreeBlocksTreeBucketTests") {
 
   using value_type = FreeBlocksTreeBucket::iterator::value_type;
 
+  SECTION("iterate empty tree") {
+    REQUIRE(std::distance(bucket.begin(), bucket.end()) == 0);
+  }
+
   SECTION("insert items sorted") {
     constexpr int kItemsCount = 600 * 300;
     for (uint32_t i = 0; i < kItemsCount; ++i) {

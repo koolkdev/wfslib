@@ -154,8 +154,14 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::begin_impl() const {
   assert(!eptree.iterator.is_end());
   iterator::ftree_node_info ftree{{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
   ftree.iterator = ftree.node->begin();
-  while (ftree.iterator.is_end() && !eptree.iterator.is_end()) {
-    ftree = {{allocator_->LoadAllocatorBlock((++eptree.iterator)->value), block_size_index_}};
+  while (ftree.iterator.is_end()) {
+    if ((++eptree.iterator).is_end()) {
+      // end
+      --eptree.iterator;
+      return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+    }
+
+    ftree = {{allocator_->LoadAllocatorBlock(eptree.iterator->value), block_size_index_}};
     ftree.iterator = ftree.node->begin();
   }
   return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
