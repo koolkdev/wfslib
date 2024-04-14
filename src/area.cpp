@@ -178,7 +178,7 @@ std::expected<std::shared_ptr<MetadataBlock>, WfsError> Area::GetMetadataBlock(u
                                                                                Block::BlockSize size,
                                                                                bool new_block) const {
   return MetadataBlock::LoadBlock(device_, ToAbsoluteBlockNumber(block_number), size,
-                                  IV(ToRelativeBlocksCount(block_number)), /*check_hash=*/true, !new_block);
+                                  IV(ToAbsoluteBlocksCount(block_number)), /*check_hash=*/true, !new_block);
 }
 
 std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t block_number,
@@ -187,7 +187,7 @@ std::expected<std::shared_ptr<DataBlock>, WfsError> Area::GetDataBlock(uint32_t 
                                                                        const DataBlock::DataBlockHash& data_hash,
                                                                        bool encrypted) const {
   return DataBlock::LoadBlock(device_, ToAbsoluteBlockNumber(block_number), size, data_size,
-                              IV(ToRelativeBlocksCount(block_number)), data_hash, encrypted);
+                              IV(ToAbsoluteBlocksCount(block_number)), data_hash, encrypted);
 }
 
 size_t Area::BlockSizeLog2() const {
