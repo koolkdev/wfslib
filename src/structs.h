@@ -106,7 +106,7 @@ struct WfsHeader {
   uint32_be_t version;      // should be 0x01010800
   uint16_be_t device_type;  // usb - 0x16a2. mlc - 0x136a?
   uint16_be_t _pad;
-  Attributes root_area_attributes;
+  Attributes root_quota_attributes;
   uint32_be_t transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
   uint32_be_t transactions_area_blocks_count;
   uint32_be_t unknown[2];  // not used??

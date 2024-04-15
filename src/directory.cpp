@@ -72,10 +72,10 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
       if (!(attributes->flags.value() & attributes->Flags::AREA_SIZE_BASIC) &&
           (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
         block_size = Block::BlockSize::Regular;
-      auto new_area = area_->GetArea(attributes->directory_block_number.value(), name, attributes_block, block_size);
+      auto new_area = area_->GetArea(attributes->directory_block_number.value(), block_size);
       if (!new_area.has_value())
         return std::unexpected(new_area.error());
-      return (*new_area)->GetRootDirectory();
+      return (*new_area)->GetRootDirectory(name, attributes_block);
     } else {
       return area_->GetDirectory(attributes->directory_block_number.value(), name, attributes_block);
     }

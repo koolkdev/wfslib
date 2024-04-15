@@ -23,6 +23,7 @@ struct DirectoryTreeNode;
 
 class Directory : public WfsItem, public std::enable_shared_from_this<Directory> {
  public:
+  // TODO: Replace name with tree iterator?
   Directory(const std::string& name,
             AttributesBlock attributes,
             const std::shared_ptr<Area>& area,
@@ -50,7 +51,6 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   std::shared_ptr<MetadataBlock> block_;
 
-  // TODO: Remove the name arg
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObjectInternal(const std::string& name,
                                                                       const AttributesBlock& attributes) const;
   std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
