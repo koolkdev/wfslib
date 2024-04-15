@@ -17,28 +17,20 @@
 #include "structs.h"
 #include "wfs_item.h"
 
-class BlocksDevice;
+class Wfs;
 class Directory;
 class FreeBlocksAllocator;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
-  Area(const std::shared_ptr<BlocksDevice>& device,
-       const std::shared_ptr<Area>& root_area,
-       const std::shared_ptr<MetadataBlock>& block,
-       const std::string& root_directory_name,
-       const AttributesBlock& root_directory_attributes);
+  Area(std::shared_ptr<Wfs> wfs_device, std::shared_ptr<MetadataBlock> header_block);
 
-  static std::expected<std::shared_ptr<Area>, WfsError> LoadRootArea(const std::shared_ptr<BlocksDevice>& device);
-  static std::expected<std::shared_ptr<Area>, WfsError> CreateRootArea(const std::shared_ptr<BlocksDevice>& device);
+  // static std::expected<std::shared_ptr<Area>, WfsError> CreateRootArea(const std::shared_ptr<BlocksDevice>& device);
 
-  std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t block_number,
-                                                         const std::string& root_directory_name,
-                                                         const AttributesBlock& root_directory_attributes,
-                                                         Block::BlockSize size);
+  std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t block_number, Block::BlockSize size);
 
-  std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();
-
+  std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory(const std::string& name,
+                                                                       const AttributesBlock& attributes);
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
   std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea1() const;
@@ -113,11 +105,6 @@ class Area : public std::enable_shared_from_this<Area> {
 
   uint32_t IV(uint32_t block_number) const;
 
-  std::shared_ptr<BlocksDevice> device_;
-  std::shared_ptr<Area> root_area_;  // Empty pointer for root area
-
+  std::shared_ptr<Wfs> wfs_device_;
   std::shared_ptr<MetadataBlock> header_block_;
-
-  std::string root_directory_name_;
-  AttributesBlock root_directory_attributes_;
 };

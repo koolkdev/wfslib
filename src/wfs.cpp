@@ -16,18 +16,8 @@
 #include "directory.h"
 #include "structs.h"
 
-Wfs::Wfs(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key)
-    : Wfs(std::make_shared<BlocksDevice>(std::move(device), std::move(key))) {}
-
-Wfs::Wfs(std::shared_ptr<BlocksDevice> device) : device_(std::move(device)) {
-  // Read first area
-  auto area = Area::LoadRootArea(device_);
-  if (!area.has_value())
-    throw std::runtime_error("Failed to load first block (bad key?)");
-  if ((*area)->wfs_header()->version.value() != WFS_VERSION)
-    throw std::runtime_error("Unexpected WFS version (bad key?)");
-  root_area_ = *area;
-}
+Wfs::Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<MetadataBlock> root_block)
+    : device_(std::move(device)), root_block_(std::move(root_block)) {}
 
 Wfs::~Wfs() {
   Flush();
@@ -67,7 +57,7 @@ std::shared_ptr<File> Wfs::GetFile(const std::string& filename) {
 
 std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
   std::filesystem::path path(filename);
-  auto current_directory = root_area_->GetRootDirectory();
+  auto current_directory = GetRootDirectory();
   if (!current_directory.has_value()) {
     if (current_directory.error() == WfsError::kItemNotFound)
       return nullptr;
@@ -92,4 +82,26 @@ std::shared_ptr<Directory> Wfs::GetDirectory(const std::string& filename) {
 
 void Wfs::Flush() {
   device_->FlushAll();
+}
+
+std::shared_ptr<Area> Wfs::GetRootArea() {
+  return std::make_shared<Area>(shared_from_this(), root_block_);
+}
+
+std::expected<std::shared_ptr<Directory>, WfsError> Wfs::GetRootDirectory() {
+  return GetRootArea()->GetRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_attributes)});
+}
+
+// static
+std::expected<std::shared_ptr<Wfs>, WfsError> Wfs::Load(std::shared_ptr<BlocksDevice> device) {
+  auto block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
+  if (!block.has_value()) {
+    block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Regular, 0);
+    if (!block.has_value())
+      return std::unexpected(WfsError::kAreaHeaderCorrupted);
+  }
+  auto* header = (*block)->get_object<WfsHeader>(header_offset());
+  if (header->version.value() != WFS_VERSION)
+    return std::unexpected(WfsError::kInvalidWfsVersion);
+  return std::make_shared<Wfs>(std::move(device), std::move(*block));
 }

@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <cassert>
 #include <memory>
 #include <span>
 #include <string>
@@ -42,12 +43,22 @@ class Block {
 
   template <typename T>
   const T* get_object(size_t offset) const {
+    assert(offset + sizeof(T) <= size());
     return reinterpret_cast<const T*>(data().data() + offset);
   }
 
   template <typename T>
   T* get_mutable_object(size_t offset) {
+    assert(offset + sizeof(T) <= size());
     return reinterpret_cast<T*>(mutable_data().data() + offset);
+  }
+
+  template <typename T>
+  size_t to_offset(const T* obj) const {
+    auto res = reinterpret_cast<const std::byte*>(obj) - data_.data();
+    assert(res >= 0 && res < size());
+    // TODO: [[assume(res >= 0)]]; and remove cast
+    return static_cast<size_t>(res);
   }
 
   // TODO: Rename to AbsBlockNumber for clarity?

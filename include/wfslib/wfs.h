@@ -7,11 +7,16 @@
 
 #pragma once
 
+#include <expected>
 #include <memory>
 #include <optional>
 #include <span>
 #include <string>
 #include <vector>
+
+#include "errors.h"
+#include "metadata_block.h"
+#include "structs.h"
 
 class Device;
 class FileDevice;
@@ -22,10 +27,9 @@ class File;
 class Directory;
 class BlocksDevice;
 
-class Wfs {
+class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
  public:
-  Wfs(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key = std::nullopt);
-  Wfs(std::shared_ptr<BlocksDevice> device);
+  Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<MetadataBlock> root_block);
   ~Wfs();
 
   const std::shared_ptr<BlocksDevice>& GetDevice() { return device_; }
@@ -34,11 +38,20 @@ class Wfs {
   std::shared_ptr<File> GetFile(const std::string& filename);
   std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-  std::shared_ptr<Area> GetRootArea() { return root_area_; }
+  std::shared_ptr<Area> GetRootArea();
+  std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();
 
   void Flush();
 
+  WfsHeader* mutable_header() { return root_block_->get_mutable_object<WfsHeader>(header_offset()); }
+  const WfsHeader* header() const { return root_block_->get_object<WfsHeader>(header_offset()); }
+
+  static std::expected<std::shared_ptr<Wfs>, WfsError> Load(std::shared_ptr<BlocksDevice> device);
+  // Create
+
  private:
+  static constexpr uint16_t header_offset() { return sizeof(MetadataBlockHeader); }
+
   std::shared_ptr<BlocksDevice> device_;
-  std::shared_ptr<Area> root_area_;
+  std::shared_ptr<MetadataBlock> root_block_;
 };

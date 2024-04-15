@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include "blocks_device.h"
 #include "directory.h"
 #include "errors.h"
 #include "file.h"
