@@ -8,6 +8,7 @@
 #pragma once
 
 #include <memory>
+#include "block.h"
 #include "structs.h"
 
 class Block;
