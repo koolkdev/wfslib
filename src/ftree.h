@@ -25,7 +25,7 @@ using FTreesBlock = TreeNodesAllocator<FTreesBlockArgs>;
 
 class FTree : public PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlockArgs> {
  public:
-  FTree(std::shared_ptr<MetadataBlock> block, size_t block_size_index)
+  FTree(std::shared_ptr<Block> block, size_t block_size_index)
       : PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlockArgs>(std::move(block)),
         block_size_index_(block_size_index) {}
 

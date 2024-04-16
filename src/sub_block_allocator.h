@@ -8,10 +8,9 @@
 #pragma once
 
 #include <memory>
-#include "metadata_block.h"
+#include "block.h"
 #include "structs.h"
 
-class MetadataBlock;
 struct SubBlockAllocatorStruct;
 
 class SubBlockAllocatorBase {
@@ -20,7 +19,7 @@ class SubBlockAllocatorBase {
   static constexpr int MAX_BLOCK_SIZE =
       BLOCK_SIZE_QUANTA + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
 
-  SubBlockAllocatorBase(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
+  SubBlockAllocatorBase(std::shared_ptr<Block> block) : block_(std::move(block)) {}
 
   uint16_t Alloc(uint16_t size);
   void Free(uint16_t offset, uint16_t size);
@@ -30,8 +29,8 @@ class SubBlockAllocatorBase {
 
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader); }
 
-  MetadataBlock* block() { return block_.get(); }
-  const MetadataBlock* block() const { return block_.get(); }
+  Block* block() { return block_.get(); }
+  const Block* block() const { return block_.get(); }
 
  private:
   SubBlockAllocatorStruct* mutable_header() {
@@ -41,7 +40,7 @@ class SubBlockAllocatorBase {
     return block()->get_object<SubBlockAllocatorStruct>(header_offset());
   }
 
-  std::shared_ptr<MetadataBlock> block_;
+  std::shared_ptr<Block> block_;
 
   uint16_t PopFreeEntry(int size_index);
   void Unlink(const SubBlockAllocatorFreeListEntry* entry, int size_index);
@@ -50,7 +49,7 @@ class SubBlockAllocatorBase {
 template <typename ExtraHeaderType>
 class SubBlockAllocator : SubBlockAllocatorBase {
  public:
-  SubBlockAllocator(const std::shared_ptr<MetadataBlock>& block) : SubBlockAllocatorBase(block) {}
+  SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
   void Init() { Init(sizeof(ExtraHeaderType)); }
 

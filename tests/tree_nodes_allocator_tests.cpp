@@ -9,8 +9,8 @@
 
 #include "../src/tree_nodes_allocator.h"
 
+#include "test_block.h"
 #include "test_blocks_device.h"
-#include "test_metadata_block.h"
 
 namespace {
 
@@ -34,7 +34,7 @@ class DummyAllocatorBlock : public TreeNodesAllocator<DummyAllocatorBlockArgs> {
  public:
   using base = TreeNodesAllocator<DummyAllocatorBlockArgs>;
 
-  DummyAllocatorBlock(std::shared_ptr<MetadataBlock> block) : base(std::move(block)) {}
+  DummyAllocatorBlock(std::shared_ptr<Block> block) : base(std::move(block)) {}
 
   const HeapHeader* get_heap_header() const { return base::heap_header(); }
   const HeapFreelistEntry* get_freelist_entry(uint32_t index) const { return base::get_freelist_entry(index); }
@@ -42,7 +42,7 @@ class DummyAllocatorBlock : public TreeNodesAllocator<DummyAllocatorBlockArgs> {
 
 TEST_CASE("TreeNodesAllocatorTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto block = TestMetadataBlock::LoadBlock(test_device, 0);
+  auto block = TestBlock::LoadMetadataBlock(test_device, 0);
   DummyAllocatorBlock allocator{block};
   allocator.Init();
 

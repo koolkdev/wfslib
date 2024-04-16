@@ -9,8 +9,7 @@
 
 #include <cassert>
 #include "area.h"
-#include "data_block.h"
-#include "metadata_block.h"
+#include "block.h"
 #include "structs.h"
 
 struct FileDataChunkInfo {
@@ -25,10 +24,6 @@ uint32_t File::Size() const {
 
 uint32_t File::SizeOnDisk() const {
   return attributes_data().data()->size_on_disk.value();
-}
-
-static size_t GetOffsetInMetadataBlock(const std::shared_ptr<const MetadataBlock>& block, const std::byte* data) {
-  return data - block->data().data();
 }
 
 class File::DataCategoryReader {
@@ -107,8 +102,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
     LoadDataBlock(blocks_list[-block_index - 1].block_number.value(),
                   static_cast<uint32_t>(
                       std::min(1U << GetDataBlockSize(), file_->attributes_data().data()->size.value() - block_offset)),
-                  {hash_block, GetOffsetInMetadataBlock(hash_block, reinterpret_cast<const std::byte*>(
-                                                                        &blocks_list[-block_index - 1].hash))});
+                  {hash_block, hash_block->to_offset(&blocks_list[-block_index - 1].hash)});
     size = std::min(size, current_data_block->size() - offset_in_block);
     return FileDataChunkInfo{current_data_block, offset_in_block, size};
   }
@@ -147,7 +141,6 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
       }
       file_->attributes_data().mutable_data()->size = static_cast<uint32_t>(old_size);
       if (current_block) {
-        assert(std::dynamic_pointer_cast<DataBlock>(current_block));
         current_block->Resize(static_cast<uint32_t>(new_block_size));
       }
     }
@@ -156,16 +149,17 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
  protected:
   virtual size_t GetBlocksLog2CountInDataBlock() const = 0;
   virtual Block::BlockSize GetDataBlockSize() const {
-    return static_cast<Block::BlockSize>(file_->area()->BlockSizeLog2() + GetBlocksLog2CountInDataBlock());
+    return static_cast<Block::BlockSize>(file_->area()->block_size_log2() + GetBlocksLog2CountInDataBlock());
   }
-  std::shared_ptr<DataBlock> current_data_block;
+  std::shared_ptr<Block> current_data_block;
 
-  void LoadDataBlock(uint32_t block_number, uint32_t data_size, const DataBlock::DataBlockHash& data_hash) {
-    if (current_data_block && file_->area()->ToRelativeBlockNumber(current_data_block->BlockNumber()) == block_number)
+  void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
+    if (current_data_block &&
+        file_->area()->to_area_block_number(current_data_block->device_block_number()) == block_number)
       return;
     auto block =
-        file_->area()->GetDataBlock(block_number, GetDataBlockSize(), data_size, data_hash,
-                                    !(file_->attributes_data().data()->flags.value() & Attributes::UNENCRYPTED_FILE));
+        file_->area()->LoadDataBlock(block_number, GetDataBlockSize(), data_size, std::move(data_hash),
+                                     !(file_->attributes_data().data()->flags.value() & Attributes::UNENCRYPTED_FILE));
     if (!block.has_value())
       throw WfsException(WfsError::kFileDataCorrupted);
     current_data_block = std::move(*block);
@@ -215,7 +209,7 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
   FileDataChunkInfo GetFileDataChunkInfoFromClustersList(size_t offset,
                                                          size_t original_offset,
                                                          size_t size,
-                                                         const std::shared_ptr<MetadataBlock>& metadata_block,
+                                                         const std::shared_ptr<Block>& metadata_block,
                                                          const DataBlocksClusterMetadata* clusters_list,
                                                          bool reverse) {
     int64_t cluster_index = offset >> ClusterDataLog2Size();
@@ -229,12 +223,10 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
       cluster = &clusters_list[-cluster_index - 1];
     else
       cluster = &clusters_list[cluster_index];
-    LoadDataBlock(
-        cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
-        static_cast<uint32_t>(
-            std::min(1U << GetDataBlockSize(), file_->attributes_data().data()->size.value() - block_offset)),
-        {metadata_block,
-         GetOffsetInMetadataBlock(metadata_block, reinterpret_cast<const std::byte*>(&cluster->hash[block_index]))});
+    LoadDataBlock(cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
+                  static_cast<uint32_t>(
+                      std::min(1U << GetDataBlockSize(), file_->attributes_data().data()->size.value() - block_offset)),
+                  {metadata_block, metadata_block->to_offset(&cluster->hash[block_index])});
     size = std::min(size, current_data_block->size() - offset_in_block);
     return FileDataChunkInfo{current_data_block, offset_in_block, size};
   }
@@ -267,13 +259,13 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 
  protected:
-  std::shared_ptr<MetadataBlock> current_metadata_block;
+  std::shared_ptr<Block> current_metadata_block;
 
   void LoadMetadataBlock(uint32_t block_number) {
     if (current_metadata_block &&
-        file_->area()->ToRelativeBlockNumber(current_metadata_block->BlockNumber()) == block_number)
+        file_->area()->to_area_block_number(current_metadata_block->device_block_number()) == block_number)
       return;
-    auto metadata_block = file_->area()->GetMetadataBlock(block_number);
+    auto metadata_block = file_->area()->LoadMetadataBlock(block_number);
     if (!metadata_block.has_value())
       throw WfsException(WfsError::kFileMetadataCorrupted);
     current_metadata_block = std::move(*metadata_block);
@@ -281,7 +273,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   size_t ClustersInBlock() const {
     size_t clusters_in_block =
-        (file_->area()->BlockSizeLog2() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
+        (file_->area()->block_size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
     clusters_in_block = std::min(clusters_in_block, static_cast<size_t>(48));
     return clusters_in_block;
   }

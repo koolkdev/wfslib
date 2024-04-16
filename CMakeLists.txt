@@ -26,7 +26,6 @@ add_library(${PROJECT_NAME}
     src/area.cpp
     src/block.cpp
     src/blocks_device.cpp
-    src/data_block.cpp
     src/device_encryption.cpp
     src/directory.cpp
     src/directory_items_iterator.cpp
@@ -40,7 +39,6 @@ add_library(${PROJECT_NAME}
     src/ftree.cpp
     src/ftrees.cpp
     src/key_file.cpp
-    src/metadata_block.cpp
     src/ptree.cpp
     src/recovery.cpp
     src/rtree.cpp

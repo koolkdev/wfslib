@@ -16,7 +16,7 @@
 
 class Directory;
 class WfsItem;
-class MetadataBlock;
+class Block;
 
 struct DirectoryTreeNode;
 
@@ -27,7 +27,7 @@ class DirectoryItemsIterator {
   using value_type = std::tuple<std::string, std::expected<std::shared_ptr<WfsItem>, WfsError>>;
 
   struct NodeState {
-    std::shared_ptr<MetadataBlock> block;
+    std::shared_ptr<Block> block;
     const DirectoryTreeNode* node;
     std::shared_ptr<NodeState> parent;
     size_t current_index;

@@ -16,7 +16,7 @@
 #include "wfs_item.h"
 
 class Area;
-class MetadataBlock;
+class Block;
 class File;
 
 struct DirectoryTreeNode;
@@ -27,7 +27,7 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   Directory(const std::string& name,
             AttributesBlock attributes,
             const std::shared_ptr<Area>& area,
-            const std::shared_ptr<MetadataBlock>& block)
+            const std::shared_ptr<Block>& block)
       : WfsItem(name, attributes), area_(area), block_(block) {}
 
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObject(const std::string& name) const;
@@ -49,10 +49,10 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<Area> area_;
 
-  std::shared_ptr<MetadataBlock> block_;
+  std::shared_ptr<Block> block_;
 
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObjectInternal(const std::string& name,
                                                                       const AttributesBlock& attributes) const;
-  std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
+  std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<Block>& block,
                                                                const std::string& name) const;
 };

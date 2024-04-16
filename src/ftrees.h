@@ -137,7 +137,7 @@ class FTrees {
   using reverse_iterator = TreeReverseIterator<iterator>;
   using const_reverse_iterator = TreeReverseIterator<const_iterator>;
 
-  FTrees(std::shared_ptr<MetadataBlock> block)
+  FTrees(std::shared_ptr<Block> block)
       : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBuckets.size()>{})) {}
 
   size_t size() const {
@@ -174,7 +174,7 @@ class FTrees {
 
  private:
   template <std::size_t... Is>
-  static std::array<FTree, kSizeBuckets.size()> CreateFTreeArray(std::shared_ptr<MetadataBlock> block,
+  static std::array<FTree, kSizeBuckets.size()> CreateFTreeArray(std::shared_ptr<Block> block,
                                                                  std::index_sequence<Is...>) {
     return {{{block, Is}...}};
   }

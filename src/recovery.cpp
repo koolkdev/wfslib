@@ -14,7 +14,6 @@
 #include "device_encryption.h"
 #include "directory.h"
 #include "file_device.h"
-#include "metadata_block.h"
 #include "structs.h"
 #include "wfs.h"
 
@@ -46,8 +45,8 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
   // This is the initial iv that the encryption will use
   std::array<uint32_t, 4> iv = {block_number << Block::BlockSize::Basic, 0, device->SectorsCount(),
                                 device->SectorSize()};
-  std::shared_ptr<const MetadataBlock> block =
-      *MetadataBlock::LoadBlock(blocks_device, block_number, block_size, 0, false);
+  auto block = *Block::LoadMetadataBlock(blocks_device, block_number, block_size, /*iv=*/0, /*load_data=*/true,
+                                         /*check_hash=*/false);
   // The two last dwords of the IV is the sectors count and sector size, right now it is xored with our fake sector size
   // and sector count, and with the hash
   std::vector<std::byte> data{block->data().begin(), block->data().end()};
@@ -77,7 +76,8 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
   block.reset();
 
   // Now try to fetch block again, this time check the hash.
-  if (!MetadataBlock::LoadBlock(blocks_device, block_number, block_size, iv32, true).has_value())
+  if (!Block::LoadMetadataBlock(blocks_device, block_number, block_size, iv32, /*load_data=*/true, /*check_hash=*/true)
+           .has_value())
     return false;
 
   area_xor_wfs_iv = iv32 - ((block_number - area_start_block_number) << (Block::BlockSize::Basic - log2_sector_size));
@@ -88,8 +88,8 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
 
 bool Recovery::CheckWfsKey(std::shared_ptr<FileDevice> device, std::optional<std::vector<std::byte>> key) {
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  std::shared_ptr<const MetadataBlock> block =
-      *MetadataBlock::LoadBlock(blocks_device, 0, Block::BlockSize::Basic, 0, false);
+  auto block = *Block::LoadMetadataBlock(blocks_device, 0, Block::BlockSize::Basic, /*iv=*/0, /*load_data=*/true,
+                                         /*check_hash=*/false);
   auto wfs_header = reinterpret_cast<const WfsHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
   // Check wfs header
   return wfs_header->version.value() == WFS_VERSION;
@@ -100,8 +100,8 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
   if (!CheckWfsKey(device, key))
     return WfsError::kInvalidWfsVersion;
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  std::shared_ptr<const MetadataBlock> block =
-      *MetadataBlock::LoadBlock(blocks_device, 0, Block::BlockSize::Basic, 0, false);
+  auto block = *Block::LoadMetadataBlock(blocks_device, /*device_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0,
+                                         /*load_data=*/true, /*check_hash=*/false);
   auto wfs_header = block->get_object<WfsHeader>(sizeof(MetadataBlockHeader));
   auto block_size = Block::BlockSize::Basic;
   if (!(wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
@@ -167,8 +167,9 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   device->SetLog2SectorSize(9);
   device->SetSectorsCount((kUsrDirectoryBlockNumber + 2) << 3);
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  std::shared_ptr<const MetadataBlock> block =
-      *MetadataBlock::LoadBlock(blocks_device, kUsrDirectoryBlockNumber, Block::BlockSize::Basic, 0, false);
+  auto block = *Block::LoadMetadataBlock(blocks_device, kUsrDirectoryBlockNumber, Block::BlockSize::Basic, /*iv=*/0,
+                                         /*load_data=*/true,
+                                         /*check_hash=*/false);
   auto metadata_header = block->get_object<MetadataBlockHeader>(0);
   // Check wfs header
   if ((metadata_header->block_flags.value() >> 20) != 0xe00) {
@@ -245,8 +246,8 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   uint32_t sub_area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(
           device, blocks_device,
-          sub_area->ToAbsoluteBlockNumber(sub_area->header()->root_directory_block_number.value()),
-          sub_area->ToAbsoluteBlockNumber(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
+          sub_area->to_device_block_number(sub_area->header()->root_directory_block_number.value()),
+          sub_area->to_device_block_number(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
   uint32_t wfs_iv = sub_area_xor_wfs_iv ^ sub_area->header()->iv.value();

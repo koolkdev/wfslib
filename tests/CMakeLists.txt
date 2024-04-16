@@ -13,7 +13,7 @@ add_executable(${PROJECT_NAME}
   ftrees_tests.cpp
   test_blocks_device.cpp
   test_free_blocks_allocator.cpp
-  test_metadata_block.cpp
+  test_block.cpp
   rtree_tests.cpp
   tree_nodes_allocator_tests.cpp
 )

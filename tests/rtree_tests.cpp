@@ -13,14 +13,14 @@
 
 #include "../src/rtree.h"
 
+#include "test_block.h"
 #include "test_blocks_device.h"
 #include "test_free_blocks_allocator.h"
-#include "test_metadata_block.h"
 #include "test_utils.h"
 
 TEST_CASE("RTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto rtree_block = TestMetadataBlock::LoadBlock(test_device, 0);
+  auto rtree_block = TestBlock::LoadMetadataBlock(test_device, 0);
   RTree rtree{rtree_block};
   rtree.Init(/*depth=*/1, /*block_number=*/0);
 

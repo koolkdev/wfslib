@@ -14,12 +14,10 @@
 #include <string>
 #include <vector>
 
+#include "block.h"
 #include "errors.h"
-#include "metadata_block.h"
 #include "structs.h"
 
-class Device;
-class FileDevice;
 class BlocksDevice;
 class Area;
 class WfsItem;
@@ -29,10 +27,10 @@ class BlocksDevice;
 
 class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
  public:
-  Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<MetadataBlock> root_block);
+  Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<Block> root_block);
   ~Wfs();
 
-  const std::shared_ptr<BlocksDevice>& GetDevice() { return device_; }
+  BlocksDevice* device() { return device_.get(); }
 
   std::shared_ptr<WfsItem> GetObject(const std::string& filename);
   std::shared_ptr<File> GetFile(const std::string& filename);
@@ -43,15 +41,33 @@ class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
 
   void Flush();
 
-  WfsHeader* mutable_header() { return root_block_->get_mutable_object<WfsHeader>(header_offset()); }
-  const WfsHeader* header() const { return root_block_->get_object<WfsHeader>(header_offset()); }
+  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea(bool backup_area = false);
+
+  std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(const Area* area,
+                                                                    uint32_t device_block_number,
+                                                                    Block::BlockSize size,
+                                                                    bool new_block = false) const;
+  std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(const Area* area,
+                                                                uint32_t device_block_number,
+                                                                Block::BlockSize size,
+                                                                uint32_t data_size,
+                                                                Block::HashRef data_hash,
+                                                                bool encrypted,
+                                                                bool new_block = false) const;
+
+  uint32_t CalcIV(const Area* area, uint32_t device_block_number) const;
 
   static std::expected<std::shared_ptr<Wfs>, WfsError> Load(std::shared_ptr<BlocksDevice> device);
   // Create
 
  private:
+  friend class Area;
+
   static constexpr uint16_t header_offset() { return sizeof(MetadataBlockHeader); }
 
+  WfsHeader* mutable_header() { return root_block_->get_mutable_object<WfsHeader>(header_offset()); }
+  const WfsHeader* header() const { return root_block_->get_object<WfsHeader>(header_offset()); }
+
   std::shared_ptr<BlocksDevice> device_;
-  std::shared_ptr<MetadataBlock> root_block_;
+  std::shared_ptr<Block> root_block_;
 };

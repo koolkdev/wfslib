@@ -91,7 +91,7 @@ bool FreeBlocksTreeBucket::insert(iterator& pos, FTree::iterator::value_type key
   FTrees old_ftrees{old_block};
   uint32_t left_block_number = pos.eptree().iterator->value;
   auto left_block = allocator_->LoadAllocatorBlock(left_block_number, true);
-  assert(left_block->BlockNumber() == old_block->BlockNumber());
+  assert(left_block->device_block_number() == old_block->device_block_number());
 
   std::optional<FreeBlocksExtentInfo> allocated_extent;
   auto right_block_number = allocator_->AllocFreeBlockFromCache();

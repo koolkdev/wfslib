@@ -18,7 +18,7 @@
 #include "tree_nodes_allocator.h"
 #include "tree_utils.h"
 
-class MetadataBlock;
+class Block;
 
 template <typename T>
 PTreeNode<T>::const_iterator split_point(const PTreeNode<T>& node,
@@ -214,7 +214,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
   using parent_node = PTreeNode<ParentNodeDetails>;
   using leaf_node = PTreeNode<LeafNodeDetails>;
 
-  PTree(std::shared_ptr<MetadataBlock> block) : TreeNodesAllocator<AllocatorArgs>(std::move(block)) {}
+  PTree(std::shared_ptr<Block> block) : TreeNodesAllocator<AllocatorArgs>(std::move(block)) {}
   virtual ~PTree() = default;
 
   virtual uint16_t extra_info() const { return 0; }

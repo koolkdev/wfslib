@@ -23,7 +23,7 @@ using EPTreeBlock = TreeNodesAllocator<EPTreeBlockArgs>;
 
 class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs> {
  public:
-  RTree(std::shared_ptr<MetadataBlock> block)
+  RTree(std::shared_ptr<Block> block)
       : PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs>(std::move(block)) {}
 
   PTreeHeader* mutable_header() override { return &mutable_tree_header()->current_tree; }
