@@ -12,14 +12,14 @@
 
 #include "../src/ftrees.h"
 
+#include "test_block.h"
 #include "test_blocks_device.h"
 #include "test_free_blocks_allocator.h"
-#include "test_metadata_block.h"
 #include "test_utils.h"
 
 TEST_CASE("FTreesTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto ftrees_block = TestMetadataBlock::LoadBlock(test_device, 0);
+  auto ftrees_block = TestBlock::LoadMetadataBlock(test_device, 0);
   FTrees ftrees{ftrees_block};
   ftrees.Init();
 
@@ -161,8 +161,8 @@ TEST_CASE("FTreesTests") {
     }
 
     key_type split_point;
-    std::array<FTrees, 2> new_ftrees{FTrees{TestMetadataBlock::LoadBlock(test_device, 1)},
-                                     FTrees{TestMetadataBlock::LoadBlock(test_device, 2)}};
+    std::array<FTrees, 2> new_ftrees{FTrees{TestBlock::LoadMetadataBlock(test_device, 1)},
+                                     FTrees{TestBlock::LoadMetadataBlock(test_device, 2)}};
     new_ftrees[0].Init();
     new_ftrees[1].Init();
     ftrees.split(new_ftrees[0], new_ftrees[1], split_point);
@@ -196,8 +196,8 @@ TEST_CASE("FTreesTests") {
     REQUIRE(ftrees.ftrees()[2].insert({1000, nibble{0}}));
 
     key_type split_point;
-    std::array<FTrees, 2> new_ftrees{FTrees{TestMetadataBlock::LoadBlock(test_device, 1)},
-                                     FTrees{TestMetadataBlock::LoadBlock(test_device, 2)}};
+    std::array<FTrees, 2> new_ftrees{FTrees{TestBlock::LoadMetadataBlock(test_device, 1)},
+                                     FTrees{TestBlock::LoadMetadataBlock(test_device, 2)}};
     new_ftrees[0].Init();
     new_ftrees[1].Init();
     ftrees.split(new_ftrees[0], new_ftrees[1], split_point);

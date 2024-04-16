@@ -12,8 +12,6 @@
 #include <vector>
 
 #include "block.h"
-#include "data_block.h"
-#include "metadata_block.h"
 #include "structs.h"
 #include "wfs_item.h"
 
@@ -23,49 +21,61 @@ class FreeBlocksAllocator;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
-  Area(std::shared_ptr<Wfs> wfs_device, std::shared_ptr<MetadataBlock> header_block);
+  Area(std::shared_ptr<Wfs> wfs_device, std::shared_ptr<Block> header_block);
 
   // static std::expected<std::shared_ptr<Area>, WfsError> CreateRootArea(const std::shared_ptr<BlocksDevice>& device);
 
-  std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t block_number, Block::BlockSize size);
+  std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t area_block_number, Block::BlockSize size);
 
   std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory(const std::string& name,
                                                                        const AttributesBlock& attributes);
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
-  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea1() const;
-  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea2() const;
 
-  std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(uint32_t block_number,
+  std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(uint32_t area_block_number,
                                                                    const std::string& name,
                                                                    const AttributesBlock& attributes);
 
-  std::expected<std::shared_ptr<MetadataBlock>, WfsError> GetMetadataBlock(uint32_t block_number,
-                                                                           bool new_block = false) const;
-  std::expected<std::shared_ptr<MetadataBlock>, WfsError> GetMetadataBlock(uint32_t block_number,
-                                                                           Block::BlockSize size,
-                                                                           bool new_block = false) const;
+  std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(uint32_t area_block_number,
+                                                                    bool new_block = false) const;
+  std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(uint32_t area_block_number,
+                                                                    Block::BlockSize size,
+                                                                    bool new_block = false) const;
+  std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(uint32_t area_block_number,
+                                                                Block::BlockSize size,
+                                                                uint32_t data_size,
+                                                                Block::HashRef data_hash,
+                                                                bool encrypted,
+                                                                bool new_block = false) const;
 
-  std::expected<std::shared_ptr<DataBlock>, WfsError> GetDataBlock(uint32_t block_number,
-                                                                   Block::BlockSize size,
-                                                                   uint32_t data_size,
-                                                                   const DataBlock::DataBlockHash& data_hash,
-                                                                   bool encrypted) const;
-
-  std::expected<std::shared_ptr<MetadataBlock>, WfsError> AllocMetadataBlock();
+  std::expected<std::shared_ptr<Block>, WfsError> AllocMetadataBlock();
   std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t chunks_count,
                                                                  Block::BlockSizeType chunk_size);
-  bool DeleteBlocks(uint32_t block_number, uint32_t blocks_count);
+  bool DeleteBlocks(uint32_t area_block_number, uint32_t area_blocks_count);
 
-  uint32_t ToRelativeBlockNumber(uint32_t absolute_block_number) const;
-  uint32_t ToAbsoluteBlockNumber(uint32_t relative_block_number) const;
-  uint32_t ToRelativeBlocksCount(uint32_t absolute_blocks_count) const;
-  uint32_t ToAbsoluteBlocksCount(uint32_t relative_blocks_count) const;
+  uint32_t to_area_block_number(uint32_t device_block_number) const {
+    return to_area_blocks_count(device_block_number - header_block_->device_block_number());
+  }
 
-  size_t BlockSizeLog2() const;
+  uint32_t to_device_block_number(uint32_t area_block_number) const {
+    return header_block_->device_block_number() + to_device_blocks_count(area_block_number);
+  }
 
-  uint32_t BlockNumber() const;
-  uint32_t BlocksCount() const;
+  uint32_t to_area_blocks_count(uint32_t device_blocks_count) const {
+    return device_blocks_count >> (block_size_log2() - Block::BlockSize::Basic);
+  }
+
+  uint32_t to_device_blocks_count(uint32_t area_blocks_count) const {
+    return area_blocks_count << (block_size_log2() - Block::BlockSize::Basic);
+  }
+
+  size_t block_size_log2() const { return header()->block_size_log2.value(); }
+  size_t block_size() const { return size_t{1} << block_size_log2(); }
+
+  uint32_t device_block_number() const { return header_block_->device_block_number(); }
+
+  // In area blocks count
+  uint32_t blocks_count() const { return header()->blocks_count.value(); }
 
   size_t BlocksCacheSizeLog2() const;
   uint32_t ReservedBlocksCount() const;
@@ -73,9 +83,8 @@ class Area : public std::enable_shared_from_this<Area> {
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  private:
-  friend class Wfs;
   friend class Recovery;
-  friend class FreeBlocksAllocator;
+  friend class Wfs;
 
   static constexpr uint32_t kFreeBlocksAllocatorBlockNumber = 1;
   static constexpr uint32_t kFreeBlocksAllocatorInitialFTreeBlockNumber = 2;
@@ -86,25 +95,17 @@ class Area : public std::enable_shared_from_this<Area> {
 
   static constexpr uint32_t kTransactionsBlockNumber = 6;
 
-  MetadataBlock* block() { return header_block_.get(); }
-  const MetadataBlock* block() const { return header_block_.get(); }
+  Block* block() { return header_block_.get(); }
+  const Block* block() const { return header_block_.get(); }
 
-  bool has_wfs_header() const { return BlockNumber() == 0; }
-  uint16_t wfs_header_offset() const { return sizeof(MetadataBlockHeader); }
-  uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (has_wfs_header() ? sizeof(WfsHeader) : 0); }
+  bool is_root_area() const { return device_block_number() == 0; }
+  uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsHeader) : 0); }
 
   WfsAreaHeader* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
   const WfsAreaHeader* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
 
-  WfsHeader* mutable_wfs_header() {
-    return has_wfs_header() ? block()->get_mutable_object<WfsHeader>(wfs_header_offset()) : NULL;
-  }
-  const WfsHeader* wfs_header() const {
-    return has_wfs_header() ? block()->get_object<WfsHeader>(wfs_header_offset()) : NULL;
-  }
-
   uint32_t IV(uint32_t block_number) const;
 
   std::shared_ptr<Wfs> wfs_device_;
-  std::shared_ptr<MetadataBlock> header_block_;
+  std::shared_ptr<Block> header_block_;
 };

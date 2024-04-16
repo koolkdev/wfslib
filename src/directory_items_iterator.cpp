@@ -12,7 +12,6 @@
 
 #include "area.h"
 #include "directory.h"
-#include "metadata_block.h"
 #include "structs.h"
 #include "sub_block_allocator.h"
 
@@ -36,8 +35,8 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
   while (node_state_->node->choices()[node_state_->current_index] != std::byte{0}) {
     auto block = node_state_->block;
     uint16_t node_offset = 0;
-    if (node_state_->block->Header()->block_flags.value() &
-        node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
+    auto* header = node_state_->block->get_object<MetadataBlockHeader>(0);
+    if (header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE) {
       node_offset = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node)
                         ->get_item(node_state_->current_index)
                         .value();
@@ -52,10 +51,10 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
                        current_node->prefix();
     node_state_ = std::make_shared<NodeState>(NodeState{block, current_node, std::move(node_state_), 0, path});
   }
-  if (!(node_state_->block->Header()->block_flags.value() &
-        node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE)) {
+  auto* header = node_state_->block->get_object<MetadataBlockHeader>(0);
+  if (!(header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE)) {
     // This is just internal node (in the directories trees tree), it just point to another tree
-    auto block = directory_->area()->GetMetadataBlock(
+    auto block = directory_->area()->LoadMetadataBlock(
         static_cast<const InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
     if (!block.has_value())
       throw WfsException(WfsError::kDirectoryCorrupted);
@@ -93,8 +92,8 @@ bool DirectoryItemsIterator::operator!=(const DirectoryItemsIterator& rhs) const
 DirectoryItemsIterator::value_type DirectoryItemsIterator::operator*() {
   if (!node_state_)
     throw std::runtime_error("Out of bounds");
-  if (node_state_->block->Header()->block_flags.value() &
-      node_state_->block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
+  auto* header = node_state_->block->get_object<MetadataBlockHeader>(0);
+  if (header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto block = node_state_->block;
     auto external_node = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node);
     const AttributesBlock attributes{block, external_node->get_item(node_state_->current_index).value()};

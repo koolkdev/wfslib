@@ -13,6 +13,8 @@
 #include <string>
 #include <vector>
 
+#include "errors.h"
+
 class BlocksDevice;
 
 class Block {
@@ -27,6 +29,21 @@ class Block {
     Large = 3,
     LargeCluster = 6,
   };
+
+  struct HashRef {
+    std::shared_ptr<Block> block;  // null if hash in same block
+    size_t offset;
+  };
+
+  // TODO: Private constructor?
+  Block(std::shared_ptr<BlocksDevice> device,
+        uint32_t device_block_number,
+        Block::BlockSize size_category,
+        uint32_t data_size,
+        uint32_t iv,
+        HashRef hash_ref,
+        bool encrypted);
+  virtual ~Block();
 
   bool Fetch(bool check_hash = true);
   void Flush();
@@ -61,37 +78,47 @@ class Block {
     return static_cast<size_t>(res);
   }
 
-  // TODO: Rename to AbsBlockNumber for clarity?
-  uint32_t BlockNumber() const { return block_number_; }
+  uint32_t device_block_number() const { return device_block_number_; }
   Block::BlockSize log2_size() const { return size_category_; }
 
   bool encrypted() const { return encrypted_; }
 
-  virtual void Resize(uint32_t data_size);
+  void Resize(uint32_t data_size);
 
   void Detach();
 
-  // TODO: fix private/protected
+  static std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(std::shared_ptr<BlocksDevice> device,
+                                                                       uint32_t device_block_number,
+                                                                       Block::BlockSize size_category,
+                                                                       uint32_t data_size,
+                                                                       uint32_t iv,
+                                                                       HashRef data_hash,
+                                                                       bool encrypted,
+                                                                       bool load_data = true,
+                                                                       bool check_hash = true);
+
+  static std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(std::shared_ptr<BlocksDevice> device,
+                                                                           uint32_t device_block_number,
+                                                                           Block::BlockSize size_category,
+                                                                           uint32_t iv,
+                                                                           bool load_data = true,
+                                                                           bool check_hash = true);
+
  private:
   uint32_t GetAlignedSize(uint32_t size) const;
 
   std::span<std::byte> GetDataForWriting();
 
- protected:
-  Block(const std::shared_ptr<BlocksDevice>& device,
-        uint32_t block_number,
-        Block::BlockSize size_category,
-        uint32_t data_size,
-        uint32_t iv,
-        bool encrypted);
-  virtual ~Block();
-
-  virtual std::span<std::byte> MutableHash() = 0;
-  virtual std::span<const std::byte> Hash() const = 0;
+  std::byte* mutable_hash() {
+    return (hash_ref_.block ? hash_ref_.block.get() : this)->get_mutable_object<std::byte>(hash_ref_.offset);
+  }
+  const std::byte* hash() const {
+    return (hash_ref_.block ? hash_ref_.block.get() : this)->get_object<std::byte>(hash_ref_.offset);
+  }
 
   std::shared_ptr<BlocksDevice> device_;
 
-  uint32_t block_number_;
+  uint32_t device_block_number_;
   Block::BlockSize size_category_;
   uint32_t data_size_;
   uint32_t iv_;
@@ -100,6 +127,7 @@ class Block {
   bool dirty_{false};
   bool detached_{false};
 
+  HashRef hash_ref_;
   // data buffer of at least size_, rounded to sector.
   std::vector<std::byte> data_;
 };

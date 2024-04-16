@@ -19,7 +19,7 @@ constexpr auto kSizeBuckets = std::to_array({0, 3, 6, 10, 14, 18, 22});
 
 class EPTree;
 class Area;
-class MetadataBlock;
+class Block;
 struct FreeBlocksAllocatorHeader;
 
 struct FreeBlocksExtentInfo {
@@ -39,7 +39,7 @@ struct FreeBlocksRangeInfo {
 
 class FreeBlocksAllocator {
  public:
-  FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block);
+  FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<Block> block);
   virtual ~FreeBlocksAllocator() = default;
 
   void Init();
@@ -62,9 +62,9 @@ class FreeBlocksAllocator {
   // Return whether any part of the block is freed
   bool IsRangeIsFree(FreeBlocksRangeInfo range);
 
-  virtual std::shared_ptr<MetadataBlock> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
+  virtual std::shared_ptr<Block> LoadAllocatorBlock(uint32_t block_number, bool new_block = false);
 
-  std::shared_ptr<MetadataBlock> root_block() const { return block_; }
+  std::shared_ptr<Block> root_block() const { return block_; }
 
  protected:
   bool AllocBlocksOfSpecificSize(uint32_t blocks_count,
@@ -87,5 +87,5 @@ class FreeBlocksAllocator {
 
  private:
   std::shared_ptr<Area> area_;
-  std::shared_ptr<MetadataBlock> block_;
+  std::shared_ptr<Block> block_;
 };

@@ -10,15 +10,14 @@
 #include "../src/eptree.h"
 #include "../src/ftrees.h"
 #include "../src/structs.h"
+#include "test_block.h"
 #include "test_blocks_device.h"
-#include "test_metadata_block.h"
 
-TestFreeBlocksAllocator::TestFreeBlocksAllocator(std::shared_ptr<MetadataBlock> block,
-                                                 std::shared_ptr<TestBlocksDevice> device)
+TestFreeBlocksAllocator::TestFreeBlocksAllocator(std::shared_ptr<Block> block, std::shared_ptr<TestBlocksDevice> device)
     : FreeBlocksAllocator(nullptr, std::move(block)), blocks_device_(device) {}
 
 bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tree_blocks) {
-  initial_ftrees_block_number_ = root_block()->BlockNumber() + 1;
+  initial_ftrees_block_number_ = root_block()->device_block_number() + 1;
   initial_frees_block_number_ = initial_ftrees_block_number_ + 1;
 
   if (free_cache_blocks) {
@@ -44,6 +43,6 @@ bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tre
   return true;
 }
 
-std::shared_ptr<MetadataBlock> TestFreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
-  return TestMetadataBlock::LoadBlock(blocks_device_, block_number, new_block);
+std::shared_ptr<Block> TestFreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
+  return TestBlock::LoadMetadataBlock(blocks_device_, block_number, new_block);
 }

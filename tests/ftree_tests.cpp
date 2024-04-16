@@ -12,14 +12,14 @@
 
 #include "../src/ftree.h"
 
+#include "test_block.h"
 #include "test_blocks_device.h"
 #include "test_free_blocks_allocator.h"
-#include "test_metadata_block.h"
 #include "test_utils.h"
 
 TEST_CASE("FTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto ftrees_block = TestMetadataBlock::LoadBlock(test_device, 0);
+  auto ftrees_block = TestBlock::LoadMetadataBlock(test_device, 0);
   FTreesBlock{ftrees_block}.Init();
 
   auto ftrees = std::ranges::iota_view(size_t{0}, kSizeBuckets.size()) |
@@ -87,7 +87,7 @@ TEST_CASE("FTreeTests") {
     }
     REQUIRE(ftrees[0].size() == kItemsCount);
 
-    FTree ftree{TestMetadataBlock::LoadBlock(test_device, 1), 0};
+    FTree ftree{TestBlock::LoadMetadataBlock(test_device, 1), 0};
     ftree.Init();
     REQUIRE(ftree.insert_compact(ftrees[0].begin(), ftrees[0].end()));
 

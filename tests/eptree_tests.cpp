@@ -13,14 +13,14 @@
 
 #include "../src/eptree.h"
 
+#include "test_block.h"
 #include "test_blocks_device.h"
 #include "test_free_blocks_allocator.h"
-#include "test_metadata_block.h"
 #include "test_utils.h"
 
 TEST_CASE("EPTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto allocator_block = TestMetadataBlock::LoadBlock(test_device, 0);
+  auto allocator_block = TestBlock::LoadMetadataBlock(test_device, 0);
   TestFreeBlocksAllocator allocator{allocator_block, test_device};
   allocator.Init(1000000);
   EPTree eptree{&allocator};

@@ -12,7 +12,6 @@
 #include "area.h"
 #include "file.h"
 #include "link.h"
-#include "metadata_block.h"
 #include "structs.h"
 #include "sub_block_allocator.h"
 
@@ -85,11 +84,12 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
   }
 }
 
-std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const std::shared_ptr<MetadataBlock>& block,
+std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const std::shared_ptr<Block>& block,
                                                                         const std::string& name) const {
   DirectoryTree dir_tree{block};
   auto current_node = block->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
-  if (block->Header()->block_flags.value() & block->Header()->Flags::EXTERNAL_DIRECTORY_TREE) {
+  auto* header = block->get_object<MetadataBlockHeader>(0);
+  if (header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto pos_in_path = name.begin();
     while (true) {
       auto external_node = static_cast<const ExternalDirectoryTreeNode*>(current_node);
@@ -166,7 +166,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
       // Not found
       return std::unexpected(kItemNotFound);
     }
-    auto next_block = area_->GetMetadataBlock(last_block_number);
+    auto next_block = area_->LoadMetadataBlock(last_block_number);
     if (!next_block.has_value())
       return std::unexpected(kDirectoryCorrupted);
     return GetObjectAttributes(std::move(*next_block), name);

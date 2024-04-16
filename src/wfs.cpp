@@ -13,10 +13,11 @@
 
 #include "area.h"
 #include "blocks_device.h"
+#include "device.h"
 #include "directory.h"
 #include "structs.h"
 
-Wfs::Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<MetadataBlock> root_block)
+Wfs::Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<Block> root_block)
     : device_(std::move(device)), root_block_(std::move(root_block)) {}
 
 Wfs::~Wfs() {
@@ -94,9 +95,9 @@ std::expected<std::shared_ptr<Directory>, WfsError> Wfs::GetRootDirectory() {
 
 // static
 std::expected<std::shared_ptr<Wfs>, WfsError> Wfs::Load(std::shared_ptr<BlocksDevice> device) {
-  auto block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Basic, 0);
+  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0);
   if (!block.has_value()) {
-    block = MetadataBlock::LoadBlock(device, 0, Block::BlockSize::Regular, 0);
+    block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Regular, /*iv=*/0);
     if (!block.has_value())
       return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
@@ -104,4 +105,38 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Wfs::Load(std::shared_ptr<BlocksDe
   if (header->version.value() != WFS_VERSION)
     return std::unexpected(WfsError::kInvalidWfsVersion);
   return std::make_shared<Wfs>(std::move(device), std::move(*block));
+}
+
+std::expected<std::shared_ptr<Block>, WfsError> Wfs::LoadMetadataBlock(const Area* area,
+                                                                       uint32_t device_block_number,
+                                                                       Block::BlockSize size,
+                                                                       bool new_block) const {
+  return Block::LoadMetadataBlock(device_, device_block_number, size, CalcIV(area, device_block_number), !new_block);
+}
+
+std::expected<std::shared_ptr<Block>, WfsError> Wfs::LoadDataBlock(const Area* area,
+                                                                   uint32_t device_block_number,
+                                                                   Block::BlockSize size,
+                                                                   uint32_t data_size,
+                                                                   Block::HashRef data_hash,
+                                                                   bool encrypted,
+                                                                   bool new_block) const {
+  return Block::LoadDataBlock(device_, device_block_number, size, data_size, CalcIV(area, device_block_number),
+                              std::move(data_hash), encrypted, !new_block);
+}
+
+uint32_t Wfs::CalcIV(const Area* area, uint32_t device_block_number) const {
+  return (area->header()->iv.value() ^ header()->iv.value()) +
+         ((device_block_number - area->device_block_number())
+          << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
+}
+
+std::expected<std::shared_ptr<Area>, WfsError> Wfs::GetTransactionsArea(bool backup_area) {
+  auto root_area = GetRootArea();
+  auto block =
+      LoadMetadataBlock(root_area.get(), header()->transactions_area_block_number.value() + (backup_area ? 1 : 0),
+                        Block::BlockSize::Basic);
+  if (!block.has_value())
+    return std::unexpected(WfsError::kTransactionsAreaCorrupted);
+  return std::make_shared<Area>(shared_from_this(), *block);
 }

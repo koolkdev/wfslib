@@ -35,12 +35,12 @@ size_t BlockSizeToIndex(Block::BlockSizeType size) {
 
 }  // namespace
 
-FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<MetadataBlock> block)
+FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<Block> block)
     : area_(std::move(area)), block_(std::move(block)) {}
 
 void FreeBlocksAllocator::Init() {
   uint32_t initial_free_blocks_number = area_->ReservedBlocksCount();
-  uint32_t free_blocks_count = area_->BlocksCount() - initial_free_blocks_number;
+  uint32_t free_blocks_count = area_->blocks_count() - initial_free_blocks_number;
 
   // Init cach info
   auto* header = mutable_header();
@@ -49,10 +49,10 @@ void FreeBlocksAllocator::Init() {
 
   if (area_->BlocksCacheSizeLog2()) {
     uint32_t cache_end_block_number = initial_free_blocks_number + (1 << area_->BlocksCacheSizeLog2());
-    cache_end_block_number = area_->ToAbsoluteBlockNumber(cache_end_block_number);
+    cache_end_block_number = area_->to_device_block_number(cache_end_block_number);
     cache_end_block_number = align_ceil_pow2(
-        cache_end_block_number, area_->BlocksCacheSizeLog2() + area_->BlockSizeLog2() - Block::BlockSize::Basic);
-    cache_end_block_number = area_->ToRelativeBlockNumber(cache_end_block_number);
+        cache_end_block_number, area_->BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+    cache_end_block_number = area_->to_area_block_number(cache_end_block_number);
     uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks_number;
     if (cache_free_blocks_count > free_blocks_count) {
       cache_free_blocks_count = free_blocks_count;
@@ -69,7 +69,7 @@ void FreeBlocksAllocator::Init() {
 
   // TODO: support sparse areas
   EPTree eptree{this};
-  eptree.Init(area_->ToRelativeBlockNumber(block_->BlockNumber()));
+  eptree.Init(area_->to_area_block_number(block_->device_block_number()));
   // TODO: 2 -> k
   auto ftree_block = LoadAllocatorBlock(2, true);
   FTrees ftrees{std::move(ftree_block)};
@@ -361,10 +361,10 @@ bool FreeBlocksAllocator::ReplanishBlocksCache() {
   if (!selected_extent)
     return false;
   // Round the block number to be aligned to blocks cache in the whole disk
-  auto abs_block_number = area_->ToAbsoluteBlockNumber(selected_extent->block_number);
+  auto abs_block_number = area_->to_device_block_number(selected_extent->block_number);
   auto aligned_block_number = align_ceil_pow2(
-      abs_block_number, area_->BlocksCacheSizeLog2() + area_->BlockSizeLog2() - Block::BlockSize::Basic);
-  selected_extent->block_number = area_->ToRelativeBlockNumber(aligned_block_number);
+      abs_block_number, area_->BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+  selected_extent->block_number = area_->to_area_block_number(aligned_block_number);
   selected_extent->blocks_count = blocks_to_alloc;
   return true;
 }
@@ -459,8 +459,8 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   return std::vector<FreeBlocksRangeInfo>{res.begin(), res.end()};
 }
 
-std::shared_ptr<MetadataBlock> FreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
-  return throw_if_error(area_->GetMetadataBlock(block_number, new_block));
+std::shared_ptr<Block> FreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
+  return throw_if_error(area_->LoadMetadataBlock(block_number, new_block));
 }
 
 const FreeBlocksAllocatorHeader* FreeBlocksAllocator::header() {

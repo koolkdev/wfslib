@@ -12,10 +12,11 @@
 
 struct Attributes;
 struct AttributesBlock;
-class MetadataBlock;
+class Block;
 
+// TODO: change to AttributesRef
 struct AttributesBlock {
-  std::shared_ptr<MetadataBlock> block;
+  std::shared_ptr<Block> block;
   size_t attributes_offset;
 
   ::Attributes* mutable_data();

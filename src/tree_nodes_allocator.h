@@ -8,10 +8,9 @@
 #pragma once
 
 #include <memory>
-#include "metadata_block.h"
 #include "structs.h"
 
-class MetadataBlock;
+class Block;
 struct SubBlockAllocatorStruct;
 
 template <typename T, size_t N>
@@ -44,7 +43,7 @@ class TreeNodesAllocator {
 
   static_assert(entry_size >= sizeof(HeapFreelistEntry));
 
-  TreeNodesAllocator(const std::shared_ptr<MetadataBlock>& block) : block_(block) {}
+  TreeNodesAllocator(const std::shared_ptr<Block>& block) : block_(block) {}
 
   void Init() {
     auto* header = mutable_heap_header();
@@ -148,7 +147,7 @@ class TreeNodesAllocator {
     return block()->template get_object<extra_header_type>(extra_header_offset());
   }
 
-  std::shared_ptr<MetadataBlock> block() const { return block_; }
+  std::shared_ptr<Block> block() const { return block_; }
 
   template <typename T>
   T* get_mutable_object(uint16_t offset) const
@@ -204,5 +203,5 @@ class TreeNodesAllocator {
   HeapHeader* mutable_heap_header() { return block_->template get_mutable_object<HeapHeader>(heap_header_offset()); }
   const HeapHeader* heap_header() const { return block_->template get_object<HeapHeader>(heap_header_offset()); }
 
-  std::shared_ptr<MetadataBlock> block_;
+  std::shared_ptr<Block> block_;
 };
