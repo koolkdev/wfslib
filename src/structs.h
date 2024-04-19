@@ -73,8 +73,8 @@ struct Attributes {
   uint32_be_t mtime;
   uint32_be_t unknown;  // TODO: ????
   union {
-    uint32_be_t size;          // for file
-    uint32_be_t blocks_count;  // for quota
+    uint32_be_t file_size;           // for file
+    uint32_be_t quota_blocks_count;  // for quota
   };
   uint32_be_t directory_block_number;  // in case of directory
   Permissions permissions;
@@ -84,12 +84,12 @@ struct Attributes {
   uint8_be_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
                            // byte, it is a bitmap of filename_length
 
-  bool IsDirectory() const { return !!(flags.value() & Flags::DIRECTORY); }
-  bool IsFile() const { return !IsDirectory(); }
-  bool IsLink() const { return !!(flags.value() & Flags::LINK); }
-  bool IsQuota() const { return !!(flags.value() & Flags::QUOTA); }
+  bool is_directory() const { return !!(flags.value() & Flags::DIRECTORY); }
+  bool is_file() const { return !is_directory(); }
+  bool is_link() const { return !!(flags.value() & Flags::LINK); }
+  bool is_quota() const { return !!(flags.value() & Flags::QUOTA); }
 
-  size_t DataOffset() const;
+  size_t size() const { return offsetof(Attributes, case_bitmap) + div_ceil(filename_length.value(), 8); }
 
   std::string GetCaseSensitiveName(const std::string& name) const;
 };

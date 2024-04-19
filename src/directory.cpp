@@ -11,81 +11,49 @@
 
 #include "area.h"
 #include "file.h"
-#include "link.h"
 #include "structs.h"
 #include "sub_block_allocator.h"
 
 using NodeState = DirectoryItemsIterator::NodeState;
 using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
+Directory::Directory(std::string name,
+                     AttributesRef attributes,
+                     std::shared_ptr<Area> area,
+                     std::shared_ptr<Block> block)
+    : WfsItem(std::move(name), std::move(attributes)), area_(std::move(area)), block_(std::move(block)) {}
+
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
-  const auto attributes_block = GetObjectAttributes(block_, name);
+  const auto attributes_block = FindObjectAttributes(block_, name);
   if (!attributes_block.has_value())
     return std::unexpected(attributes_block.error());
-  return GetObjectInternal(name, *attributes_block);
+  return WfsItem::Load(area_, name, std::move(*attributes_block));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
-  const auto attributes_block = GetObjectAttributes(block_, name);
-  if (!attributes_block.has_value()) {
-    return std::unexpected(attributes_block.error());
-  }
-  auto attributes = attributes_block->data();
-  if (attributes->IsLink() || !attributes->IsDirectory()) {
+  auto obj = GetObject(name);
+  if (!obj.has_value())
+    return std::unexpected(obj.error());
+  if (!(*obj)->is_directory()) {
     // Not a directory
     return std::unexpected(kNotDirectory);
   }
-  auto obj = GetObjectInternal(attributes->GetCaseSensitiveName(name), *attributes_block);
-  if (!obj.has_value())
-    return std::unexpected(obj.error());
   return std::dynamic_pointer_cast<Directory>(*obj);
 }
 
 std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::string& name) const {
-  const auto attributes_block = GetObjectAttributes(block_, name);
-  if (!attributes_block.has_value()) {
-    return std::unexpected(attributes_block.error());
-  }
-  auto attributes = attributes_block->data();
-  if (attributes->IsLink() || attributes->IsDirectory()) {
+  auto obj = GetObject(name);
+  if (!obj.has_value())
+    return std::unexpected(obj.error());
+  if (!(*obj)->is_file()) {
     // Not a file
     return std::unexpected(kNotFile);
   }
-  auto obj = GetObjectInternal(name, *attributes_block);
-  if (!obj.has_value())
-    return std::unexpected(obj.error());
   return std::dynamic_pointer_cast<File>(*obj);
 }
 
-std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObjectInternal(
-    const std::string& name,
-    const AttributesBlock& attributes_block) const {
-  auto attributes = attributes_block.data();
-  if (attributes->IsLink()) {
-    // TODO, I think that the link info is in the attributes metadata
-    return std::make_shared<Link>(name, attributes_block, area_);
-  } else if (attributes->IsDirectory()) {
-    if (attributes->flags.value() & attributes->Flags::QUOTA) {
-      // The directory is quota, aka new area
-      auto block_size = Block::BlockSize::Basic;
-      if (!(attributes->flags.value() & attributes->Flags::AREA_SIZE_BASIC) &&
-          (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
-        block_size = Block::BlockSize::Regular;
-      auto new_area = area_->GetArea(attributes->directory_block_number.value(), block_size);
-      if (!new_area.has_value())
-        return std::unexpected(new_area.error());
-      return (*new_area)->GetRootDirectory(name, attributes_block);
-    } else {
-      return area_->GetDirectory(attributes->directory_block_number.value(), name, attributes_block);
-    }
-  } else {
-    // IsFile()
-    return std::make_shared<File>(name, attributes_block, area_);
-  }
-}
-
-std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const std::shared_ptr<Block>& block,
-                                                                        const std::string& name) const {
+std::expected<AttributesRef, WfsError> Directory::FindObjectAttributes(const std::shared_ptr<Block>& block,
+                                                                       const std::string& name) const {
   DirectoryTree dir_tree{block};
   auto current_node = block->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
   auto* header = block->get_object<MetadataBlockHeader>(0);
@@ -119,7 +87,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
       auto value_offset = external_node->get_item(res - choices.begin()).value();
       if (pos_in_path == name.end()) {
         // We found the attribute!
-        return AttributesBlock{block, value_offset};
+        return AttributesRef{block, value_offset};
       }
       pos_in_path++;
       // Go to next node
@@ -169,7 +137,7 @@ std::expected<AttributesBlock, WfsError> Directory::GetObjectAttributes(const st
     auto next_block = area_->LoadMetadataBlock(last_block_number);
     if (!next_block.has_value())
       return std::unexpected(kDirectoryCorrupted);
-    return GetObjectAttributes(std::move(*next_block), name);
+    return FindObjectAttributes(std::move(*next_block), name);
   }
 }
 

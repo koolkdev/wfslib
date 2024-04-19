@@ -90,7 +90,7 @@ std::shared_ptr<Area> Wfs::GetRootArea() {
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Wfs::GetRootDirectory() {
-  return GetRootArea()->GetRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_attributes)});
+  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_attributes)});
 }
 
 // static

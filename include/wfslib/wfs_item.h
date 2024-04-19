@@ -10,33 +10,39 @@
 #include <memory>
 #include <string>
 
-struct Attributes;
-struct AttributesBlock;
-class Block;
+#include "block.h"
+#include "structs.h"
 
-// TODO: change to AttributesRef
-struct AttributesBlock {
+class Area;
+
+struct AttributesRef {
   std::shared_ptr<Block> block;
-  size_t attributes_offset;
+  size_t offset;
 
-  ::Attributes* mutable_data();
-  const ::Attributes* data() const;
+  const Attributes* get() const { return block->get_object<Attributes>(offset); }
+  Attributes* get_mutable() const { return block->get_mutable_object<Attributes>(offset); }
 };
 
 class WfsItem {
  public:
-  WfsItem(const std::string& name, const AttributesBlock& block);
-  virtual ~WfsItem() {}
-  const std::string& GetName() const { return name_; }
-  virtual bool IsDirectory() const;
-  virtual bool IsFile() const;
-  virtual bool IsLink() const;
-  virtual bool IsQuota() const;
+  WfsItem(std::string name, AttributesRef block);
+  virtual ~WfsItem();
+
+  const std::string& name() const { return name_; }
+  bool is_directory() const { return !attributes()->is_link() && attributes()->is_directory(); }
+  bool is_file() const { return !attributes()->is_link() && !attributes()->is_directory(); }
+  bool is_link() const { return attributes()->is_link(); }
+  bool is_quota() const { return attributes()->is_directory() && attributes()->is_quota(); }
+
+  static std::expected<std::shared_ptr<WfsItem>, WfsError> Load(std::shared_ptr<Area> area,
+                                                                std::string name,
+                                                                AttributesRef attributes_ref);
 
  protected:
-  AttributesBlock& attributes_data() { return attributes_; }
-  const AttributesBlock& attributes_data() const { return attributes_; }
+  Attributes* mutable_attributes() { return attributes_.get_mutable(); }
+  const Attributes* attributes() const { return attributes_.get(); }
+  const std::shared_ptr<Block>& attributes_block() const { return attributes_.block; }
 
   std::string name_;
-  AttributesBlock attributes_;
+  AttributesRef attributes_;
 };
