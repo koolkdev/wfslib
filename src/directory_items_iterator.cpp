@@ -96,9 +96,9 @@ DirectoryItemsIterator::value_type DirectoryItemsIterator::operator*() {
   if (header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE) {
     auto block = node_state_->block;
     auto external_node = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node);
-    const AttributesBlock attributes{block, external_node->get_item(node_state_->current_index).value()};
-    auto name = attributes.data()->GetCaseSensitiveName(node_state_->path);
-    return {name, directory_->GetObjectInternal(name, attributes)};
+    const AttributesRef attributes{block, external_node->get_item(node_state_->current_index).value()};
+    auto name = attributes.get()->GetCaseSensitiveName(node_state_->path);
+    return {name, WfsItem::Load(directory_->area(), name, std::move(attributes))};
   } else {
     // Should not happen (can't happen, the iterator should stop only at external trees)
     throw std::logic_error("Should not happen!");

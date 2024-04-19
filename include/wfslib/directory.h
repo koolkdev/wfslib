@@ -24,11 +24,7 @@ struct DirectoryTreeNode;
 class Directory : public WfsItem, public std::enable_shared_from_this<Directory> {
  public:
   // TODO: Replace name with tree iterator?
-  Directory(const std::string& name,
-            AttributesBlock attributes,
-            const std::shared_ptr<Area>& area,
-            const std::shared_ptr<Block>& block)
-      : WfsItem(name, attributes), area_(area), block_(block) {}
+  Directory(std::string name, AttributesRef attributes, std::shared_ptr<Area> area, std::shared_ptr<Block> block);
 
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObject(const std::string& name) const;
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(const std::string& name) const;
@@ -40,8 +36,6 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   const std::shared_ptr<Area>& area() const { return area_; }
 
-  static void LoadDirectory(std::shared_ptr<Area> area, AttributesBlock attributes, uint32_t block_number);
-
  private:
   friend DirectoryItemsIterator;
   friend class Recovery;
@@ -51,8 +45,6 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
 
   std::shared_ptr<Block> block_;
 
-  std::expected<std::shared_ptr<WfsItem>, WfsError> GetObjectInternal(const std::string& name,
-                                                                      const AttributesBlock& attributes) const;
-  std::expected<AttributesBlock, WfsError> GetObjectAttributes(const std::shared_ptr<Block>& block,
-                                                               const std::string& name) const;
+  std::expected<AttributesRef, WfsError> FindObjectAttributes(const std::shared_ptr<Block>& block,
+                                                              const std::string& name) const;
 };
