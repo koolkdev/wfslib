@@ -101,7 +101,7 @@ enum class DeviceType : uint16_t {
 };
 
 // sizeof 0x48
-struct WfsHeader {
+struct WfsDeviceHeader {
   uint32_be_t iv;           // most 2 bits are device type. 1-mlc/3-usb
   uint32_be_t version;      // should be 0x01010800
   uint16_be_t device_type;  // usb - 0x16a2. mlc - 0x136a?
@@ -111,7 +111,7 @@ struct WfsHeader {
   uint32_be_t transactions_area_blocks_count;
   uint32_be_t unknown[2];  // not used??
 };
-static_assert(sizeof(WfsHeader) == 0x48, "Incorrect sizeof WfsHeader");
+static_assert(sizeof(WfsDeviceHeader) == 0x48, "Incorrect sizeof WfsDeviceHeader");
 
 // sizof 0x8
 struct WfsAreaFragmentInfo {

@@ -15,7 +15,7 @@
 #include "errors.h"
 
 class FileDevice;
-class Wfs;
+class WfsDevice;
 class Directory;
 
 class Recovery {
@@ -26,12 +26,12 @@ class Recovery {
                                                     std::optional<std::vector<std::byte>> key);
 
   // Open a WFS device without knowning the exact device parameters
-  static std::expected<std::shared_ptr<Wfs>, WfsError> OpenWfsWithoutDeviceParams(
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> OpenWfsDeviceWithoutDeviceParams(
       std::shared_ptr<FileDevice> device,
       std::optional<std::vector<std::byte>> key);
 
   // Open a WFS device with /usr as root directory while skipping the wfs header
-  static std::expected<std::shared_ptr<Wfs>, WfsError> OpenUsrDirectoryWithoutWfsHeader(
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> OpenUsrDirectoryWithoutWfsDeviceHeader(
       std::shared_ptr<FileDevice> device,
       std::optional<std::vector<std::byte>> key);
 };

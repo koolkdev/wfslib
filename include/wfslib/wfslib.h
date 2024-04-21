@@ -14,4 +14,4 @@
 #include "file_device.h"
 #include "key_file.h"
 #include "recovery.h"
-#include "wfs.h"
+#include "wfs_device.h"
