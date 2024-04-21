@@ -80,16 +80,10 @@ class Area : public std::enable_shared_from_this<Area> {
 
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
- protected:
-  auto* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
-  const auto* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
-
-  Block* block() { return header_block_.get(); }
-  const Block* block() const { return header_block_.get(); }
-
  private:
   friend class Recovery;
   friend class WfsDevice;
+  friend class TestArea;
 
   static constexpr uint32_t kFreeBlocksAllocatorBlockNumber = 1;
   static constexpr uint32_t kFreeBlocksAllocatorInitialFTreeBlockNumber = 2;
@@ -104,6 +98,9 @@ class Area : public std::enable_shared_from_this<Area> {
   uint16_t header_offset() const {
     return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsDeviceHeader) : 0);
   }
+
+  WfsAreaHeader* mutable_header() { return header_block_->get_mutable_object<WfsAreaHeader>(header_offset()); }
+  const WfsAreaHeader* header() const { return header_block_->get_object<WfsAreaHeader>(header_offset()); }
 
   uint32_t IV(uint32_t block_number) const;
 
