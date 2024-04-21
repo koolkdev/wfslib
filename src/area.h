@@ -14,14 +14,14 @@
 #include "block.h"
 #include "structs.h"
 
-class Wfs;
+class WfsDevice;
 class Directory;
 class FreeBlocksAllocator;
 struct AttributesRef;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
-  Area(std::shared_ptr<Wfs> wfs_device, std::shared_ptr<Block> header_block);
+  Area(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block);
 
   // static std::expected<std::shared_ptr<Area>, WfsError> CreateRootArea(const std::shared_ptr<BlocksDevice>& device);
 
@@ -81,15 +81,15 @@ class Area : public std::enable_shared_from_this<Area> {
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  protected:
-  WfsAreaHeader* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
-  const WfsAreaHeader* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
+  auto* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
+  const auto* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
 
   Block* block() { return header_block_.get(); }
   const Block* block() const { return header_block_.get(); }
 
  private:
   friend class Recovery;
-  friend class Wfs;
+  friend class WfsDevice;
 
   static constexpr uint32_t kFreeBlocksAllocatorBlockNumber = 1;
   static constexpr uint32_t kFreeBlocksAllocatorInitialFTreeBlockNumber = 2;
@@ -101,10 +101,12 @@ class Area : public std::enable_shared_from_this<Area> {
   static constexpr uint32_t kTransactionsBlockNumber = 6;
 
   bool is_root_area() const { return device_block_number() == 0; }
-  uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsHeader) : 0); }
+  uint16_t header_offset() const {
+    return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsDeviceHeader) : 0);
+  }
 
   uint32_t IV(uint32_t block_number) const;
 
-  std::shared_ptr<Wfs> wfs_device_;
+  std::shared_ptr<WfsDevice> wfs_device_;
   std::shared_ptr<Block> header_block_;
 };

@@ -44,7 +44,7 @@ add_library(${PROJECT_NAME}
     src/rtree.cpp
     src/structs.cpp
     src/sub_block_allocator.cpp
-    src/wfs.cpp
+    src/wfs_device.cpp
     src/wfs_item.cpp
 )
 

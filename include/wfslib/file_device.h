@@ -12,8 +12,6 @@
 #include <mutex>
 #include "device.h"
 
-class Wfs;
-
 class FileDevice : public Device {
  public:
   FileDevice(const std::string& path,

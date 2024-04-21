@@ -15,7 +15,7 @@
 #include "directory.h"
 #include "file_device.h"
 #include "structs.h"
-#include "wfs.h"
+#include "wfs_device.h"
 
 namespace {
 
@@ -90,7 +90,7 @@ bool Recovery::CheckWfsKey(std::shared_ptr<FileDevice> device, std::optional<std
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
   auto block = *Block::LoadMetadataBlock(blocks_device, 0, Block::BlockSize::Basic, /*iv=*/0, /*load_data=*/true,
                                          /*check_hash=*/false);
-  auto wfs_header = reinterpret_cast<const WfsHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
+  auto wfs_header = reinterpret_cast<const WfsDeviceHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
   // Check wfs header
   return wfs_header->version.value() == WFS_VERSION;
 }
@@ -102,7 +102,7 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
   auto block = *Block::LoadMetadataBlock(blocks_device, /*device_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0,
                                          /*load_data=*/true, /*check_hash=*/false);
-  auto wfs_header = block->get_object<WfsHeader>(sizeof(MetadataBlockHeader));
+  auto wfs_header = block->get_object<WfsDeviceHeader>(sizeof(MetadataBlockHeader));
   auto block_size = Block::BlockSize::Basic;
   if (!(wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
       (wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
@@ -115,23 +115,23 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
   return std::nullopt;
 }
 
-std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenWfsWithoutDeviceParams(
+std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenWfsDeviceWithoutDeviceParams(
     std::shared_ptr<FileDevice> device,
     std::optional<std::vector<std::byte>> key) {
   auto res = DetectDeviceParams(device, key);
   if (res.has_value())
     return std::unexpected(*res);
-  return Wfs::Load(std::make_shared<BlocksDevice>(std::move(device), key));
+  return WfsDevice::Open(std::make_shared<BlocksDevice>(std::move(device), key));
 }
 
 namespace {
-class FakeWfsHeaderBlocksDevice final : public BlocksDevice {
+class FakeWfsDeviceHeaderBlocksDevice final : public BlocksDevice {
  public:
-  FakeWfsHeaderBlocksDevice(std::shared_ptr<Device> device,
-                            std::optional<std::vector<std::byte>> key,
-                            std::vector<std::byte> wfs_header_block)
+  FakeWfsDeviceHeaderBlocksDevice(std::shared_ptr<Device> device,
+                                  std::optional<std::vector<std::byte>> key,
+                                  std::vector<std::byte> wfs_header_block)
       : BlocksDevice(std::move(device), std::move(key)), wfs_header_block_(std::move(wfs_header_block)) {}
-  ~FakeWfsHeaderBlocksDevice() final override = default;
+  ~FakeWfsDeviceHeaderBlocksDevice() final override = default;
 
   bool ReadBlock(uint32_t block_number,
                  uint32_t size_in_blocks,
@@ -158,7 +158,7 @@ class FakeWfsHeaderBlocksDevice final : public BlocksDevice {
 
 }  // namespace
 
-std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutWfsHeader(
+std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWithoutWfsDeviceHeader(
     std::shared_ptr<FileDevice> device,
     std::optional<std::vector<std::byte>> key) {
   // First step: Read the /usr directory and restore root area ^ wfs ivs
@@ -188,7 +188,7 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
   MetadataBlockHeader header;
   std::memset(&header, 0, sizeof(header));
   header.block_flags = MetadataBlockHeader::Flags::AREA | MetadataBlockHeader::Flags::ROOT_AREA;
-  WfsHeader wfs_header;
+  WfsDeviceHeader wfs_header;
   std::memset(&wfs_header, 0, sizeof(wfs_header));
   wfs_header.iv = 0;
   wfs_header.version = 0x01010800;
@@ -213,14 +213,14 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
             std::back_inserter(first_wfs_block));
   std::fill_n(std::back_inserter(first_wfs_block), (1 << Block::BlockSize::Regular) - first_wfs_block.size(),
               std::byte{0});
-  auto first_fixed_device = std::make_shared<FakeWfsHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
+  auto first_fixed_device = std::make_shared<FakeWfsDeviceHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
 
   // Now go to the the /usr/system/save directory, there must be a sub-area there
-  auto wfs = Wfs::Load(first_fixed_device);
-  if (!wfs.has_value()) {
+  auto wfs_device = WfsDevice::Open(first_fixed_device);
+  if (!wfs_device.has_value()) {
     throw std::logic_error("Failed to load wfs root block after fix");
   }
-  auto system_save_dir = (*wfs)->GetDirectory("/save/system");
+  auto system_save_dir = (*wfs_device)->GetDirectory("/save/system");
   if (!system_save_dir) {
     throw std::logic_error("Failed to find /usr/save/system");
   }
@@ -267,6 +267,6 @@ std::expected<std::shared_ptr<Wfs>, WfsError> Recovery::OpenUsrDirectoryWithoutW
             std::back_inserter(first_wfs_block));
   std::fill_n(std::back_inserter(first_wfs_block), (1 << Block::BlockSize::Regular) - first_wfs_block.size(),
               std::byte{0});
-  auto final_device = std::make_shared<FakeWfsHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
-  return Wfs::Load(std::move(final_device));
+  auto final_device = std::make_shared<FakeWfsDeviceHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
+  return WfsDevice::Open(std::move(final_device));
 }

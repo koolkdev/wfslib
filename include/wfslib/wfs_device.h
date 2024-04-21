@@ -25,10 +25,10 @@ class File;
 class Directory;
 class BlocksDevice;
 
-class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
+class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
  public:
-  Wfs(std::shared_ptr<BlocksDevice> device, std::shared_ptr<Block> root_block);
-  ~Wfs();
+  WfsDevice(std::shared_ptr<BlocksDevice> device, std::shared_ptr<Block> root_block);
+  ~WfsDevice();
 
   BlocksDevice* device() { return device_.get(); }
 
@@ -57,7 +57,7 @@ class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
 
   uint32_t CalcIV(const Area* area, uint32_t device_block_number) const;
 
-  static std::expected<std::shared_ptr<Wfs>, WfsError> Load(std::shared_ptr<BlocksDevice> device);
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> Open(std::shared_ptr<BlocksDevice> device);
   // Create
 
  private:
@@ -65,8 +65,8 @@ class Wfs : public std::enable_shared_from_this<Wfs> {  // -> WfsDevice
 
   static constexpr uint16_t header_offset() { return sizeof(MetadataBlockHeader); }
 
-  WfsHeader* mutable_header() { return root_block_->get_mutable_object<WfsHeader>(header_offset()); }
-  const WfsHeader* header() const { return root_block_->get_object<WfsHeader>(header_offset()); }
+  auto* mutable_header() { return root_block_->get_mutable_object<WfsDeviceHeader>(header_offset()); }
+  const auto* header() const { return root_block_->get_object<WfsDeviceHeader>(header_offset()); }
 
   std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Block> root_block_;

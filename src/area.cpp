@@ -12,9 +12,9 @@
 
 #include "directory.h"
 #include "free_blocks_allocator.h"
-#include "wfs.h"
+#include "wfs_device.h"
 
-Area::Area(std::shared_ptr<Wfs> wfs_device, std::shared_ptr<Block> header_block)
+Area::Area(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block)
     : wfs_device_(std::move(wfs_device)), header_block_(std::move(header_block)) {}
 
 // static
