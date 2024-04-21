@@ -55,7 +55,7 @@ TEST_CASE("FTreeTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(ftrees[0],
-                              [](const FTree::iterator::value_type& extent) -> std::pair<uint32_t, nibble> {
+                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
                                 return {extent.key, extent.value};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, nibble> {
@@ -63,7 +63,7 @@ TEST_CASE("FTreeTests") {
         })));
     REQUIRE(std::ranges::equal(
         std::views::transform(ftrees[1],
-                              [](const FTree::iterator::value_type& extent) -> std::pair<uint32_t, nibble> {
+                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
                                 return {extent.key, extent.value};
                               }),
         std::views::transform(std::views::iota(uint32_t{0}, inserted), [](int i) -> std::pair<uint32_t, nibble> {

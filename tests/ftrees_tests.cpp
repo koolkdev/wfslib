@@ -37,7 +37,7 @@ TEST_CASE("FTreesTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(ftrees,
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
@@ -53,7 +53,7 @@ TEST_CASE("FTreesTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(std::views::reverse(ftrees),
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::reverse(std::views::iota(0, kItemsCount)),
@@ -111,7 +111,7 @@ TEST_CASE("FTreesTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(ftrees.begin(), it),
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, 522 / 2), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
@@ -119,7 +119,7 @@ TEST_CASE("FTreesTests") {
         })));
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(it, ftrees.end()),
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(
@@ -132,7 +132,7 @@ TEST_CASE("FTreesTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(ftrees.begin(), it),
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, 840 / 2), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
@@ -140,7 +140,7 @@ TEST_CASE("FTreesTests") {
         })));
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(it, ftrees.end()),
-                              [](const FTrees::iterator::value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
                                 return {extent.key, extent.value, extent.bucket_index};
                               }),
         std::views::transform(

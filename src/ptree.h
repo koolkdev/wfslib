@@ -140,9 +140,8 @@ class PTreeConstIterator {
   const std::vector<parent_node_info>& parents() const { return parents_; };
 
   bool is_begin() const {
-    return !leaf_ ||
-           (std::ranges::all_of(parents_, [](const parent_node_info& parent) { return parent.iterator.is_begin(); }) &&
-            leaf_->iterator.is_begin());
+    return !leaf_ || (std::ranges::all_of(parents_, [](const auto& parent) { return parent.iterator.is_begin(); }) &&
+                      leaf_->iterator.is_begin());
   }
   bool is_end() const { return !leaf_ || leaf_->iterator.is_end(); }
 

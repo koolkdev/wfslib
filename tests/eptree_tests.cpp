@@ -36,7 +36,7 @@ TEST_CASE("EPTreeTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(eptree,
-                              [](const RTree::iterator::value_type& extent) -> std::pair<uint32_t, uint32_t> {
+                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
                                 return {extent.key, extent.value};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
@@ -52,8 +52,7 @@ TEST_CASE("EPTreeTests") {
     }
 
     // Check that the tree is sorted
-    auto keys =
-        std::views::transform(eptree, [](const RTree::iterator::value_type& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(eptree, [](const auto& extent) -> uint32_t { return extent.key; });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(sorted_keys, keys));
@@ -61,7 +60,7 @@ TEST_CASE("EPTreeTests") {
     // Check the values
     REQUIRE(std::ranges::equal(
         std::views::transform(eptree,
-                              [](const RTree::iterator::value_type& extent) -> std::pair<uint32_t, uint32_t> {
+                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
                                 return {extent.key, extent.value};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
@@ -89,9 +88,8 @@ TEST_CASE("EPTreeTests") {
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(
-        std::views::transform(eptree, [](const RTree::iterator::value_type& extent) -> int { return extent.key; }),
-        sorted_upper_half));
+    REQUIRE(std::ranges::equal(std::views::transform(eptree, [](const auto& extent) -> int { return extent.key; }),
+                               sorted_upper_half));
 
     // Remove the second half
     for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
