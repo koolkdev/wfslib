@@ -7,13 +7,15 @@ enable_testing()
 
 add_executable(${PROJECT_NAME}
   eptree_tests.cpp
+  free_blocks_allocator_tests.cpp
   free_blocks_tree_bucket_tests.cpp
   free_blocks_tree_tests.cpp
   ftree_tests.cpp
   ftrees_tests.cpp
+  test_area.cpp
+  test_block.cpp
   test_blocks_device.cpp
   test_free_blocks_allocator.cpp
-  test_block.cpp
   rtree_tests.cpp
   tree_nodes_allocator_tests.cpp
 )

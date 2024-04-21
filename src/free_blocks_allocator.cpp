@@ -7,6 +7,7 @@
 
 #include "free_blocks_allocator.h"
 
+#include <algorithm>
 #include <functional>
 #include <ranges>
 
@@ -14,6 +15,8 @@
 #include "free_blocks_tree.h"
 #include "free_blocks_tree_bucket.h"
 #include "structs.h"
+
+static_assert(std::ranges::equal(kSizeBuckets, std::to_array({0, 3, 6, 10, 14, 18, 22})));
 
 namespace {
 
@@ -47,11 +50,11 @@ void FreeBlocksAllocator::Init() {
   header->free_blocks_count = free_blocks_count;
   header->always_one = 1;
 
-  if (area_->BlocksCacheSizeLog2()) {
-    uint32_t cache_end_block_number = initial_free_blocks_number + (1 << area_->BlocksCacheSizeLog2());
+  if (BlocksCacheSizeLog2()) {
+    uint32_t cache_end_block_number = initial_free_blocks_number + (1 << BlocksCacheSizeLog2());
     cache_end_block_number = area_->to_device_block_number(cache_end_block_number);
     cache_end_block_number = align_ceil_pow2(
-        cache_end_block_number, area_->BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+        cache_end_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
     cache_end_block_number = area_->to_area_block_number(cache_end_block_number);
     uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks_number;
     if (cache_free_blocks_count > free_blocks_count) {
@@ -77,10 +80,6 @@ void FreeBlocksAllocator::Init() {
   eptree.insert({0, 2});
   if (free_blocks_count)
     AddFreeBlocks({initial_free_blocks_number, free_blocks_count});
-}
-
-uint32_t FreeBlocksAllocator::FreeBlocksCount() {
-  return header()->free_blocks_count.value();
 }
 
 uint32_t FreeBlocksAllocator::AllocFreeBlockFromCache() {
@@ -120,7 +119,7 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
 }
 
 bool FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
-  if (!IsRangeIsFree(range)) {
+  if (range.blocks_count == 0 || IsRangeIsFree(range)) {
     // Error: part of this range is already free.
     assert(false);
     return false;
@@ -132,13 +131,23 @@ bool FreeBlocksAllocator::AddFreeBlocks(FreeBlocksRangeInfo range) {
 
 void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t bucket_index) {
   assert(bucket_index < kSizeBuckets.size());
-  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+  assert(range.blocks_count > 0);
   const uint32_t size_blocks_count = 1 << kSizeBuckets[bucket_index];
+  if (range.blocks_count < size_blocks_count) {
+    AddFreeBlocksForSize(range, bucket_index - 1);
+    return;
+  }
   uint32_t range_in_size_start = align_ceil_pow2(range.block_number, kSizeBuckets[bucket_index]);
   uint32_t range_in_size_end = align_floor_pow2(range.end_block_number(), kSizeBuckets[bucket_index]);
   if (range_in_size_start >= range_in_size_end) {
+    assert(range_in_size_start == range_in_size_end);
     // Doesn't fit in size
-    AddFreeBlocksForSize(range, bucket_index - 1);
+    if (range.block_number < range_in_size_start) {
+      AddFreeBlocksForSize({range.block_number, range_in_size_start - range.block_number}, bucket_index - 1);
+    }
+    if (range.end_block_number() > range_in_size_end) {
+      AddFreeBlocksForSize({range_in_size_end, range.end_block_number() - range_in_size_end}, bucket_index - 1);
+    }
     return;
   }
   FreeBlocksRangeInfo range_in_size{range_in_size_start, range_in_size_end - range_in_size_start};
@@ -148,8 +157,10 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
   FreeBlocksTreeBucket bucket{this, bucket_index};
   std::optional<FreeBlocksExtentInfo> join_before;
   FreeBlocksTreeBucket::iterator join_before_iter;
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   auto pos = bucket.find(range_in_size.block_number, false);
   auto ftree = pos.ftree();
+  bool joined = false;
   if (!pos.is_end()) {
     // Join with prev if:
     // 1. It ends exactly at this range start.
@@ -162,19 +173,19 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
       join_before_iter = pos;
       range_in_size.block_number = join_before->block_number;
       range_in_size.blocks_count += join_before->blocks_count;
+      joined = true;
     }
     // Join with next if:
     // 1. It start  exactly at this range end.
     // 2. This range end isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    if (pos->block_number() < range_in_size.block_number)  // We could be at begin() before
+    if (pos->block_number() <= range_in_size.block_number)  // We could be at begin() before
       ++pos;
     assert(pos.is_end() || pos->block_number() > range_in_size.block_number);
     if (!pos.is_end() && pos->block_number() == range_in_size.end_block_number() &&
         (!is_aligned_pow2(range_in_size.end_block_number(), next_size_pow2) ||
          pos->blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
       FreeBlocksExtentInfo join_after = *pos;
-      range_in_size.block_number = join_after.block_number;
       range_in_size.blocks_count += join_after.blocks_count;
       // We give up on the optimization that is done in the original logic (just update the join after block number to
       // the new one if we were going to add it to the same leaf FTree anyway) because:
@@ -182,6 +193,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
       // 2. In case of maximum bucket size, the iterator can change so we can't just save it, we will need to keep
       // tracking it, which will make the code more complex because we don't optimize it in such way anyway currently.
       bucket.erase(pos, blocks_to_delete);
+      joined = true;
     }
   }
   FreeBlocksRangeInfo sub_range = range_in_size;
@@ -189,25 +201,25 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     if (sub_range.blocks_count >= next_size_blocks_count) {
       if (bucket_index == kSizeBuckets.size() - 1) {
         // Maximum bucket, use blocks count until alignment)
-        sub_range.blocks_count = align_ceil_pow2(sub_range.block_number, next_size_pow2) - sub_range.block_number;
-      } else {
+        sub_range.blocks_count = align_ceil_pow2(sub_range.block_number + 1, next_size_pow2) - sub_range.block_number;
+      } else if (joined) {
         if (join_before)
           bucket.erase(join_before_iter, blocks_to_delete);
-        AddFreeBlocks(sub_range);
+        AddFreeBlocksForSize(sub_range, bucket_index + 1);
+        break;
       }
+    }
+    assert(sub_range.blocks_count > 0 && sub_range.blocks_count % size_blocks_count == 0 &&
+           sub_range.blocks_count / size_blocks_count <= 0x10);
+    auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
+    if (join_before && sub_range.block_number == range_in_size.block_number) {
+      join_before_iter->value = new_value;
     } else {
-      assert(sub_range.blocks_count > 0 && sub_range.blocks_count % size_blocks_count == 0 &&
-             sub_range.blocks_count / size_blocks_count <= 0x10);
-      auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
-      if (join_before && sub_range.block_number == range_in_size.block_number) {
-        join_before_iter->value = new_value;
-      } else {
-        // Don't use pos to insert because:
-        // 1. Our find may go back so it isn't the exact location to insert it.
-        // 2. Won't work when inserting multiple items (in maximum bucket size), we will need to keep updating the
-        // iterator and we don't do it currently.
-        bucket.insert({sub_range.block_number, new_value});
-      }
+      // Don't use pos to insert because:
+      // 1. Our find may go back so it isn't the exact location to insert it.
+      // 2. Won't work when inserting multiple items (in maximum bucket size), we will need to keep updating the
+      // iterator and we don't do it currently.
+      bucket.insert({sub_range.block_number, new_value});
     }
     sub_range.block_number += sub_range.blocks_count;
     sub_range.blocks_count = range_in_size.end_block_number() - sub_range.block_number;
@@ -259,7 +271,7 @@ bool FreeBlocksAllocator::RemoveSpecificFreeBlocksExtent(FreeBlocksExtentInfo ex
       AddFreeBlocks({full_extent.block_number, extent.block_number - full_extent.block_number});
     if (extent.end_block_number() < full_extent.end_block_number())
       AddFreeBlocks({extent.end_block_number(), full_extent.end_block_number() - extent.end_block_number()});
-    mutable_header()->free_blocks_count -= extent.blocks_count;
+    mutable_header()->free_blocks_count -= full_extent.blocks_count;
     return true;
   }
   return false;
@@ -294,30 +306,33 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
 
 bool FreeBlocksAllocator::IsRangeIsFree(FreeBlocksRangeInfo range) {
   FreeBlocksTree tree{this};
-  auto pos = tree.find(range.block_number);
+  auto pos = tree.find(range.block_number, /*exact_match=*/false);
   if (pos.is_end())
-    return true;
-  // Ensure that previous allocated block is before us
-  if (pos->end_block_number() > range.block_number)
+    return false;
+  // Check intersection with the free range before us.
+  if (range.block_number >= pos->block_number() && range.block_number < pos->end_block_number())
     return true;
   ++pos;
-  // Ensure that previous allocated block is after us
-  if (!pos.is_end() && pos->block_number() < range.end_block_number())
-    return true;
-  return false;
+  if (pos.is_end())
+    return false;
+  // Check intersection with the free range after us.
+  return pos->block_number() >= range.block_number && pos->block_number() < range.end_block_number();
 }
 
 std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t chunks_count,
                                                                       Block::BlockSizeType size,
                                                                       bool use_cache) {
   std::vector<uint32_t> result;
+  result.reserve(chunks_count);
   size_t size_index = BlockSizeToIndex(size);
   uint32_t need_more_blocks_count = chunks_count << size;
   if (!need_more_blocks_count)
     return result;
-  if (use_cache && size_index == 0 && area_->BlocksCacheSizeLog2()) {
+  if (use_cache && size_index == 0 && BlocksCacheSizeLog2()) {
     do {
-      auto blocks_from_cache = std::min(need_more_blocks_count, header()->free_blocks_count.value());
+      auto blocks_from_cache = std::min(need_more_blocks_count, header()->free_blocks_cache_count.value());
+      if (!blocks_from_cache)
+        continue;
       auto* header = mutable_header();
       auto cache_block_number = header->free_blocks_cache.value();
       header->free_blocks_cache += blocks_from_cache;
@@ -346,12 +361,13 @@ std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t c
 }
 
 bool FreeBlocksAllocator::ReplanishBlocksCache() {
-  uint32_t blocks_to_alloc = 1 << area_->BlocksCacheSizeLog2();
+  assert(header()->free_blocks_cache_count.value() == 0);
+  uint32_t blocks_to_alloc = 1 << BlocksCacheSizeLog2();
   std::optional<FreeBlocksExtentInfo> selected_extent;
   for (size_t i = 0; i < kSizeBuckets.size(); ++i) {
     FreeBlocksTreeBucket bucket(this, i);
     auto it = bucket.begin();
-    if (!it.is_end())
+    if (it.is_end())
       continue;
     FreeBlocksExtentInfo extent = *it;
     if (extent.blocks_count >= blocks_to_alloc * 2 &&
@@ -362,10 +378,15 @@ bool FreeBlocksAllocator::ReplanishBlocksCache() {
     return false;
   // Round the block number to be aligned to blocks cache in the whole disk
   auto abs_block_number = area_->to_device_block_number(selected_extent->block_number);
-  auto aligned_block_number = align_ceil_pow2(
-      abs_block_number, area_->BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+  auto aligned_block_number =
+      align_ceil_pow2(abs_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
   selected_extent->block_number = area_->to_area_block_number(aligned_block_number);
   selected_extent->blocks_count = blocks_to_alloc;
+  auto* header = mutable_header();
+  header->free_blocks_cache = selected_extent->block_number;
+  header->free_blocks_cache_count = selected_extent->blocks_count;
+  header->free_blocks_count += selected_extent->blocks_count;
+  RemoveFreeBlocksExtent(*selected_extent);
   return true;
 }
 
@@ -384,12 +405,17 @@ bool FreeBlocksAllocator::AllocBlocksOfSpecificSize(uint32_t blocks_count,
     }
     blocks_count -= extent.blocks_count;
     extents.push_back(extent);
-    for (uint32_t i = 0; i < extent.blocks_count >> (kSizeBuckets[extent.bucket_index] - kSizeBuckets[size_index]); ++i)
-      result.push_back(extent.block_number + (i << kSizeBuckets[size_index]));
+    if (!blocks_count)
+      break;
   }
   if (blocks_count) {
     // Not enough free blocks under those conditions
     return false;
+  }
+
+  for (const auto& extent : extents) {
+    for (uint32_t i = 0; i < extent.blocks_count >> kSizeBuckets[size_index]; ++i)
+      result.push_back(extent.block_number + (i << kSizeBuckets[size_index]));
   }
   std::ranges::for_each(extents, std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
   return true;
@@ -409,64 +435,81 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
     if (!ranges.empty() && ranges.back().first.block_number == extent.end_block_number()) {
       ranges.back().first.blocks_count += extent.blocks_count();
       ranges.back().first.block_number = extent.block_number();
+      ranges.back().second.push_back(extent);
     } else {
       ranges.push_back({{extent.block_number(), extent.blocks_count()}, {extent}});
     }
-    if (ranges.back().first.blocks_count > wanted_blocks_count) {
+    if (ranges.back().first.blocks_count >= wanted_blocks_count) {
       selected_range = ranges.back();
       break;
     }
   }
   if (selected_range) {
     // remove  unneeded blocks
-    selected_range->second.back().block_number += selected_range->first.blocks_count - wanted_blocks_count;
-    selected_range->second.back().blocks_count -= selected_range->first.blocks_count - wanted_blocks_count;
+    auto remainder = selected_range->first.blocks_count - wanted_blocks_count;
+    selected_range->second.back().block_number += remainder;
+    selected_range->second.back().blocks_count -= remainder;
+    selected_range->first.block_number += remainder;
     selected_range->first.blocks_count = wanted_blocks_count;
     std::ranges::for_each(selected_range->second,
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
     return std::vector<FreeBlocksRangeInfo>{selected_range->first};
   }
   // use the bigger chunkis first
-  std::sort(ranges.begin(), ranges.end(), [](const range_and_extents& a, const range_and_extents& b) {
+  std::ranges::sort(ranges, [](const range_and_extents& a, const range_and_extents& b) {
     return b.first.blocks_count < a.first.blocks_count;
   });
   uint32_t total_blocks{0};
   std::vector<range_and_extents> used_ranges;
   for (auto& range : ranges) {
     total_blocks += range.first.blocks_count;
-    if (total_blocks > wanted_blocks_count)
-      break;
     used_ranges.push_back(range);
+    if (total_blocks >= wanted_blocks_count)
+      break;
   }
   if (total_blocks < wanted_blocks_count || used_ranges.size() > 0x100)
     return std::nullopt;  // not enough space
   // now sort by block number
-  std::sort(ranges.begin(), ranges.end(), [](const range_and_extents& a, const range_and_extents& b) {
+  std::ranges::sort(used_ranges, [](const range_and_extents& a, const range_and_extents& b) {
     return a.first.block_number < b.first.blocks_count;
   });
   // remove from first chunk unneeded blocks
-  used_ranges.begin()->first.block_number += total_blocks - wanted_blocks_count;
-  while (used_ranges.begin()->second.back().end_block_number() <= used_ranges.begin()->first.block_number) {
-    total_blocks -= used_ranges.begin()->second.back().blocks_count;
-    used_ranges.begin()->second.pop_back();
+  auto remainder = total_blocks - wanted_blocks_count;
+  used_ranges[0].first.block_number += remainder;
+  used_ranges[0].first.blocks_count -= remainder;
+  while (used_ranges[0].second.back().end_block_number() <= used_ranges[0].first.block_number) {
+    remainder -= used_ranges[0].second.back().blocks_count;
+    used_ranges[0].second.pop_back();
   }
-  used_ranges.begin()->second.back().block_number += total_blocks - wanted_blocks_count;
-  used_ranges.begin()->second.back().blocks_count -= total_blocks - wanted_blocks_count;
+  used_ranges[0].second.back().block_number += remainder;
+  used_ranges[0].second.back().blocks_count -= remainder;
   for (const auto& range : used_ranges)
     std::ranges::for_each(range.second,
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
-  auto res = used_ranges | std::views::transform([](const range_and_extents& x) { return x.first; });
-  return std::vector<FreeBlocksRangeInfo>{res.begin(), res.end()};
+  return used_ranges | std::views::transform([](const range_and_extents& x) { return x.first; }) |
+         std::ranges::to<std::vector>();
 }
 
 std::shared_ptr<Block> FreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
   return throw_if_error(area_->LoadMetadataBlock(block_number, new_block));
 }
 
-const FreeBlocksAllocatorHeader* FreeBlocksAllocator::header() {
+const FreeBlocksAllocatorHeader* FreeBlocksAllocator::header() const {
   return block_->get_object<FreeBlocksAllocatorHeader>(sizeof(MetadataBlockHeader));
 }
 
 FreeBlocksAllocatorHeader* FreeBlocksAllocator::mutable_header() {
   return block_->get_mutable_object<FreeBlocksAllocatorHeader>(sizeof(MetadataBlockHeader));
+}
+
+size_t FreeBlocksAllocator::BlocksCacheSizeLog2() const {
+  if (area_->blocks_count() >> (24 - Block::BlockSize::Basic)) {
+    if (area_->blocks_count() >> (30 - area_->block_size_log2())) {
+      return 23 - area_->block_size_log2();
+    } else {
+      return 21 - area_->block_size_log2();
+    }
+  } else {
+    return 0;
+  }
 }

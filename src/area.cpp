@@ -143,12 +143,6 @@ std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> Area::GetFreeBlock
   return std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(*block));
 }
 
-size_t Area::BlocksCacheSizeLog2() const {
-  return (blocks_count() >> (24 - Block::BlockSize::Basic))
-             ? ((blocks_count() >> (30 - block_size_log2()) ? 23 : 21) - block_size_log2())
-             : 0;
-}
-
 uint32_t Area::ReservedBlocksCount() const {
   uint32_t reserved_blocks = kReservedAreaBlocks;
   if (is_root_area()) {

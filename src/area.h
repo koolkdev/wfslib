@@ -77,10 +77,16 @@ class Area : public std::enable_shared_from_this<Area> {
   // In area blocks count
   uint32_t blocks_count() const { return header()->blocks_count.value(); }
 
-  size_t BlocksCacheSizeLog2() const;
   uint32_t ReservedBlocksCount() const;
 
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
+
+ protected:
+  WfsAreaHeader* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
+  const WfsAreaHeader* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
+
+  Block* block() { return header_block_.get(); }
+  const Block* block() const { return header_block_.get(); }
 
  private:
   friend class Recovery;
@@ -95,14 +101,8 @@ class Area : public std::enable_shared_from_this<Area> {
 
   static constexpr uint32_t kTransactionsBlockNumber = 6;
 
-  Block* block() { return header_block_.get(); }
-  const Block* block() const { return header_block_.get(); }
-
   bool is_root_area() const { return device_block_number() == 0; }
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsHeader) : 0); }
-
-  WfsAreaHeader* mutable_header() { return block()->get_mutable_object<WfsAreaHeader>(header_offset()); }
-  const WfsAreaHeader* header() const { return block()->get_object<WfsAreaHeader>(header_offset()); }
 
   uint32_t IV(uint32_t block_number) const;
 

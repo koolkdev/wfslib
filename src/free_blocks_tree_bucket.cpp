@@ -190,6 +190,10 @@ FreeBlocksTreeBucket::iterator FreeBlocksTreeBucket::find_impl(key_type key, boo
   // If FTree is empty or our key is smaller than the first key, go to previous node with value
   if (exact_match)
     return end_impl();
+  if (!ftree.iterator.is_begin()) {
+    --ftree.iterator;
+    return {allocator_, block_size_index_, std::move(eptree), std::move(ftree)};
+  }
   auto orig_eptree_it = eptree.iterator;
   // Go backward to search for value
   while (!eptree.iterator.is_begin()) {

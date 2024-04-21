@@ -10,24 +10,30 @@
 #include "../src/eptree.h"
 #include "../src/ftrees.h"
 #include "../src/structs.h"
+#include "test_area.h"
 #include "test_block.h"
 #include "test_blocks_device.h"
 
-TestFreeBlocksAllocator::TestFreeBlocksAllocator(std::shared_ptr<Block> block, std::shared_ptr<TestBlocksDevice> device)
-    : FreeBlocksAllocator(nullptr, std::move(block)), blocks_device_(device) {}
+TestFreeBlocksAllocator::TestFreeBlocksAllocator(std::shared_ptr<Block> block,
+                                                 std::shared_ptr<TestBlocksDevice> device,
+                                                 std::shared_ptr<TestArea> area)
+    : FreeBlocksAllocator(area, std::move(block)), blocks_device_(device), area_(area) {}
 
 bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tree_blocks) {
+  if (area_) {
+    area_->Init(free_cache_blocks + free_tree_blocks + 2);
+  }
   initial_ftrees_block_number_ = root_block()->device_block_number() + 1;
   initial_frees_block_number_ = initial_ftrees_block_number_ + 1;
 
   if (free_cache_blocks) {
     mutable_header()->free_blocks_cache = initial_frees_block_number_;
     mutable_header()->free_blocks_cache_count = free_cache_blocks;
-    mutable_header()->free_blocks_count = free_cache_blocks + free_tree_blocks;
+    mutable_header()->free_blocks_count = free_cache_blocks;
   } else {
     mutable_header()->free_blocks_cache = 0;
     mutable_header()->free_blocks_cache_count = 0;
-    mutable_header()->free_blocks_count = free_tree_blocks;
+    mutable_header()->free_blocks_count = 0;
   }
 
   EPTree eptree{this};
