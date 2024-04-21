@@ -13,11 +13,11 @@
 
 #include "block.h"
 #include "structs.h"
-#include "wfs_item.h"
 
 class Wfs;
 class Directory;
 class FreeBlocksAllocator;
+struct AttributesRef;
 
 class Area : public std::enable_shared_from_this<Area> {
  public:
@@ -27,14 +27,13 @@ class Area : public std::enable_shared_from_this<Area> {
 
   std::expected<std::shared_ptr<Area>, WfsError> GetArea(uint32_t area_block_number, Block::BlockSize size);
 
-  std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory(const std::string& name,
-                                                                       const AttributesBlock& attributes);
+  std::expected<std::shared_ptr<Directory>, WfsError> LoadRootDirectory(std::string name, AttributesRef attributes);
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
 
-  std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(uint32_t area_block_number,
-                                                                   const std::string& name,
-                                                                   const AttributesBlock& attributes);
+  std::expected<std::shared_ptr<Directory>, WfsError> LoadDirectory(uint32_t area_block_number,
+                                                                    std::string name,
+                                                                    AttributesRef attributes);
 
   std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(uint32_t area_block_number,
                                                                     bool new_block = false) const;

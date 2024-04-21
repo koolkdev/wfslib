@@ -86,30 +86,30 @@ std::expected<std::shared_ptr<Area>, WfsError> Area::CreateRootArea(const std::s
 }
 #endif
 
-std::expected<std::shared_ptr<Directory>, WfsError> Area::GetDirectory(uint32_t device_block_number,
-                                                                       const std::string& name,
-                                                                       const AttributesBlock& attributes) {
-  auto block = LoadMetadataBlock(device_block_number);
+std::expected<std::shared_ptr<Directory>, WfsError> Area::LoadDirectory(uint32_t area_block_number,
+                                                                        std::string name,
+                                                                        AttributesRef attributes) {
+  auto block = LoadMetadataBlock(area_block_number);
   if (!block.has_value())
     return std::unexpected(WfsError::kDirectoryCorrupted);
-  return std::make_shared<Directory>(name, attributes, shared_from_this(), std::move(*block));
+  return std::make_shared<Directory>(std::move(name), std::move(attributes), shared_from_this(), std::move(*block));
 }
 
-std::expected<std::shared_ptr<Directory>, WfsError> Area::GetRootDirectory(const std::string& name,
-                                                                           const AttributesBlock& attributes) {
-  return GetDirectory(header()->root_directory_block_number.value(), name, attributes);
+std::expected<std::shared_ptr<Directory>, WfsError> Area::LoadRootDirectory(std::string name,
+                                                                            AttributesRef attributes) {
+  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(attributes));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory1() {
-  return GetDirectory(header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
+  return LoadDirectory(header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Area::GetShadowDirectory2() {
-  return GetDirectory(header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
+  return LoadDirectory(header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
 }
 
-std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t device_block_number, Block::BlockSize size) {
-  auto area_metadata_block = LoadMetadataBlock(device_block_number, size);
+std::expected<std::shared_ptr<Area>, WfsError> Area::GetArea(uint32_t area_block_number, Block::BlockSize size) {
+  auto area_metadata_block = LoadMetadataBlock(area_block_number, size);
   if (!area_metadata_block.has_value())
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   return std::make_shared<Area>(wfs_device_, std::move(*area_metadata_block));

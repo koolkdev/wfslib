@@ -15,8 +15,8 @@ class Area;
 
 class Link : public WfsItem, public std::enable_shared_from_this<Link> {
  public:
-  Link(const std::string& name, const AttributesBlock& attributes, const std::shared_ptr<Area>& area)
-      : WfsItem(name, attributes), area_(area) {}
+  Link(std::string name, AttributesRef attributes, std::shared_ptr<Area> area)
+      : WfsItem(std::move(name), std::move(attributes)), area_(std::move(area)) {}
 
  private:
   // TODO: We may have cyclic reference here if we do cache in area.

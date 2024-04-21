@@ -26,8 +26,8 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   class DataCategory3Reader;
   class DataCategory4Reader;
 
-  File(const std::string& name, const AttributesBlock& attributes, std::shared_ptr<Area> area)
-      : WfsItem(name, attributes), area_(area) {}
+  File(std::string name, AttributesRef attributes, std::shared_ptr<Area> area)
+      : WfsItem(std::move(name), std::move(attributes)), area_(std::move(area)) {}
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;

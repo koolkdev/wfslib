@@ -11,10 +11,6 @@
 #include "structs.h"
 #include "utils.h"
 
-size_t Attributes::DataOffset() const {
-  return offsetof(Attributes, case_bitmap) + div_ceil(filename_length.value(), 8);
-}
-
 std::string Attributes::GetCaseSensitiveName(const std::string& name) const {
   std::string real_filename = "";
   if (filename_length.value() != name.size()) {
