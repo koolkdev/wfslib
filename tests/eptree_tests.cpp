@@ -13,10 +13,10 @@
 
 #include "../src/eptree.h"
 
-#include "test_block.h"
-#include "test_blocks_device.h"
-#include "test_free_blocks_allocator.h"
-#include "test_utils.h"
+#include "utils/test_block.h"
+#include "utils/test_blocks_device.h"
+#include "utils/test_free_blocks_allocator.h"
+#include "utils/test_utils.h"
 
 TEST_CASE("EPTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();

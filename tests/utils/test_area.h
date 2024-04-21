@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../src/area.h"
+#include "../../src/area.h"
 
 class TestArea : public Area {
  public:

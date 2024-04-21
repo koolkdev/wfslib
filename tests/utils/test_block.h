@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../src/block.h"
+#include "../../src/block.h"
 
 class TestBlock : public Block {
  public:

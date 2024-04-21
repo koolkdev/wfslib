@@ -7,7 +7,7 @@
 
 #include <cassert>
 
-#include "../src/block.h"
+#include "../../src/block.h"
 #include "test_blocks_device.h"
 #include "test_device.h"
 

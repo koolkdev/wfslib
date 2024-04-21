@@ -9,8 +9,8 @@
 
 #include "../src/tree_nodes_allocator.h"
 
-#include "test_block.h"
-#include "test_blocks_device.h"
+#include "utils/test_block.h"
+#include "utils/test_blocks_device.h"
 
 namespace {
 

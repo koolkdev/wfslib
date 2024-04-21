@@ -12,12 +12,12 @@ add_executable(${PROJECT_NAME}
   free_blocks_tree_tests.cpp
   ftree_tests.cpp
   ftrees_tests.cpp
-  test_area.cpp
-  test_block.cpp
-  test_blocks_device.cpp
-  test_free_blocks_allocator.cpp
   rtree_tests.cpp
   tree_nodes_allocator_tests.cpp
+  utils/test_area.cpp
+  utils/test_block.cpp
+  utils/test_blocks_device.cpp
+  utils/test_free_blocks_allocator.cpp
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)

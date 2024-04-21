@@ -13,10 +13,10 @@
 #include "../src/free_blocks_allocator.h"
 #include "../src/free_blocks_tree.h"
 
-#include "test_area.h"
-#include "test_block.h"
-#include "test_blocks_device.h"
-#include "test_free_blocks_allocator.h"
+#include "utils/test_area.h"
+#include "utils/test_block.h"
+#include "utils/test_blocks_device.h"
+#include "utils/test_free_blocks_allocator.h"
 
 TEST_CASE("FreeBlocksAllocatorTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
