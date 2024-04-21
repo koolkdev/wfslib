@@ -147,14 +147,14 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(extent_indexes.size() == 16);
     REQUIRE(std::ranges::equal(extent_indexes, std::vector<size_t>({0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 5, 4, 3, 2, 1, 0})));
     // minus 2 because the beginning and the end are not aligned.
-    auto blocks_to_alloc = (1 << (28 - 6)) - 2;
+    uint32_t blocks_to_alloc = (1 << (28 - 6)) - 2;
     auto blocks = allocator.AllocBlocks(blocks_to_alloc, Block::BlockSizeType::LargeCluster, false);
     REQUIRE(blocks.has_value());
     REQUIRE(blocks->size() == blocks_to_alloc);
     // should be first aligned block number
     REQUIRE((*blocks)[0] == 1 << 6);
-    REQUIRE(std::ranges::equal(
-        *blocks, std::views::transform(std::views::iota(0, blocks_to_alloc), [](int i) { return (i + 1) << 6; })));
+    REQUIRE(std::ranges::equal(*blocks, std::views::transform(std::views::iota(uint32_t{0}, blocks_to_alloc),
+                                                              [](auto i) { return (i + 1) << 6; })));
     REQUIRE((kTreeBlocksCount - (blocks_to_alloc << 6)) == allocator.GetHeader()->free_blocks_count.value());
 
     extent_indexes.clear();
