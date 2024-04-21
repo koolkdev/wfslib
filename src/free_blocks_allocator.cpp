@@ -423,46 +423,47 @@ bool FreeBlocksAllocator::AllocBlocksOfSpecificSize(uint32_t blocks_count,
 
 std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBlocks(uint32_t chunks_count,
                                                                                      Block::BlockSizeType size) {
-  using range_and_extents = std::pair<FreeBlocksRangeInfo, std::vector<FreeBlocksExtentInfo>>;
+  struct range_info {
+    FreeBlocksRangeInfo range;
+    std::vector<FreeBlocksExtentInfo> extents;
+  };
   size_t size_index = BlockSizeToIndex(size);
   uint32_t wanted_blocks_count = chunks_count << size;
   FreeBlocksTree tree{this};
-  std::vector<range_and_extents> ranges;
-  std::optional<range_and_extents> selected_range;
+  std::vector<range_info> ranges;
+  std::optional<range_info> selected_range;
   for (const auto& extent : std::views::reverse(tree)) {
     if (extent.bucket_index < size_index)
       continue;
-    if (!ranges.empty() && ranges.back().first.block_number == extent.end_block_number()) {
-      ranges.back().first.blocks_count += extent.blocks_count();
-      ranges.back().first.block_number = extent.block_number();
-      ranges.back().second.push_back(extent);
+    if (!ranges.empty() && ranges.back().range.block_number == extent.end_block_number()) {
+      ranges.back().range.blocks_count += extent.blocks_count();
+      ranges.back().range.block_number = extent.block_number();
+      ranges.back().extents.push_back(extent);
     } else {
       ranges.push_back({{extent.block_number(), extent.blocks_count()}, {extent}});
     }
-    if (ranges.back().first.blocks_count >= wanted_blocks_count) {
+    if (ranges.back().range.blocks_count >= wanted_blocks_count) {
       selected_range = ranges.back();
       break;
     }
   }
   if (selected_range) {
     // remove  unneeded blocks
-    auto remainder = selected_range->first.blocks_count - wanted_blocks_count;
-    selected_range->second.back().block_number += remainder;
-    selected_range->second.back().blocks_count -= remainder;
-    selected_range->first.block_number += remainder;
-    selected_range->first.blocks_count = wanted_blocks_count;
-    std::ranges::for_each(selected_range->second,
+    auto remainder = selected_range->range.blocks_count - wanted_blocks_count;
+    selected_range->extents.back().block_number += remainder;
+    selected_range->extents.back().blocks_count -= remainder;
+    selected_range->range.block_number += remainder;
+    selected_range->range.blocks_count = wanted_blocks_count;
+    std::ranges::for_each(selected_range->extents,
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
-    return std::vector<FreeBlocksRangeInfo>{selected_range->first};
+    return std::vector<FreeBlocksRangeInfo>{selected_range->range};
   }
   // use the bigger chunkis first
-  std::ranges::sort(ranges, [](const range_and_extents& a, const range_and_extents& b) {
-    return b.first.blocks_count < a.first.blocks_count;
-  });
+  std::ranges::sort(ranges, [](const auto& a, const auto& b) { return b.range.blocks_count < a.range.blocks_count; });
   uint32_t total_blocks{0};
-  std::vector<range_and_extents> used_ranges;
+  std::vector<range_info> used_ranges;
   for (auto& range : ranges) {
-    total_blocks += range.first.blocks_count;
+    total_blocks += range.range.blocks_count;
     used_ranges.push_back(range);
     if (total_blocks >= wanted_blocks_count)
       break;
@@ -470,24 +471,22 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   if (total_blocks < wanted_blocks_count || used_ranges.size() > 0x100)
     return std::nullopt;  // not enough space
   // now sort by block number
-  std::ranges::sort(used_ranges, [](const range_and_extents& a, const range_and_extents& b) {
-    return a.first.block_number < b.first.blocks_count;
-  });
+  std::ranges::sort(used_ranges,
+                    [](const auto& a, const auto& b) { return a.range.block_number < b.range.blocks_count; });
   // remove from first chunk unneeded blocks
   auto remainder = total_blocks - wanted_blocks_count;
-  used_ranges[0].first.block_number += remainder;
-  used_ranges[0].first.blocks_count -= remainder;
-  while (used_ranges[0].second.back().end_block_number() <= used_ranges[0].first.block_number) {
-    remainder -= used_ranges[0].second.back().blocks_count;
-    used_ranges[0].second.pop_back();
+  used_ranges[0].range.block_number += remainder;
+  used_ranges[0].range.blocks_count -= remainder;
+  while (used_ranges[0].extents.back().end_block_number() <= used_ranges[0].range.block_number) {
+    remainder -= used_ranges[0].extents.back().blocks_count;
+    used_ranges[0].extents.pop_back();
   }
-  used_ranges[0].second.back().block_number += remainder;
-  used_ranges[0].second.back().blocks_count -= remainder;
+  used_ranges[0].extents.back().block_number += remainder;
+  used_ranges[0].extents.back().blocks_count -= remainder;
   for (const auto& range : used_ranges)
-    std::ranges::for_each(range.second,
+    std::ranges::for_each(range.extents,
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
-  return used_ranges | std::views::transform([](const range_and_extents& x) { return x.first; }) |
-         std::ranges::to<std::vector>();
+  return used_ranges | std::views::transform([](const auto& x) { return x.range; }) | std::ranges::to<std::vector>();
 }
 
 std::shared_ptr<Block> FreeBlocksAllocator::LoadAllocatorBlock(uint32_t block_number, bool new_block) {
