@@ -115,6 +115,10 @@ FreeBlocksTree::iterator FreeBlocksTree::find_impl(key_type key, bool exact_matc
   if (exact_match) {
     return end_impl();
   }
+  if (!ftrees.iterator.is_begin()) {
+    --ftrees.iterator;
+    return {allocator_, std::move(eptree), std::move(ftrees)};
+  }
   auto orig_eptree_it = eptree.iterator;
   // Go backward to search for value
   while (!eptree.iterator.is_begin()) {
