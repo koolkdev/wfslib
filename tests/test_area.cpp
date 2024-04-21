@@ -7,6 +7,8 @@
 
 #include "test_area.h"
 
+#include <algorithm>
+
 TestArea::TestArea(std::shared_ptr<Block> block) : Area(nullptr, std::move(block)) {}
 
 void TestArea::Init(uint32_t blocks_count) {
