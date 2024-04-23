@@ -20,7 +20,7 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
-          # llvm doesn't work with libstd++ until P2493R0 is done
+          # Re-enable after llvm-19
           - platform: ubuntu-latest
             compiler: llvm
           - platform: macos-13
