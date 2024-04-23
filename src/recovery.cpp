@@ -121,7 +121,7 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenWfsDeviceWitho
   auto res = DetectDeviceParams(device, key);
   if (res.has_value())
     return std::unexpected(*res);
-  return WfsDevice::Open(std::make_shared<BlocksDevice>(std::move(device), key));
+  return WfsDevice::Open(std::move(device), std::move(key));
 }
 
 namespace {
