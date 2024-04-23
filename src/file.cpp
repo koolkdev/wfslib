@@ -8,8 +8,8 @@
 #include "file.h"
 
 #include <cassert>
-#include "area.h"
 #include "block.h"
+#include "quota_area.h"
 #include "structs.h"
 
 struct FileDataChunkInfo {
@@ -149,16 +149,16 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
  protected:
   virtual size_t GetBlocksLog2CountInDataBlock() const = 0;
   virtual Block::BlockSize GetDataBlockSize() const {
-    return static_cast<Block::BlockSize>(file_->area()->block_size_log2() + GetBlocksLog2CountInDataBlock());
+    return static_cast<Block::BlockSize>(file_->quota()->block_size_log2() + GetBlocksLog2CountInDataBlock());
   }
   std::shared_ptr<Block> current_data_block;
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
     if (current_data_block &&
-        file_->area()->to_area_block_number(current_data_block->device_block_number()) == block_number)
+        file_->quota()->to_area_block_number(current_data_block->device_block_number()) == block_number)
       return;
-    auto block = file_->area()->LoadDataBlock(block_number, GetDataBlockSize(), data_size, std::move(data_hash),
-                                              !(file_->attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
+    auto block = file_->quota()->LoadDataBlock(block_number, GetDataBlockSize(), data_size, std::move(data_hash),
+                                               !(file_->attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
     if (!block.has_value())
       throw WfsException(WfsError::kFileDataCorrupted);
     current_data_block = std::move(*block);
@@ -260,9 +260,9 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   void LoadMetadataBlock(uint32_t block_number) {
     if (current_metadata_block &&
-        file_->area()->to_area_block_number(current_metadata_block->device_block_number()) == block_number)
+        file_->quota()->to_area_block_number(current_metadata_block->device_block_number()) == block_number)
       return;
-    auto metadata_block = file_->area()->LoadMetadataBlock(block_number);
+    auto metadata_block = file_->quota()->LoadMetadataBlock(block_number);
     if (!metadata_block.has_value())
       throw WfsException(WfsError::kFileMetadataCorrupted);
     current_metadata_block = std::move(*metadata_block);
@@ -270,7 +270,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   size_t ClustersInBlock() const {
     size_t clusters_in_block =
-        (file_->area()->block_size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
+        (file_->quota()->block_size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
     clusters_in_block = std::min(clusters_in_block, static_cast<size_t>(48));
     return clusters_in_block;
   }

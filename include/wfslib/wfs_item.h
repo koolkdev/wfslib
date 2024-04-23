@@ -13,7 +13,7 @@
 #include "block.h"
 #include "structs.h"
 
-class Area;
+class QuotaArea;
 
 struct AttributesRef {
   std::shared_ptr<Block> block;
@@ -34,7 +34,7 @@ class WfsItem {
   bool is_link() const { return attributes()->is_link(); }
   bool is_quota() const { return attributes()->is_directory() && attributes()->is_quota(); }
 
-  static std::expected<std::shared_ptr<WfsItem>, WfsError> Load(std::shared_ptr<Area> area,
+  static std::expected<std::shared_ptr<WfsItem>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                                 std::string name,
                                                                 AttributesRef attributes_ref);
 

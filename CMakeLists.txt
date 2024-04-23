@@ -40,10 +40,12 @@ add_library(${PROJECT_NAME}
     src/ftrees.cpp
     src/key_file.cpp
     src/ptree.cpp
+    src/quota_area.cpp
     src/recovery.cpp
     src/rtree.cpp
     src/structs.cpp
     src/sub_block_allocator.cpp
+    src/transactions_area.cpp
     src/wfs_device.cpp
     src/wfs_item.cpp
 )

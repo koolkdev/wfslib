@@ -9,11 +9,11 @@
 
 #include <array>
 
-#include "area.h"
 #include "blocks_device.h"
 #include "device_encryption.h"
 #include "directory.h"
 #include "file_device.h"
+#include "quota_area.h"
 #include "structs.h"
 #include "wfs_device.h"
 
@@ -233,11 +233,11 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
     if (!attributes.has_value() || !attributes->get()->is_quota())
       continue;
     // ok this is quota
-    auto new_area =
-        system_save_dir->area()->GetArea(attributes->get()->directory_block_number.value(), Block::BlockSize::Regular);
-    if (!new_area.has_value())
-      return std::unexpected(new_area.error());
-    sub_area = std::move(*new_area);
+    auto new_quota = system_save_dir->quota()->LoadQuotaArea(attributes->get()->directory_block_number.value(),
+                                                             Block::BlockSize::Regular);
+    if (!new_quota.has_value())
+      return std::unexpected(new_quota.error());
+    sub_area = std::move(*new_quota);
     break;
   }
   if (!sub_area) {

@@ -47,7 +47,7 @@ class FreeBlocksAllocator {
   FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<Block> block);
   virtual ~FreeBlocksAllocator() = default;
 
-  void Init();
+  void Init(std::vector<FreeBlocksRangeInfo> initial_free_blocks);
 
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);

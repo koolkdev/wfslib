@@ -9,8 +9,8 @@
 
 #include <utility>
 
-#include "area.h"
 #include "file.h"
+#include "quota_area.h"
 #include "structs.h"
 #include "sub_block_allocator.h"
 
@@ -19,15 +19,15 @@ using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
 Directory::Directory(std::string name,
                      AttributesRef attributes,
-                     std::shared_ptr<Area> area,
+                     std::shared_ptr<QuotaArea> quota,
                      std::shared_ptr<Block> block)
-    : WfsItem(std::move(name), std::move(attributes)), area_(std::move(area)), block_(std::move(block)) {}
+    : WfsItem(std::move(name), std::move(attributes)), quota_(std::move(quota)), block_(std::move(block)) {}
 
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
   const auto attributes_block = FindObjectAttributes(block_, name);
   if (!attributes_block.has_value())
     return std::unexpected(attributes_block.error());
-  return WfsItem::Load(area_, name, std::move(*attributes_block));
+  return WfsItem::Load(quota_, name, std::move(*attributes_block));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
@@ -134,7 +134,7 @@ std::expected<AttributesRef, WfsError> Directory::FindObjectAttributes(const std
       // Not found
       return std::unexpected(kItemNotFound);
     }
-    auto next_block = area_->LoadMetadataBlock(last_block_number);
+    auto next_block = quota_->LoadMetadataBlock(last_block_number);
     if (!next_block.has_value())
       return std::unexpected(kDirectoryCorrupted);
     return FindObjectAttributes(std::move(*next_block), name);
