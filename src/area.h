@@ -72,8 +72,8 @@ class Area {
     return sizeof(MetadataBlockHeader) + (is_root_area() ? sizeof(WfsDeviceHeader) : 0);
   }
 
-  auto* mutable_header() { return header_block_->get_mutable_object<WfsAreaHeader>(header_offset()); }
-  const auto* header() const { return header_block_->get_object<WfsAreaHeader>(header_offset()); }
+  WfsAreaHeader* mutable_header() { return header_block_->get_mutable_object<WfsAreaHeader>(header_offset()); }
+  const WfsAreaHeader* header() const { return header_block_->get_object<WfsAreaHeader>(header_offset()); }
 
   const std::shared_ptr<WfsDevice>& wfs_device() { return wfs_device_; }
 
