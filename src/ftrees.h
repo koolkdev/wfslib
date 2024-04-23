@@ -141,9 +141,6 @@ class FTrees {
       : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBuckets.size()>{})) {}
 
   size_t size() const {
-    // TODO: llvm fold support
-    // return *std::ranges::fold_right_last(
-    // ftrees_ | std::views::transform([](const FTree& ftree) { return ftree.size(); }), std::plus<>());
     return std::accumulate(ftrees_.begin(), ftrees_.end(), size_t{0},
                            [](auto acc, const FTree& ftree) { return acc + ftree.size(); });
   }

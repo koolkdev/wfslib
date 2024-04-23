@@ -53,10 +53,10 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 17
-          sudo apt install libc++-17-dev
-          echo "CC=clang-17" >> $GITHUB_ENV
-          echo "CXX=clang++-17" >> $GITHUB_ENV
+          sudo ./llvm.sh 18
+          sudo apt install libc++-18-dev
+          echo "CC=clang-18" >> $GITHUB_ENV
+          echo "CXX=clang++-18" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
