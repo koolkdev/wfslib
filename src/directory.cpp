@@ -7,6 +7,7 @@
 
 #include "directory.h"
 
+#include <ranges>
 #include <utility>
 
 #include "file.h"
@@ -66,14 +67,16 @@ std::expected<AttributesRef, WfsError> Directory::FindObjectAttributes(const std
         // not equal.. path too long
         return std::unexpected(kItemNotFound);
       }
-      if (prefix_length && !std::equal(pos_in_path, pos_in_path + prefix_length, current_node->prefix_view().begin(),
-                                       current_node->prefix_view().end(), [](char expected_char, char prefix_char) {
-                                         return std::tolower(expected_char) == prefix_char;
-                                       })) {
+      auto case_insensitive_cmp = [](char expected_char, char prefix_char) {
+        // Ignore the case of the input name
+        return std::tolower(expected_char) == prefix_char;
+      };
+      if (prefix_length && !std::ranges::equal(std::ranges::subrange(pos_in_path, pos_in_path + prefix_length),
+                                               current_node->prefix_view(), case_insensitive_cmp)) {
         // not equal.. not found
         return std::unexpected(kItemNotFound);
       }
-      pos_in_path += current_node->prefix_length.value();
+      pos_in_path += prefix_length;
       char next_expected_char = 0;
       if (pos_in_path < name.end())
         next_expected_char = static_cast<char>(std::tolower(*pos_in_path));
