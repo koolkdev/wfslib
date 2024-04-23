@@ -97,6 +97,12 @@ std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory(
 }
 
 // static
+std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_ptr<Device> device,
+                                                                    std::optional<std::vector<std::byte>> key) {
+  return Open(std::make_shared<BlocksDevice>(std::move(device), std::move(key)));
+}
+
+// static
 std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_ptr<BlocksDevice> device) {
   auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0);
   if (!block.has_value()) {
@@ -108,6 +114,12 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_
   if (header->version.value() != WFS_VERSION)
     return std::unexpected(WfsError::kInvalidWfsVersion);
   return std::make_shared<WfsDevice>(std::move(device), std::move(*block));
+}
+
+// static
+std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Create(std::shared_ptr<Device> device,
+                                                                      std::optional<std::vector<std::byte>> key) {
+  return Create(std::make_shared<BlocksDevice>(std::move(device), std::move(key)));
 }
 
 // static

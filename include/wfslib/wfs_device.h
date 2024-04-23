@@ -23,6 +23,7 @@ class Area;
 class QuotaArea;
 class TransactionsArea;
 class WfsItem;
+class Device;
 class File;
 class Directory;
 class BlocksDevice;
@@ -57,7 +58,13 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
                                                                 bool encrypted,
                                                                 bool new_block = false) const;
 
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> Open(
+      std::shared_ptr<Device> device,
+      std::optional<std::vector<std::byte>> key = std::nullopt);
   static std::expected<std::shared_ptr<WfsDevice>, WfsError> Open(std::shared_ptr<BlocksDevice> device);
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> Create(
+      std::shared_ptr<Device> device,
+      std::optional<std::vector<std::byte>> key = std::nullopt);
   static std::expected<std::shared_ptr<WfsDevice>, WfsError> Create(std::shared_ptr<BlocksDevice> device);
 
  private:
