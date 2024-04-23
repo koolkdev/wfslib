@@ -10,8 +10,8 @@
 #include <stdexcept>
 #include <utility>
 
-#include "area.h"
 #include "directory.h"
+#include "quota_area.h"
 #include "structs.h"
 #include "sub_block_allocator.h"
 
@@ -54,7 +54,7 @@ DirectoryItemsIterator& DirectoryItemsIterator::operator++() {
   auto* header = node_state_->block->get_object<MetadataBlockHeader>(0);
   if (!(header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE)) {
     // This is just internal node (in the directories trees tree), it just point to another tree
-    auto block = directory_->area()->LoadMetadataBlock(
+    auto block = directory_->quota()->LoadMetadataBlock(
         static_cast<const InternalDirectoryTreeNode*>(node_state_->node)->get_next_allocator_block_number().value());
     if (!block.has_value())
       throw WfsException(WfsError::kDirectoryCorrupted);
@@ -98,7 +98,7 @@ DirectoryItemsIterator::value_type DirectoryItemsIterator::operator*() {
     auto external_node = static_cast<const ExternalDirectoryTreeNode*>(node_state_->node);
     const AttributesRef attributes{block, external_node->get_item(node_state_->current_index).value()};
     auto name = attributes.get()->GetCaseSensitiveName(node_state_->path);
-    return {name, WfsItem::Load(directory_->area(), name, std::move(attributes))};
+    return {name, WfsItem::Load(directory_->quota(), name, std::move(attributes))};
   } else {
     // Should not happen (can't happen, the iterator should stop only at external trees)
     throw std::logic_error("Should not happen!");

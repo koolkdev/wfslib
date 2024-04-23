@@ -10,12 +10,15 @@
 #include <array>
 #include <bit>
 #include <filesystem>
+#include <random>
 
 #include "area.h"
 #include "blocks_device.h"
 #include "device.h"
 #include "directory.h"
+#include "quota_area.h"
 #include "structs.h"
+#include "transactions_area.h"
 
 WfsDevice::WfsDevice(std::shared_ptr<BlocksDevice> device, std::shared_ptr<Block> root_block)
     : device_(std::move(device)), root_block_(std::move(root_block)) {}
@@ -85,8 +88,8 @@ void WfsDevice::Flush() {
   device_->FlushAll();
 }
 
-std::shared_ptr<Area> WfsDevice::GetRootArea() {
-  return std::make_shared<Area>(shared_from_this(), root_block_);
+std::shared_ptr<QuotaArea> WfsDevice::GetRootArea() {
+  return std::make_shared<QuotaArea>(shared_from_this(), root_block_);
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory() {
@@ -105,6 +108,19 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_
   if (header->version.value() != WFS_VERSION)
     return std::unexpected(WfsError::kInvalidWfsVersion);
   return std::make_shared<WfsDevice>(std::move(device), std::move(*block));
+}
+
+// static
+std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Create(std::shared_ptr<BlocksDevice> device) {
+  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Regular, /*iv=*/0,
+                                        /*load_data=*/false);
+  if (!block.has_value()) {
+    return std::unexpected(block.error());
+  }
+
+  auto wfs_device = std::make_shared<WfsDevice>(std::move(device), std::move(*block));
+  wfs_device->Init();
+  return wfs_device;
 }
 
 std::expected<std::shared_ptr<Block>, WfsError> WfsDevice::LoadMetadataBlock(const Area* area,
@@ -131,12 +147,46 @@ uint32_t WfsDevice::CalcIV(const Area* area, uint32_t device_block_number) const
           << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
 }
 
-std::expected<std::shared_ptr<Area>, WfsError> WfsDevice::GetTransactionsArea(bool backup_area) {
+std::expected<std::shared_ptr<TransactionsArea>, WfsError> WfsDevice::GetTransactionsArea(bool backup_area) {
   auto root_area = GetRootArea();
   auto block =
       LoadMetadataBlock(root_area.get(), header()->transactions_area_block_number.value() + (backup_area ? 1 : 0),
                         Block::BlockSize::Basic);
   if (!block.has_value())
     return std::unexpected(WfsError::kTransactionsAreaCorrupted);
-  return std::make_shared<Area>(shared_from_this(), *block);
+  return std::make_shared<TransactionsArea>(shared_from_this(), std::move(*block));
+}
+
+void WfsDevice::Init() {
+  constexpr uint32_t kTransactionsAreaEnd = 0x1000;
+
+  uint32_t blocks_count =
+      device_->device()->SectorsCount() >> (Block::BlockSize::Regular - device_->device()->Log2SectorSize());
+
+  std::random_device rand_device;
+  std::default_random_engine rand_engine{rand_device()};
+  std::uniform_int_distribution<uint32_t> random_iv_generator(std::numeric_limits<uint32_t>::min(),
+                                                              std::numeric_limits<uint32_t>::max());
+
+  // Initialize device header
+  auto* header = mutable_header();
+  std::fill(reinterpret_cast<std::byte*>(header), reinterpret_cast<std::byte*>(header + 1), std::byte{0});
+  header->iv = random_iv_generator(rand_engine);
+  header->device_type = static_cast<uint16_t>(DeviceType::USB);  // TODO
+  header->version = WFS_VERSION;
+  header->root_quota_attributes.flags = Attributes::DIRECTORY | Attributes::AREA_SIZE_REGULAR | Attributes::QUOTA;
+  header->root_quota_attributes.quota_blocks_count = blocks_count;
+  header->transactions_area_block_number = QuotaArea::kReservedAreaBlocks
+                                           << (Block::BlockSize::Regular - Block::BlockSize::Basic);
+  header->transactions_area_blocks_count = kTransactionsAreaEnd - header->transactions_area_block_number.value();
+
+  // Initialize root area
+  auto root_area =
+      throw_if_error(QuotaArea::Create(shared_from_this(), /*parent_area=*/nullptr,
+                                       blocks_count >> (Block::BlockSize::Regular - Block::BlockSize::Basic),
+                                       Block::BlockSize::Regular, {{0, blocks_count}}));
+
+  auto transactions_area = throw_if_error(TransactionsArea::Create(shared_from_this(), root_area,
+                                                                   header->transactions_area_block_number.value(),
+                                                                   header->transactions_area_blocks_count.value()));
 }

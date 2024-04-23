@@ -14,7 +14,7 @@
 #include <vector>
 #include "wfs_item.h"
 
-class Area;
+class QuotaArea;
 
 class File : public WfsItem, public std::enable_shared_from_this<File> {
  public:
@@ -26,8 +26,8 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   class DataCategory3Reader;
   class DataCategory4Reader;
 
-  File(std::string name, AttributesRef attributes, std::shared_ptr<Area> area)
-      : WfsItem(std::move(name), std::move(attributes)), area_(std::move(area)) {}
+  File(std::string name, AttributesRef attributes, std::shared_ptr<QuotaArea> quota)
+      : WfsItem(std::move(name), std::move(attributes)), quota_(std::move(quota)) {}
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;
@@ -54,10 +54,10 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
-  std::shared_ptr<Area> area() const { return area_; }
+  std::shared_ptr<QuotaArea> quota() const { return quota_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
-  std::shared_ptr<Area> area_;
+  std::shared_ptr<QuotaArea> quota_;
 
   static std::shared_ptr<DataCategoryReader> CreateReader(std::shared_ptr<File> file);
 };

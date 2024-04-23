@@ -41,30 +41,28 @@ size_t BlockSizeToIndex(Block::BlockSizeType size) {
 FreeBlocksAllocator::FreeBlocksAllocator(std::shared_ptr<Area> area, std::shared_ptr<Block> block)
     : area_(std::move(area)), block_(std::move(block)) {}
 
-void FreeBlocksAllocator::Init() {
-  uint32_t initial_free_blocks_number = area_->ReservedBlocksCount();
-  uint32_t free_blocks_count = area_->blocks_count() - initial_free_blocks_number;
-
+void FreeBlocksAllocator::Init(std::vector<FreeBlocksRangeInfo> initial_free_blocks) {
   // Init cach info
   auto* header = mutable_header();
-  header->free_blocks_count = free_blocks_count;
+  header->free_blocks_count = 0;
   header->always_one = 1;
 
   if (BlocksCacheSizeLog2()) {
-    uint32_t cache_end_block_number = initial_free_blocks_number + (1 << BlocksCacheSizeLog2());
+    uint32_t cache_end_block_number = initial_free_blocks[0].block_number + (1 << BlocksCacheSizeLog2());
     cache_end_block_number = area_->to_device_block_number(cache_end_block_number);
     cache_end_block_number = align_ceil_pow2(
         cache_end_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
     cache_end_block_number = area_->to_area_block_number(cache_end_block_number);
-    uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks_number;
-    if (cache_free_blocks_count > free_blocks_count) {
-      cache_free_blocks_count = free_blocks_count;
+    uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks[0].block_number;
+    if (cache_free_blocks_count > initial_free_blocks[0].blocks_count) {
+      cache_free_blocks_count = initial_free_blocks[0].blocks_count;
     }
-    header->free_blocks_cache = initial_free_blocks_number;
+    header->free_blocks_cache = initial_free_blocks[0].block_number;
     header->free_blocks_cache_count = cache_free_blocks_count;
+    header->free_blocks_count += cache_free_blocks_count;
 
-    initial_free_blocks_number += cache_free_blocks_count;
-    free_blocks_count -= cache_free_blocks_count;
+    initial_free_blocks[0].block_number += cache_free_blocks_count;
+    initial_free_blocks[0].blocks_count -= cache_free_blocks_count;
   } else {
     header->free_blocks_cache = 0;
     header->free_blocks_cache_count = 0;
@@ -78,8 +76,8 @@ void FreeBlocksAllocator::Init() {
   FTrees ftrees{std::move(ftree_block)};
   ftrees.Init();
   eptree.insert({0, 2});
-  if (free_blocks_count)
-    AddFreeBlocks({initial_free_blocks_number, free_blocks_count});
+  for (const auto& free_range : initial_free_blocks)
+    AddFreeBlocks(free_range);
 }
 
 uint32_t FreeBlocksAllocator::AllocFreeBlockFromCache() {

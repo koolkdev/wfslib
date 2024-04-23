@@ -149,7 +149,7 @@ struct WfsAreaHeader {
 static_assert(sizeof(WfsAreaHeader) == 0x60, "Incorrect sizeof WfsAreaHeader");
 
 // sizof 0x8
-struct WfsAreaFragmentsInfo {
+struct WfsQuotaAreaHeader {
   uint16_be_t max_fragments_count;        // 480
   uint16_be_t fragments_log2_block_size;  // block size of parent area. In root area it is the minimum block size (12)
   uint32_be_t fragments_count;
@@ -157,25 +157,16 @@ struct WfsAreaFragmentsInfo {
                                        // sequentials blocks it will framgnet the area). parent area blocks, so in
                                        // parent area block size.
 };
-static_assert(sizeof(WfsAreaFragmentsInfo) == 0xF08, "Incorrect sizeof WfsAreaFragmentsInfo");
+static_assert(sizeof(WfsQuotaAreaHeader) == 0xF08, "Incorrect sizeof WfsQuotaAreaHeader");
 
-struct WfsQuotaArea {
-  WfsAreaHeader header;
-
-  WfsAreaFragmentsInfo framgnets;
-};
-static_assert(sizeof(WfsQuotaArea) == 0x60 + 0xF08, "Incorrect sizeof WfsQuotaArea");
-
-struct WfsTransactionsArea {
-  WfsAreaHeader header;
-
+struct WfsTransactionsAreaHeader {
   // This is the area that responsible for creating transaction when making changes to the file system (until the quota
   // is flushed to the disk).
   // Most of the structures of this area are known, but it isn't interesting since it is cleared every time the WiiU
   // mount the file system. (transactions from previous boot that weren't flushed to the disk are lost)
   uint8_be_t unknown[0x3B4];
 };
-static_assert(sizeof(WfsTransactionsArea) == 0x60 + 0x3B4, "Incorrect sizeof WfsTransactionsArea");
+static_assert(sizeof(WfsTransactionsAreaHeader) == 0x3B4, "Incorrect sizeof WfsTransactionsAreaHeader");
 
 struct SubBlockAllocatorFreeListEntry {
   static const uint16_t FREE_MARK_CONST = 0xFEDC;

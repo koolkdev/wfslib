@@ -24,7 +24,7 @@ struct DirectoryTreeNode;
 class Directory : public WfsItem, public std::enable_shared_from_this<Directory> {
  public:
   // TODO: Replace name with tree iterator?
-  Directory(std::string name, AttributesRef attributes, std::shared_ptr<Area> area, std::shared_ptr<Block> block);
+  Directory(std::string name, AttributesRef attributes, std::shared_ptr<QuotaArea> quota, std::shared_ptr<Block> block);
 
   std::expected<std::shared_ptr<WfsItem>, WfsError> GetObject(const std::string& name) const;
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(const std::string& name) const;
@@ -34,14 +34,14 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   DirectoryItemsIterator begin() const;
   DirectoryItemsIterator end() const;
 
-  const std::shared_ptr<Area>& area() const { return area_; }
+  const std::shared_ptr<QuotaArea>& quota() const { return quota_; }
 
  private:
   friend DirectoryItemsIterator;
   friend class Recovery;
 
   // TODO: We may have cyclic reference here if we do cache in area.
-  std::shared_ptr<Area> area_;
+  std::shared_ptr<QuotaArea> quota_;
 
   std::shared_ptr<Block> block_;
 

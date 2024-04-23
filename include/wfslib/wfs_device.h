@@ -20,6 +20,8 @@
 
 class BlocksDevice;
 class Area;
+class QuotaArea;
+class TransactionsArea;
 class WfsItem;
 class File;
 class Directory;
@@ -36,12 +38,12 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
   std::shared_ptr<File> GetFile(const std::string& filename);
   std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
-  std::shared_ptr<Area> GetRootArea();
+  std::shared_ptr<QuotaArea> GetRootArea();
   std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();
 
   void Flush();
 
-  std::expected<std::shared_ptr<Area>, WfsError> GetTransactionsArea(bool backup_area = false);
+  std::expected<std::shared_ptr<TransactionsArea>, WfsError> GetTransactionsArea(bool backup_area = false);
 
   std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(const Area* area,
                                                                     uint32_t device_block_number,
@@ -55,18 +57,23 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
                                                                 bool encrypted,
                                                                 bool new_block = false) const;
 
-  uint32_t CalcIV(const Area* area, uint32_t device_block_number) const;
-
   static std::expected<std::shared_ptr<WfsDevice>, WfsError> Open(std::shared_ptr<BlocksDevice> device);
-  // Create
+  static std::expected<std::shared_ptr<WfsDevice>, WfsError> Create(std::shared_ptr<BlocksDevice> device);
 
  private:
   friend class Area;
+  friend class QuotaArea;
+
+  void Init();
+
+  uint32_t CalcIV(const Area* area, uint32_t device_block_number) const;
 
   static constexpr uint16_t header_offset() { return sizeof(MetadataBlockHeader); }
 
   auto* mutable_header() { return root_block_->get_mutable_object<WfsDeviceHeader>(header_offset()); }
   const auto* header() const { return root_block_->get_object<WfsDeviceHeader>(header_offset()); }
+
+  const std::shared_ptr<Block>& root_block() const { return root_block_; }
 
   std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Block> root_block_;
