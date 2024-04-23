@@ -27,7 +27,7 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std
   const auto attributes_block = FindObjectAttributes(block_, name);
   if (!attributes_block.has_value())
     return std::unexpected(attributes_block.error());
-  return WfsItem::Load(quota_, name, std::move(*attributes_block));
+  return WfsItem::Load(quota_, name, *attributes_block);
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {

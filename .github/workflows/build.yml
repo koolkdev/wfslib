@@ -20,15 +20,12 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
-          # llvm doesn't work with libstd++ until P2493R0 is done
+          # Re-enable after llvm-19
           - platform: ubuntu-latest
             compiler: llvm
           - platform: macos-13
             compiler: msvc
           - platform: macos-13
-            compiler: gcc
-          # Temporary until gcc-14
-          - platform: ubuntu-latest
             compiler: gcc
     runs-on: ${{matrix.platform}}
 
@@ -44,6 +41,10 @@ jobs:
 
       - name: Set gcc
         run: |
+          # Temporary until gcc-14 is officialy released and available on the runner
+          sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe"
+          sudo apt update
+          sudo apt install gcc-14 g++-14
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
