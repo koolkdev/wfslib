@@ -159,7 +159,7 @@ TEST_CASE("RTreeTests") {
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(rtree, [](const auto& extent) { return extent.key; });
+    auto keys = std::views::transform(rtree, [](const auto& extent) -> uint32_t { return extent.key; });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     CHECK_THAT(keys, RangeEquals(sorted_keys));
