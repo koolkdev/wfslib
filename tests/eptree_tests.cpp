@@ -6,6 +6,7 @@
  */
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
 
 #include <algorithm>
 #include <random>
@@ -18,6 +19,8 @@
 #include "utils/test_free_blocks_allocator.h"
 #include "utils/test_utils.h"
 
+using Catch::Matchers::RangeEquals;
+
 TEST_CASE("EPTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto allocator_block = TestBlock::LoadMetadataBlock(test_device, 0);
@@ -27,53 +30,42 @@ TEST_CASE("EPTreeTests") {
   eptree.Init(/*block_number=*/0);
 
   SECTION("insert items sorted") {
-    constexpr int kItemsCount = 600 * 300;
+    constexpr auto kItemsCount = 600 * 300ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(eptree.insert({i, i + 1}));
     }
 
-    REQUIRE(eptree.tree_header()->depth.value() == 3);
-
-    REQUIRE(std::ranges::equal(
-        std::views::transform(eptree,
-                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key, extent.value};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
-          return {i, i + 1};
-        })));
+    CHECK(eptree.tree_header()->depth.value() == 3);
+    CHECK_THAT(eptree, RangeEquals(std::views::iota(0ul, kItemsCount), [](const auto& extent, uint32_t i) {
+                 return extent.key == i && extent.value == i + 1;
+               }));
   }
 
   SECTION("insert items unsorted") {
-    constexpr int kItemsCount = 600 * 300;
+    constexpr auto kItemsCount = 600 * 300ul;
     auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
     for (auto key : unsorted_keys) {
       REQUIRE(eptree.insert({key, key + 1}));
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(eptree, [](const auto& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(eptree, [](const auto& extent) { return extent.key; });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
-    REQUIRE(std::ranges::equal(sorted_keys, keys));
+    CHECK_THAT(keys, RangeEquals(sorted_keys));
 
     // Check the values
-    REQUIRE(std::ranges::equal(
-        std::views::transform(eptree,
-                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key, extent.value};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
-          return {i, i + 1};
-        })));
+    CHECK_THAT(eptree, RangeEquals(std::views::iota(0ul, kItemsCount), [](const auto& extent, uint32_t i) {
+                 return extent.key == i && extent.value == i + 1;
+               }));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(eptree.find(i, true)->key == i);
+      CHECK(eptree.find(i, true)->key == i);
     }
   }
 
   SECTION("erase items randomly") {
-    constexpr int kItemsCount = 600 * 300;
+    constexpr auto kItemsCount = 600 * 300ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(eptree.insert({i, 0}));
     }
@@ -85,11 +77,10 @@ TEST_CASE("EPTreeTests") {
       REQUIRE(eptree.erase(key, blocks_to_delete));
     }
 
+    // Ensure that the right items were deleted
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(eptree, [](const auto& extent) -> int { return extent.key; }),
-                               sorted_upper_half));
+    CHECK_THAT(eptree, RangeEquals(sorted_upper_half, [](const auto& extent, auto key) { return extent.key == key; }));
 
     // Remove the second half
     for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
@@ -97,12 +88,12 @@ TEST_CASE("EPTreeTests") {
     }
 
     // Should be empty
-    REQUIRE(eptree.begin() == eptree.end());
-    REQUIRE(eptree.tree_header()->depth.value() == 1);
+    CHECK(eptree.begin() == eptree.end());
+    CHECK(eptree.tree_header()->depth.value() == 1);
   }
 
   SECTION("check backward/forward iterator") {
-    constexpr int kItemsCount = 600 * 300;
+    constexpr auto kItemsCount = 600 * 300ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(eptree.insert({i, i}));
     }
@@ -110,30 +101,30 @@ TEST_CASE("EPTreeTests") {
     auto it = eptree.begin();
     uint32_t steps = 0;
     while (it != eptree.end()) {
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
       ++it;
       ++steps;
     }
-    REQUIRE(steps == kItemsCount);
-    REQUIRE(it.is_end());
+    CHECK(steps == kItemsCount);
+    CHECK(it.is_end());
     while (it != eptree.begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
-    REQUIRE(steps == 0);
-    REQUIRE(it.is_begin());
+    CHECK(steps == 0);
+    CHECK(it.is_begin());
 
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
-    REQUIRE(it->key == 20);
+    CHECK(it->key == 20);
   }
 }

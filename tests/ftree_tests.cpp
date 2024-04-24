@@ -6,6 +6,7 @@
  */
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_range_equals.hpp>
 
 #include <algorithm>
 #include <ranges>
@@ -16,6 +17,8 @@
 #include "utils/test_blocks_device.h"
 #include "utils/test_free_blocks_allocator.h"
 #include "utils/test_utils.h"
+
+using Catch::Matchers::RangeEquals;
 
 TEST_CASE("FTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
@@ -34,13 +37,13 @@ TEST_CASE("FTreeTests") {
   }
 
   SECTION("insert and erase sorted item") {
-    constexpr int kItemsCount = 500;
+    constexpr auto kItemsCount = 500ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(ftrees[0].insert({i, static_cast<nibble>(i % 16)}));
     }
 
     // Tree should fill now
-    uint32_t inserted = 0;
+    auto inserted = 0ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       inserted += ftrees[1].insert({i, static_cast<nibble>(i % 16)}) ? 1 : 0;
     }
@@ -53,56 +56,46 @@ TEST_CASE("FTreeTests") {
     REQUIRE(ftrees[1].size() == inserted);
     REQUIRE(ftrees[2].size() == 0);
 
-    REQUIRE(std::ranges::equal(
-        std::views::transform(ftrees[0],
-                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
-                                return {extent.key, extent.value};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, nibble> {
-          return {i, static_cast<nibble>(i % 16)};
-        })));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(ftrees[1],
-                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
-                                return {extent.key, extent.value};
-                              }),
-        std::views::transform(std::views::iota(uint32_t{0}, inserted), [](int i) -> std::pair<uint32_t, nibble> {
-          return {i, static_cast<nibble>(i % 16)};
-        })));
+    CHECK_THAT(ftrees[0], RangeEquals(std::views::iota(0ul, kItemsCount), [](const auto& extent, auto i) {
+                 return extent.key == i && extent.value == static_cast<nibble>(i % 16);
+               }));
+    CHECK_THAT(ftrees[1], RangeEquals(std::views::iota(0ul, inserted), [](const auto& extent, auto i) {
+                 return extent.key == i && extent.value == static_cast<nibble>(i % 16);
+               }));
 
     ftrees[0].erase(ftrees[0].begin(), ftrees[0].end());
-    REQUIRE(ftrees[0].size() == 0);
+    CHECK(ftrees[0].size() == 0);
 
     // Should be able to fill ftrees[2] now
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(ftrees[2].insert({i, static_cast<nibble>(i % 16)}));
     }
-    REQUIRE(ftrees[2].size() == kItemsCount);
+    CHECK(ftrees[2].size() == kItemsCount);
   }
 
   SECTION("insert compact") {
-    constexpr int kItemsCount = 500;
+    constexpr auto kItemsCount = 500ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(ftrees[0].insert({i, static_cast<nibble>(i % 16)}));
     }
-    REQUIRE(ftrees[0].size() == kItemsCount);
+    CHECK(ftrees[0].size() == kItemsCount);
 
     FTree ftree{TestBlock::LoadMetadataBlock(test_device, 1), 0};
     ftree.Init();
     REQUIRE(ftree.insert_compact(ftrees[0].begin(), ftrees[0].end()));
 
     // Check that the tree is completly identical and valid.
-    REQUIRE(ftree.size() == kItemsCount);
-    REQUIRE(std::distance(ftree.begin(), ftree.end()) == kItemsCount);
-    REQUIRE(std::ranges::equal(ftrees[0], ftree));
+    CHECK(ftree.size() == kItemsCount);
+    CHECK(std::distance(ftree.begin(), ftree.end()) == kItemsCount);
+    CHECK_THAT(ftrees[0], RangeEquals(ftree));
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftree.find(i)->key == i);
-      REQUIRE(ftree.find(i)->value == static_cast<nibble>(i % 16));
+      CHECK(ftree.find(i)->key == i);
+      CHECK(ftree.find(i)->value == static_cast<nibble>(i % 16));
     }
   }
 
   SECTION("check backward/forward iterator") {
-    constexpr int kItemsCount = 500;
+    constexpr auto kItemsCount = 500ul;
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(ftrees[0].insert({i, static_cast<nibble>(i % 16)}));
     }
@@ -110,40 +103,40 @@ TEST_CASE("FTreeTests") {
     auto it = ftrees[0].begin();
     uint32_t steps = 0;
     while (it != ftrees[0].end()) {
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
       ++it;
       ++steps;
     }
-    REQUIRE(steps == kItemsCount);
-    REQUIRE(it.is_end());
+    CHECK(steps == kItemsCount);
+    CHECK(it.is_end());
     while (it != ftrees[0].begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
-    REQUIRE(steps == 0);
-    REQUIRE(it.is_begin());
+    CHECK(steps == 0);
+    CHECK(it.is_begin());
 
     for (int i = 0; i < 4; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
     for (int i = 0; i < 2; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      CHECK(it->key == steps);
     }
-    REQUIRE(it->key == 22);
+    CHECK(it->key == 22);
   }
 }
