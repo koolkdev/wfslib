@@ -151,7 +151,7 @@ TEST_CASE("RTreeTests") {
         })));
 
     for (uint32_t i = 0; i < index; ++i) {
-      REQUIRE(rtree.find(i, true)->key == i);
+      REQUIRE((*rtree.find(i, true)).key == i);
     }
   }
 

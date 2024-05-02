@@ -96,8 +96,8 @@ TEST_CASE("FTreeTests") {
     REQUIRE(std::distance(ftree.begin(), ftree.end()) == kItemsCount);
     REQUIRE(std::ranges::equal(ftrees[0], ftree));
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(ftree.find(i)->key == i);
-      REQUIRE(ftree.find(i)->value == static_cast<nibble>(i % 16));
+      REQUIRE((*ftree.find(i)).key == i);
+      REQUIRE((*ftree.find(i)).value == static_cast<nibble>(i % 16));
     }
   }
 
@@ -110,7 +110,7 @@ TEST_CASE("FTreeTests") {
     auto it = ftrees[0].begin();
     uint32_t steps = 0;
     while (it != ftrees[0].end()) {
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
       ++it;
       ++steps;
     }
@@ -119,7 +119,7 @@ TEST_CASE("FTreeTests") {
     while (it != ftrees[0].begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
@@ -127,23 +127,23 @@ TEST_CASE("FTreeTests") {
     for (int i = 0; i < 4; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 2; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
-    REQUIRE(it->key == 22);
+    REQUIRE((*it).key == 22);
   }
 }

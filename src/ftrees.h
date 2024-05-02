@@ -22,6 +22,7 @@
 
 struct free_blocks_extent_ref {
   union {
+    node_item_ref_base _base;
     node_key_ref<FTreeLeaf_details> key;
     node_value_ref<FTreeLeaf_details> value;
     const extra_info_ref<size_t> bucket_index;
@@ -36,14 +37,11 @@ struct free_blocks_extent_ref {
   operator FreeBlocksExtentInfo() const { return {block_number(), blocks_count(), bucket_index}; }
 
   bool operator==(const free_blocks_extent_ref& other) const {
-    uint32_t _key = key;
-    std::ignore = _key;
     return key == other.key && value == other.value && bucket_index == other.bucket_index;
   }
 };
-static_assert(sizeof(free_blocks_extent_ref) == sizeof(node_item_ref<FTreeLeaf_details>));
 
-class FTreesConstIterator {
+class FTreesIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = int;
@@ -51,28 +49,23 @@ class FTreesConstIterator {
   using value_type = free_blocks_extent_ref;
   using ref_type = free_blocks_extent_ref;
 
-  using const_reference = const ref_type;
-  using const_pointer = const ref_type*;
-
-  using reference = const_reference;
-  using pointer = const_pointer;
+  using reference = ref_type;
 
   using ftree_info = node_iterator_info<FTree>;
 
-  FTreesConstIterator() = default;
-  FTreesConstIterator(std::array<ftree_info, kSizeBuckets.size()> ftrees, size_t index)
+  FTreesIterator() = default;
+  FTreesIterator(std::array<ftree_info, kSizeBuckets.size()> ftrees, size_t index)
       : ftrees_(std::move(ftrees)), index_(index) {}
 
-  reference operator*() const { return *operator->(); }
-  pointer operator->() const& { return reinterpret_cast<pointer>(ftrees_[index_].iterator.operator->()); }
+  reference operator*() const { return {(*ftrees_[index_].iterator)._base}; }
 
-  FTreesConstIterator& operator++();
-  FTreesConstIterator& operator--();
+  FTreesIterator& operator++();
+  FTreesIterator& operator--();
 
-  FTreesConstIterator operator++(int);
-  FTreesConstIterator operator--(int);
+  FTreesIterator operator++(int);
+  FTreesIterator operator--(int);
 
-  bool operator==(const FTreesConstIterator& other) const {
+  bool operator==(const FTreesIterator& other) const {
     return index_ == other.index_ && ftrees_[index_].iterator == other.ftrees_[other.index_].iterator;
   }
 
@@ -85,7 +78,7 @@ class FTreesConstIterator {
                              return !ftree.iterator.is_end() && !reverse_end.test(ftree.node->index());
                            });
     auto res = std::ranges::max_element(iterated_ftrees, [max](const ftree_info& a, const ftree_info& b) {
-      return max ^ (a.iterator->key > b.iterator->key);
+      return max ^ ((*a.iterator).key > (*b.iterator).key);
     });
     return res != std::ranges::end(iterated_ftrees) ? res->node->index() : 0;
   }
@@ -100,42 +93,11 @@ class FTreesConstIterator {
   bool is_forward_{true};
   std::bitset<kSizeBuckets.size()> reverse_end_;
 };
-
-class FTreesIterator : public FTreesConstIterator {
- public:
-  using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = int;
-
-  using ref_type = FTreesConstIterator::ref_type;
-
-  using reference = ref_type;
-  using pointer = ref_type*;
-
-  FTreesIterator() = default;
-  FTreesIterator(std::array<ftree_info, kSizeBuckets.size()> ftrees, size_t index)
-      : FTreesConstIterator(std::move(ftrees), index) {}
-
-  reference operator*() const { return *operator->(); }
-  pointer operator->() const& { return const_cast<pointer>(FTreesConstIterator::operator->()); }
-
-  FTreesIterator& operator++();
-  FTreesIterator& operator--();
-
-  FTreesIterator operator++(int);
-  FTreesIterator operator--(int);
-
-  bool operator==(const FTreesIterator& other) const { return FTreesConstIterator::operator==(other); }
-};
-
-static_assert(std::bidirectional_iterator<FTreesConstIterator>);
 static_assert(std::bidirectional_iterator<FTreesIterator>);
 
 class FTrees {
  public:
   using iterator = FTreesIterator;
-  using const_iterator = FTreesConstIterator;
-  using reverse_iterator = TreeReverseIterator<iterator>;
-  using const_reverse_iterator = TreeReverseIterator<const_iterator>;
 
   FTrees(std::shared_ptr<Block> block)
       : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBuckets.size()>{})) {}
@@ -147,21 +109,10 @@ class FTrees {
 
   bool empty() const { return size() == 0; }
 
-  iterator begin() { return begin_impl(); }
-  iterator end() { return end_impl(); }
-  const_iterator begin() const { return begin_impl(); }
-  const_iterator end() const { return end_impl(); }
+  iterator begin() const;
+  iterator end() const;
 
-  reverse_iterator rbegin() { return reverse_iterator{end()}; }
-  reverse_iterator rend() { return reverse_iterator{begin()}; }
-  const_reverse_iterator rbegin() const { return const_reverse_iterator{end()}; }
-  const_reverse_iterator rend() const { return const_reverse_iterator{begin()}; }
-
-  const_iterator cbegin() const { return begin(); }
-  const_iterator cend() const { return end(); }
-
-  iterator find(key_type key, bool exact_match = true) { return find_impl(key, exact_match); }
-  const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
+  iterator find(key_type key, bool exact_match = true) const;
 
   void split(FTrees& left, FTrees& right, key_type& split_point_key);
 
@@ -176,9 +127,6 @@ class FTrees {
     return {{{block, Is}...}};
   }
 
-  iterator begin_impl() const;
-  iterator end_impl() const;
-  iterator find_impl(key_type key, bool exact_match = true) const;
-
   std::array<FTree, kSizeBuckets.size()> ftrees_;
 };
+static_assert(std::ranges::bidirectional_range<FTrees>);

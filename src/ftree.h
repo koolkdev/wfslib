@@ -14,10 +14,9 @@
 #include "tree_nodes_allocator.h"
 
 template <>
-PTreeNode<FTreeLeaf_details>::const_iterator split_point(
-    const PTreeNode<FTreeLeaf_details>& node,
-    const typename PTreeNode<FTreeLeaf_details>::const_iterator& pos,
-    key_type& split_key);
+PTreeNode<FTreeLeaf_details>::iterator split_point(const PTreeNode<FTreeLeaf_details>& node,
+                                                   const typename PTreeNode<FTreeLeaf_details>::iterator& pos,
+                                                   key_type& split_key);
 
 static_assert(sizeof(PTreeNode_details) == sizeof(FTreeLeaf_details));
 using FTreesBlockArgs = TreeNodesAllocatorArgs<FTreesBlockHeader, FTreesFooter, sizeof(PTreeNode_details)>;
@@ -39,3 +38,4 @@ class FTree : public PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlockArgs
  private:
   size_t block_size_index_;
 };
+static_assert(std::ranges::bidirectional_range<FTree>);

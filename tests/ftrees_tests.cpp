@@ -71,7 +71,7 @@ TEST_CASE("FTreesTests") {
     auto it = ftrees.begin();
     uint32_t steps = 0;
     while (it != ftrees.end()) {
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
       ++it;
       ++steps;
     }
@@ -80,21 +80,22 @@ TEST_CASE("FTreesTests") {
     while (it != ftrees.begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
 
     for (int i = 0; i < 40; ++i) {
-      UNSCOPED_INFO(it->key);
       ++it;
+      ++steps;
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 20; ++i) {
-      UNSCOPED_INFO(it->key);
       --it;
+      --steps;
+      REQUIRE((*it).key == steps);
     }
-    UNSCOPED_INFO(it->key);
-    REQUIRE(it->key == 20);
+    REQUIRE((*it).key == 20);
   }
 
   SECTION("check find") {
@@ -107,7 +108,7 @@ TEST_CASE("FTreesTests") {
     REQUIRE(it.is_end());
 
     it = ftrees.find(523, false);
-    REQUIRE(it->key == 522);
+    REQUIRE((*it).key == 522);
 
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(ftrees.begin(), it),
@@ -128,7 +129,7 @@ TEST_CASE("FTreesTests") {
             })));
 
     it = ftrees.find(840);
-    REQUIRE(it->key == 840);
+    REQUIRE((*it).key == 840);
 
     REQUIRE(std::ranges::equal(
         std::views::transform(std::ranges::subrange(ftrees.begin(), it),
@@ -148,10 +149,10 @@ TEST_CASE("FTreesTests") {
               return {i * 2, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
             })));
 
-    REQUIRE(ftrees.find(4, false)->key == 4);
-    REQUIRE(ftrees.find(6, false)->key == 6);
-    REQUIRE((++ftrees.find(4, false))->key == 6);
-    REQUIRE((++ftrees.find(14, false))->key == 16);
+    REQUIRE((*ftrees.find(4, false)).key == 4);
+    REQUIRE((*ftrees.find(6, false)).key == 6);
+    REQUIRE((*++ftrees.find(4, false)).key == 6);
+    REQUIRE((*++ftrees.find(14, false)).key == 16);
   }
 
   SECTION("test split") {

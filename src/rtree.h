@@ -12,10 +12,9 @@
 #include "structs.h"
 
 template <>
-PTreeNode<RTreeLeaf_details>::const_iterator split_point(
-    const PTreeNode<RTreeLeaf_details>& node,
-    const typename PTreeNode<RTreeLeaf_details>::const_iterator& pos,
-    key_type& split_key);
+PTreeNode<RTreeLeaf_details>::iterator split_point(const PTreeNode<RTreeLeaf_details>& node,
+                                                   const typename PTreeNode<RTreeLeaf_details>::iterator& pos,
+                                                   key_type& split_key);
 
 static_assert(sizeof(PTreeNode_details) == sizeof(RTreeLeaf_details));
 using EPTreeBlockArgs = TreeNodesAllocatorArgs<FreeBlocksAllocatorHeader, EPTreeFooter, sizeof(PTreeNode_details)>;
@@ -31,3 +30,4 @@ class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs
 
   void Init(uint8_t depth, uint32_t block_number);
 };
+static_assert(std::ranges::bidirectional_range<RTree>);

@@ -123,13 +123,10 @@ struct node_item {
 template <is_node_details T>
 struct node_item_ref {
   union {
+    node_item_ref_base _base;
     node_key_ref<T> key;
     node_value_ref<T> value;
   };
-
-  node_item_ref() = default;
-  node_item_ref(const node_item_ref& other) = default;
-  node_item_ref(node_item_ref&& other) = default;
 
   node_item_ref& operator=(const node_item_ref& other) {
     key = other.key;
@@ -161,154 +158,82 @@ struct node_item_ref {
 };
 
 template <is_node_details T>
-auto operator<=>(key_type key, const node_item<T>& node_value) {
-  return key <=> node_value;
-}
-template <is_node_details T>
-auto operator==(key_type key, const node_item<T>& node_value) {
-  return key == node_value;
-}
-
-template <typename T>
-concept TreeIterator = requires(const T& iterator) {
-                         { iterator.is_begin() } -> std::same_as<bool>;
-                         { iterator.is_end() } -> std::same_as<bool>;
-                       };
-
-template <typename T>
-  requires TreeIterator<T>
-class TreeReverseIterator : public std::reverse_iterator<T> {
- public:
-  TreeReverseIterator() = default;
-  explicit TreeReverseIterator(T it) : std::reverse_iterator<T>(std::move(it)) {}
-  TreeReverseIterator(const TreeReverseIterator& other) : std::reverse_iterator<T>(other) {}
-  TreeReverseIterator(TreeReverseIterator&& other) : std::reverse_iterator<T>(other) {}
-  template <typename It>
-    requires std::convertible_to<It, T>
-  TreeReverseIterator(const TreeReverseIterator<It>& it) : std::reverse_iterator<T>(std::move(it)) {}
-
-  typename T::pointer operator->() const& {
-    T tmp(std::reverse_iterator<T>::base());
-    --tmp;
-    // We need to store the value for the ref.
-    const_cast<TreeReverseIterator*>(this)->val_ = *reinterpret_cast<node_item_ref_base*>(tmp.operator->());
-    return reinterpret_cast<T::pointer>(const_cast<node_item_ref_base*>(&val_));
-  }
-
-  TreeReverseIterator& operator++() {
-    std::reverse_iterator<T>::operator++();
-    return *this;
-  }
-  TreeReverseIterator& operator--() {
-    std::reverse_iterator<T>::operator--();
-    return *this;
-  }
-  TreeReverseIterator operator++(int) {
-    TreeReverseIterator tmp(*this);
-    ++(*this);
-    return tmp;
-  }
-  TreeReverseIterator operator--(int) {
-    TreeReverseIterator tmp(*this);
-    --(*this);
-    return tmp;
-  }
-  TreeReverseIterator& operator=(const TreeReverseIterator& other) {
-    std::reverse_iterator<T>::operator=(other);
-    return *this;
-  }
-
-  bool is_begin() const { return this->base().is_end(); }
-  bool is_end() const { return this->base().is_begin(); }
-
- private:
-  node_item_ref_base val_;
-  static_assert(sizeof(typename std::remove_pointer_t<typename T::pointer>) == sizeof(val_));
-};
-
-template <is_node_details T>
-class PTreeNodeConstIterator {
+class PTreeNodeIterator {
  public:
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = int;
   using value_type = node_item<T>;
 
   using ref_type = node_item_ref<T>;
-  static_assert(sizeof(ref_type) == sizeof(node_item_ref_base));
 
-  using const_reference = const ref_type;
-  using const_pointer = const ref_type*;
+  using reference = ref_type;
 
-  using reference = const_reference;
-  using pointer = const_pointer;
-
-  PTreeNodeConstIterator() = default;
-  PTreeNodeConstIterator(node_ref node, size_t index) : PTreeNodeConstIterator(node_item_ref_base{node, index}) {}
-  PTreeNodeConstIterator(node_item_ref_base node_item) : node_item_(node_item) {
+  PTreeNodeIterator() = default;
+  PTreeNodeIterator(node_ref node, size_t index) : PTreeNodeIterator(node_item_ref_base{node, index}) {}
+  PTreeNodeIterator(node_item_ref_base node_item) : node_item_(node_item) {
     assert(node_item_.index <= node_values_capacity<T>::value);
   }
 
-  reference operator*() const { return *operator->(); }
-  pointer operator->() const& { return reinterpret_cast<pointer>(&node_item_); }
+  reference operator*() const { return {node_item_}; }
 
-  PTreeNodeConstIterator& operator++() {
+  PTreeNodeIterator& operator++() {
     ++node_item_.index;
     return *this;
   }
 
-  PTreeNodeConstIterator& operator--() {
+  PTreeNodeIterator& operator--() {
     --node_item_.index;
     return *this;
   }
 
-  PTreeNodeConstIterator operator++(int) {
-    PTreeNodeConstIterator tmp(*this);
+  PTreeNodeIterator operator++(int) {
+    PTreeNodeIterator tmp(*this);
     ++(*this);
     return tmp;
   }
 
-  PTreeNodeConstIterator operator--(int) {
-    PTreeNodeConstIterator tmp(*this);
+  PTreeNodeIterator operator--(int) {
+    PTreeNodeIterator tmp(*this);
     --(*this);
     return tmp;
   }
-  PTreeNodeConstIterator& operator+=(difference_type n) {
+  PTreeNodeIterator& operator+=(difference_type n) {
     node_item_.index += n;
     assert(node_item_.index <= node_values_capacity<T>::value);
     return *this;
   }
-  PTreeNodeConstIterator& operator-=(difference_type n) {
+  PTreeNodeIterator& operator-=(difference_type n) {
     node_item_.index -= n;
     assert(node_item_.index <= node_values_capacity<T>::value);
     return *this;
   }
 
-  PTreeNodeConstIterator operator+(difference_type n) const {
-    PTreeNodeConstIterator tmp(*this);
+  PTreeNodeIterator operator+(difference_type n) const {
+    PTreeNodeIterator tmp(*this);
     tmp += n;
     return tmp;
   }
 
-  PTreeNodeConstIterator operator-(difference_type n) const {
-    PTreeNodeConstIterator tmp(*this);
+  PTreeNodeIterator operator-(difference_type n) const {
+    PTreeNodeIterator tmp(*this);
     tmp -= n;
     return tmp;
   }
 
-  difference_type operator-(const PTreeNodeConstIterator& other) const {
+  difference_type operator-(const PTreeNodeIterator& other) const {
     assert(node_item_.get<T>() == other.node_item_.template get<T>());
     return static_cast<difference_type>(node_item_.index) - static_cast<difference_type>(other.node_item_.index);
   }
 
-  auto operator<=>(const PTreeNodeConstIterator& other) const {
+  auto operator<=>(const PTreeNodeIterator& other) const {
     if (const auto res = node_item_.get<T>() <=> other.node_item_.template get<T>(); res != 0)
       return res;
     return node_item_.index <=> other.node_item_.index;
   }
 
-  bool operator==(const PTreeNodeConstIterator& other) const { return node_item_ == other.node_item_; }
+  bool operator==(const PTreeNodeIterator& other) const { return node_item_ == other.node_item_; }
 
-  const ref_type operator[](difference_type n) const { return *(*this + n); }
+  reference operator[](difference_type n) const { return *(*this + n); }
 
   bool is_begin() const { return node_item_.index == 0; }
   bool is_end() const {
@@ -321,115 +246,24 @@ class PTreeNodeConstIterator {
 };
 
 template <is_node_details T>
-class PTreeNodeIterator : public PTreeNodeConstIterator<T> {
- public:
-  using base = PTreeNodeConstIterator<T>;
-
-  using iterator_category = std::random_access_iterator_tag;
-  using difference_type = int;
-  using value_type = node_item<T>;
-
-  using ref_type = node_item_ref<T>;
-
-  using reference = ref_type;
-  using pointer = ref_type*;
-
-  PTreeNodeIterator() = default;
-  PTreeNodeIterator(node_ref node, size_t index) : base(node, index) {}
-  PTreeNodeIterator(node_item_ref_base node_item) : base(node_item) {}
-
-  reference operator*() const { return *operator->(); }
-  pointer operator->() const& { return const_cast<pointer>(base::operator->()); }
-
-  PTreeNodeIterator& operator++() {
-    base::operator++();
-    return *this;
-  }
-
-  PTreeNodeIterator& operator--() {
-    base::operator--();
-    return *this;
-  }
-
-  PTreeNodeIterator operator++(int) {
-    PTreeNodeIterator tmp(*this);
-    ++(*this);
-    return tmp;
-  }
-  PTreeNodeIterator operator--(int) {
-    PTreeNodeIterator tmp(*this);
-    --(*this);
-    return tmp;
-  }
-
-  PTreeNodeIterator& operator+=(difference_type n) {
-    base::operator+=(n);
-    return *this;
-  }
-  PTreeNodeIterator& operator-=(difference_type n) {
-    base::operator-=(n);
-    return *this;
-  }
-  PTreeNodeIterator operator+(difference_type n) const {
-    PTreeNodeIterator tmp(*this);
-    tmp += n;
-    return tmp;
-    ;
-  }
-  PTreeNodeIterator operator-(difference_type n) const {
-    PTreeNodeIterator tmp(*this);
-    tmp -= n;
-    return tmp;
-  }
-  difference_type operator-(const PTreeNodeIterator& other) const { return base::operator-(other); }
-  difference_type operator-(const PTreeNodeConstIterator<T>& other) const { return base::operator-(other); }
-
-  reference operator[](difference_type n) const { return const_cast<pointer>(base::operator[](n)); }
-};
-
-template <is_node_details T>
-PTreeNodeConstIterator<T> operator+(typename PTreeNodeConstIterator<T>::difference_type n,
-                                    const PTreeNodeConstIterator<T>& iter) {
-  return iter + n;
-}
-
-template <is_node_details T>
 PTreeNodeIterator<T> operator+(typename PTreeNodeIterator<T>::difference_type n, const PTreeNodeIterator<T>& iter) {
   return iter + n;
 }
 
 template <is_node_details T>
-PTreeNodeConstIterator<T>::difference_type operator-(const PTreeNodeConstIterator<T>& a,
-                                                     const PTreeNodeIterator<T>& b) {
-  return a.operator-(b);
-}
-
-template <is_node_details T>
-  requires std::random_access_iterator<PTreeNodeIterator<T>> && std::random_access_iterator<PTreeNodeConstIterator<T>>
 class PTreeNode {
  public:
   using iterator = PTreeNodeIterator<T>;
-  using const_iterator = PTreeNodeConstIterator<T>;
-  using reverse_iterator = TreeReverseIterator<iterator>;
-  using const_reverse_iterator = TreeReverseIterator<const_iterator>;
+  static_assert(std::random_access_iterator<iterator>);
+
+  using reference = typename iterator::reference;
 
   PTreeNode(node_ref node) : PTreeNode(node, node_values_size(*node.get<T>())) {}
   PTreeNode(node_ref node, size_t size) : node_(node), size_(size) {}
 
   size_t size() const { return size_; }
-  iterator begin() { return iterator(node_, 0); }
-  iterator end() { return iterator(node_, size_); }
-  const_iterator begin() const { return const_iterator(node_, 0); }
-  const_iterator end() const { return const_iterator(node_, size_); }
-  const_iterator cbegin() const { return begin(); }
-  const_iterator cend() const { return end(); }
-
-  reverse_iterator rbegin() { return {end()}; }
-  reverse_iterator rend() { return {begin()}; }
-  const_reverse_iterator rbegin() const { return {end()}; }
-  const_reverse_iterator rend() const { return {begin()}; }
-  const_reverse_iterator crbegin() const { return rbegin(); }
-  const_reverse_iterator crend() const { return rend(); }
+  iterator begin() const { return iterator(node_, 0); }
+  iterator end() const { return iterator(node_, size_); }
 
   bool full() const { return size_ == node_values_capacity<T>::value; }
   bool empty() const { return size_ == 0; }
@@ -438,57 +272,57 @@ class PTreeNode {
     auto it = std::upper_bound(begin(), end(), key);
     if (it != begin())
       --it;
-    if (exact_match && (it == end() || it->key != key))
+    if (exact_match && (it == end() || (*it).key != key))
       return end();
     return it;
   }
 
-  iterator insert(const const_iterator& pos, const typename iterator::value_type& key_val) {
+  iterator insert(const iterator& pos, const typename iterator::value_type& key_val) {
     if (size_ >= node_values_capacity<T>::value)
       return end();
-    assert(cbegin() <= pos && pos <= cend());
-    iterator res = begin() + (pos - cbegin());
-    std::copy_backward<const_iterator, iterator>(res, cend(), end() + 1);
+    assert(begin() <= pos && pos <= end());
+    iterator res = begin() + (pos - begin());
+    std::copy_backward(res, end(), end() + 1);
     *res = key_val;
     size_++;
     return res;
   }
 
   template <typename Range>
-  iterator insert(const const_iterator& pos, Range&& range) {
+  iterator insert(const iterator& pos, Range&& range) {
     return insert(pos, std::ranges::begin(range), std::ranges::end(range));
   }
 
   template <typename InputIt>
-  iterator insert(const const_iterator& pos, const InputIt& start_it, const InputIt& end_it) {
+  iterator insert(const iterator& pos, const InputIt& start_it, const InputIt& end_it) {
     auto items = static_cast<typename iterator::difference_type>(std::distance(start_it, end_it));
     if (size_ + items > node_values_capacity<T>::value)
       return end();
-    assert(cbegin() <= pos && pos <= cend());
-    iterator res = begin() + (pos - cbegin());
-    std::copy_backward<const_iterator, iterator>(res, cend(), end() + items);
+    assert(begin() <= pos && pos <= end());
+    iterator res = begin() + (pos - begin());
+    std::copy_backward(res, end(), end() + items);
     std::copy(start_it, end_it, res);
     size_ += items;
     return res;
   }
 
-  iterator erase(const const_iterator& pos) {
-    assert(cbegin() <= pos && pos < cend());
+  iterator erase(const iterator& pos) {
+    assert(begin() <= pos && pos < end());
     auto new_end = end() - 1;
-    iterator res = begin() + (pos - cbegin());
-    std::copy(pos + 1, cend(), res);
+    iterator res = begin() + (pos - begin());
+    std::copy(pos + 1, end(), res);
     std::fill(new_end, end(), 0);
     --size_;
     return res;
   }
 
-  iterator erase(const const_iterator& it_start, const const_iterator& it_end) {
-    assert(cbegin() <= it_start && it_start <= cend());
-    assert(cbegin() <= it_end && it_end <= cend());
+  iterator erase(const iterator& it_start, const iterator& it_end) {
+    assert(begin() <= it_start && it_start <= end());
+    assert(begin() <= it_end && it_end <= end());
     assert(it_start <= it_end);
-    iterator res = begin() + (it_start - cbegin());
-    auto new_end = res + (cend() - it_end);
-    std::copy(it_end, cend(), res);
+    iterator res = begin() + (it_start - begin());
+    auto new_end = res + (end() - it_end);
+    std::copy(it_end, end(), res);
     std::fill(new_end, end(), 0);
     size_ -= it_end - it_start;
     return res;
