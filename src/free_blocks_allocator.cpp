@@ -164,9 +164,10 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     // 1. It ends exactly at this range start.
     // 2. This range start isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    if (pos->end_block_number() == range_in_size.block_number &&
+    FreeBlocksExtentInfo before_pos = *pos;
+    if (before_pos.end_block_number() == range_in_size.block_number &&
         (!is_aligned_pow2(range_in_size.block_number, next_size_pow2) ||
-         pos->blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
+         before_pos.blocks_count + range_in_size.blocks_count < next_size_blocks_count)) {
       join_before = *pos;
       join_before_iter = pos;
       range_in_size.block_number = join_before->block_number;
@@ -177,12 +178,12 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
     // 1. It start  exactly at this range end.
     // 2. This range end isn't aligned to one size up bucket block.
     // 3. OR joining those ranges will still be smaller than one size up bucket
-    if (pos->block_number() <= range_in_size.block_number)  // We could be at begin() before
+    if (before_pos.block_number <= range_in_size.block_number)  // We could be at begin() before
       ++pos;
-    assert(pos.is_end() || pos->block_number() > range_in_size.block_number);
-    if (!pos.is_end() && pos->block_number() == range_in_size.end_block_number() &&
+    assert(pos.is_end() || (*pos).block_number() > range_in_size.block_number);
+    if (!pos.is_end() && (*pos).block_number() == range_in_size.end_block_number() &&
         (!is_aligned_pow2(range_in_size.end_block_number(), next_size_pow2) ||
-         pos->blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
+         (*pos).blocks_count() + range_in_size.blocks_count < next_size_blocks_count)) {
       FreeBlocksExtentInfo join_after = *pos;
       range_in_size.blocks_count += join_after.blocks_count;
       // We give up on the optimization that is done in the original logic (just update the join after block number to
@@ -211,7 +212,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
            sub_range.blocks_count / size_blocks_count <= 0x10);
     auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
     if (join_before && sub_range.block_number == range_in_size.block_number) {
-      join_before_iter->value = new_value;
+      (*join_before_iter).value = new_value;
     } else {
       // Don't use pos to insert because:
       // 1. Our find may go back so it isn't the exact location to insert it.
@@ -282,14 +283,14 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
     // Already trivial
     return;
   }
-  auto last = eptree.rbegin();
-  if (last->key || last->value != 2)
+  auto last = eptree.end()--;
+  if ((*last).key || (*last).value != 2)
     return;
-  uint32_t last_value = last->value;
+  uint32_t last_value = (*last).value;
   assert(last_value == 2);
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   // eptree is empty (aka have only initial FTreee), resize it to one eptree
-  auto nodes = last.base().nodes();
+  auto nodes = last.nodes();
   for (auto& [node_level, node_it] : std::views::reverse(nodes)) {
     if (node_level->header() == &eptree.tree_header()->current_tree) {
       // this is the root, reinitialize it
@@ -308,13 +309,13 @@ bool FreeBlocksAllocator::IsRangeIsFree(FreeBlocksRangeInfo range) {
   if (pos.is_end())
     return false;
   // Check intersection with the free range before us.
-  if (range.block_number >= pos->block_number() && range.block_number < pos->end_block_number())
+  if (range.block_number >= (*pos).block_number() && range.block_number < (*pos).end_block_number())
     return true;
   ++pos;
   if (pos.is_end())
     return false;
   // Check intersection with the free range after us.
-  return pos->block_number() >= range.block_number && pos->block_number() < range.end_block_number();
+  return (*pos).block_number() >= range.block_number && (*pos).block_number() < range.end_block_number();
 }
 
 std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t chunks_count,

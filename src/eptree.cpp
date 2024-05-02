@@ -9,7 +9,7 @@
 
 #include "eptree.h"
 
-EPTreeConstIterator& EPTreeConstIterator::operator++() {
+EPTreeIterator& EPTreeIterator::operator++() {
   assert(!is_end());
   auto rnode = nodes_.rbegin();
   while ((++rnode->iterator).is_end()) {
@@ -19,50 +19,28 @@ EPTreeConstIterator& EPTreeConstIterator::operator++() {
       return *this;  // end
     }
   }
-  uint32_t node_block_number = rnode->iterator->value;
+  uint32_t node_block_number = (*rnode->iterator).value;
   for (auto node = rnode.base(); node != nodes_.end(); ++node) {
     *node = {allocator_->LoadAllocatorBlock(node_block_number)};
     node->iterator = node->node->begin();
-    node_block_number = node->iterator->value;
+    node_block_number = (*node->iterator).value;
   }
   return *this;
 }
 
-EPTreeConstIterator& EPTreeConstIterator::operator--() {
+EPTreeIterator& EPTreeIterator::operator--() {
   assert(!is_begin());
   auto rnode = nodes_.rbegin();
   for (; rnode->iterator.is_begin(); rnode++) {
     if (rnode == nodes_.rend())
       return *this;  // begin
   }
-  uint32_t node_block_number = (--rnode->iterator)->value;
+  uint32_t node_block_number = (*--rnode->iterator).value;
   for (auto node = rnode.base(); node != nodes_.end(); ++node) {
     *node = {allocator_->LoadAllocatorBlock(node_block_number)};
     node->iterator = node->node->end();
-    node_block_number = (--node->iterator)->value;
+    node_block_number = (*--node->iterator).value;
   }
-  return *this;
-}
-
-EPTreeConstIterator EPTreeConstIterator::operator++(int) {
-  EPTreeConstIterator tmp(*this);
-  ++(*this);
-  return tmp;
-}
-
-EPTreeConstIterator EPTreeConstIterator::operator--(int) {
-  EPTreeConstIterator tmp(*this);
-  --(*this);
-  return tmp;
-}
-
-EPTreeIterator& EPTreeIterator::operator++() {
-  base::operator++();
-  return *this;
-}
-
-EPTreeIterator& EPTreeIterator::operator--() {
-  base::operator--();
   return *this;
 }
 
@@ -96,7 +74,7 @@ bool EPTree::insert(const iterator::value_type& key_value) {
     auto depth = node_level->tree_header()->depth.value();
     // Where to split the level
     auto split_point = node_level->middle();
-    key_type split_point_key = split_point->key;
+    key_type split_point_key = (*split_point).key;
     // Alloc new right side tree
     auto right_block_number = AllocBlockForTree(node_level->tree_header()->block_number.value(), allocated_extents);
     RTree new_right(allocator_->LoadAllocatorBlock(right_block_number, /*new_block=*/true));
@@ -135,7 +113,7 @@ bool EPTree::insert(const iterator::value_type& key_value) {
   return true;
 }
 
-bool EPTree::insert(const RTree::const_iterator& it_start, const RTree::const_iterator& it_end) {
+bool EPTree::insert(const RTree::iterator& it_start, const RTree::iterator& it_end) {
   for (const auto& val : std::ranges::subrange(it_start, it_end)) {
     if (!insert(val))
       return false;
@@ -143,7 +121,7 @@ bool EPTree::insert(const RTree::const_iterator& it_start, const RTree::const_it
   return true;
 }
 
-void EPTree::erase(const const_iterator& pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete) {
+void EPTree::erase(const iterator& pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete) {
   // Erase from each node
   for (auto& [node_level, node_it] : std::views::reverse(pos.nodes())) {
     node_level->erase(node_it);
@@ -175,38 +153,38 @@ uint32_t EPTree::AllocBlockForTree(uint32_t near, std::vector<FreeBlocksExtentIn
   return allocator_->FindSmallestFreeBlockExtent(near, allocated);
 }
 
-EPTree::iterator EPTree::begin_impl() const {
+EPTree::iterator EPTree::begin() const {
   std::vector<iterator::node_info> nodes;
   nodes.reserve(tree_header()->depth.value());
   assert(tree_header()->depth.value() >= 1);
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_end());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock(nodes.back().iterator->value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
     node.iterator = node.node->begin();
     nodes.push_back(std::move(node));
   }
   return {allocator_, std::move(nodes)};
 }
 
-EPTree::iterator EPTree::end_impl() const {
+EPTree::iterator EPTree::end() const {
   std::vector<iterator::node_info> nodes;
   nodes.reserve(tree_header()->depth.value());
   assert(tree_header()->depth.value() >= 1);
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_begin());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((--nodes.back().iterator)->value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*--nodes.back().iterator).value)};
     node.iterator = node.node->end();
     nodes.push_back(std::move(node));
   }
   return {allocator_, std::move(nodes)};
 }
 
-EPTree::iterator EPTree::find_impl(key_type key, bool exact_match) const {
+EPTree::iterator EPTree::find(key_type key, bool exact_match) const {
   std::vector<iterator::node_info> nodes;
   nodes.reserve(tree_header()->depth.value());
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_end());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((nodes.back().iterator)->value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
     node.iterator = node.node->find(key, exact_match && i + 1 == tree_header()->depth.value());
     nodes.push_back(std::move(node));
   }

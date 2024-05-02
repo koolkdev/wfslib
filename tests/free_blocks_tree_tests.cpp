@@ -49,7 +49,7 @@ TEST_CASE("FreeBlocksTreeTests") {
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(tree.find(i)->key == i);
+      REQUIRE((*tree.find(i)).key == i);
     }
   }
 
@@ -77,7 +77,7 @@ TEST_CASE("FreeBlocksTreeTests") {
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(tree.find(i)->key == i);
+      REQUIRE((*tree.find(i)).key == i);
     }
   }
 
@@ -147,8 +147,8 @@ TEST_CASE("FreeBlocksTreeTests") {
     REQUIRE(ftree2.empty());
     REQUIRE(ftree3.empty());
     REQUIRE(tree.find(150, false) != tree.end());
-    REQUIRE(tree.find(150, false)->key == 50);
-    REQUIRE(tree.find(25, false)->key == 50);
+    REQUIRE((*tree.find(150, false)).key == 50);
+    REQUIRE((*tree.find(25, false)).key == 50);
     REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
                                std::list<uint32_t>{50}));
     REQUIRE(std::ranges::equal(
@@ -159,8 +159,8 @@ TEST_CASE("FreeBlocksTreeTests") {
     REQUIRE(ftree1.size() == 1);
     REQUIRE(ftree2.size() == 1);
     REQUIRE(ftree3.empty());
-    REQUIRE(tree.find(150, false)->key == 50);
-    REQUIRE(tree.find(250, false)->key == 160);
+    REQUIRE((*tree.find(150, false)).key == 50);
+    REQUIRE((*tree.find(250, false)).key == 160);
     REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
                                std::list<uint32_t>{50, 160}));
     REQUIRE(std::ranges::equal(
@@ -173,9 +173,9 @@ TEST_CASE("FreeBlocksTreeTests") {
     REQUIRE(ftree1.empty());
     REQUIRE(ftree2.size() == 1);
     REQUIRE(ftree3.empty());
-    REQUIRE(tree.find(150, false)->key == 160);
-    REQUIRE(tree.find(250, false)->key == 160);
-    REQUIRE(tree.find(25, false)->key == 160);
+    REQUIRE((*tree.find(150, false)).key == 160);
+    REQUIRE((*tree.find(250, false)).key == 160);
+    REQUIRE((*tree.find(25, false)).key == 160);
     REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
                                std::list<uint32_t>{160}));
     REQUIRE(std::ranges::equal(
@@ -192,7 +192,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     auto it = tree.begin();
     uint32_t steps = 0;
     while (it != tree.end()) {
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
       ++it;
       ++steps;
     }
@@ -201,7 +201,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     while (it != tree.begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
@@ -209,13 +209,13 @@ TEST_CASE("FreeBlocksTreeTests") {
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
-    REQUIRE(it->key == 20);
+    REQUIRE((*it).key == 20);
   }
 }

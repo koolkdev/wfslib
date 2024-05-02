@@ -8,10 +8,9 @@
 #include "ptree.h"
 
 template <>
-PTreeNode<PTreeNode_details>::const_iterator split_point(
-    const PTreeNode<PTreeNode_details>& node,
-    const typename PTreeNode<PTreeNode_details>::const_iterator& pos,
-    key_type& split_key) {
+PTreeNode<PTreeNode_details>::iterator split_point(const PTreeNode<PTreeNode_details>& node,
+                                                   const typename PTreeNode<PTreeNode_details>::iterator& pos,
+                                                   key_type& split_key) {
   assert(node.begin() <= pos && pos <= node.end());
   assert(node.full());
   auto res = pos;
@@ -28,6 +27,6 @@ PTreeNode<PTreeNode_details>::const_iterator split_point(
       res = node.begin() + 4;
       break;
   }
-  split_key = res->key;
+  split_key = (*res).key;
   return res;
 }

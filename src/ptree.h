@@ -21,15 +21,14 @@
 class Block;
 
 template <typename T>
-PTreeNode<T>::const_iterator split_point(const PTreeNode<T>& node,
-                                         const typename PTreeNode<T>::const_iterator& pos,
-                                         key_type& split_key);
+PTreeNode<T>::iterator split_point(const PTreeNode<T>& node,
+                                   const typename PTreeNode<T>::iterator& pos,
+                                   key_type& split_key);
 
 template <>
-PTreeNode<PTreeNode_details>::const_iterator split_point(
-    const PTreeNode<PTreeNode_details>& node,
-    const typename PTreeNode<PTreeNode_details>::const_iterator& pos,
-    key_type& split_key);
+PTreeNode<PTreeNode_details>::iterator split_point(const PTreeNode<PTreeNode_details>& node,
+                                                   const typename PTreeNode<PTreeNode_details>::iterator& pos,
+                                                   key_type& split_key);
 
 class NodeRefCreator {
  public:
@@ -37,32 +36,25 @@ class NodeRefCreator {
 };
 
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
-class PTreeConstIterator {
+class PTreeIterator {
  public:
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = int;
   using value_type = typename PTreeNodeIterator<LeafNodeDetails>::value_type;
   using ref_type = typename PTreeNodeIterator<LeafNodeDetails>::ref_type;
 
-  using const_reference = typename PTreeNodeConstIterator<LeafNodeDetails>::const_reference;
-  using const_pointer = typename PTreeNodeConstIterator<LeafNodeDetails>::const_pointer;
-
-  using reference = const_reference;
-  using pointer = const_pointer;
+  using reference = typename PTreeNodeIterator<LeafNodeDetails>::reference;
 
   using parent_node_info = node_iterator_info<PTreeNode<ParentNodeDetails>>;
   using leaf_node_info = node_iterator_info<PTreeNode<LeafNodeDetails>>;
 
-  PTreeConstIterator() = default;
-  PTreeConstIterator(const NodeRefCreator* ptree,
-                     std::vector<parent_node_info> parents,
-                     std::optional<leaf_node_info> leaf)
+  PTreeIterator() = default;
+  PTreeIterator(const NodeRefCreator* ptree, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
       : ptree_(ptree), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
   reference operator*() const { return *leaf_->iterator; }
-  pointer operator->() const& { return leaf_->iterator.operator->(); }
 
-  PTreeConstIterator& operator++() {
+  PTreeIterator& operator++() {
     assert(!is_end());
     if ((++leaf_->iterator).is_end()) {
       if (parents_.empty())
@@ -76,12 +68,12 @@ class PTreeConstIterator {
           return *this;  // end
         }
       }
-      uint16_t node_offset = rparent->iterator->value;
+      uint16_t node_offset = (*rparent->iterator).value;
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{ptree_->get_node_ref(node_offset)}};
         new_parent.iterator = new_parent.node->begin();
         *parent = std::move(new_parent);
-        node_offset = parent->iterator->value;
+        node_offset = (*parent->iterator).value;
       }
       leaf_node_info new_leaf{{ptree_->get_node_ref(node_offset)}};
       new_leaf.iterator = new_leaf.node->begin();
@@ -90,7 +82,7 @@ class PTreeConstIterator {
     return *this;
   }
 
-  PTreeConstIterator& operator--() {
+  PTreeIterator& operator--() {
     assert(!is_begin());
     if (leaf_->iterator.is_begin()) {
       if (parents_.empty())
@@ -100,13 +92,13 @@ class PTreeConstIterator {
         if (++rparent == parents_.rend())
           return *this;  // begin
       }
-      uint16_t node_offset = (--rparent->iterator)->value;
+      uint16_t node_offset = (*--rparent->iterator).value;
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{ptree_->get_node_ref(node_offset)}};
         new_parent.iterator = new_parent.node->end();
         --new_parent.iterator;
         *parent = std::move(new_parent);
-        node_offset = parent->iterator->value;
+        node_offset = (*parent->iterator).value;
       }
       leaf_node_info new_leaf{{ptree_->get_node_ref(node_offset)}};
       new_leaf.iterator = new_leaf.node->end();
@@ -116,19 +108,19 @@ class PTreeConstIterator {
     return *this;
   }
 
-  PTreeConstIterator operator++(int) {
-    PTreeConstIterator tmp(*this);
+  PTreeIterator operator++(int) {
+    PTreeIterator tmp(*this);
     ++(*this);
     return tmp;
   }
 
-  PTreeConstIterator operator--(int) {
-    PTreeConstIterator tmp(*this);
+  PTreeIterator operator--(int) {
+    PTreeIterator tmp(*this);
     --(*this);
     return tmp;
   }
 
-  bool operator==(const PTreeConstIterator& other) const {
+  bool operator==(const PTreeIterator& other) const {
     if (!leaf_ || !other.leaf_)
       return !leaf_ && !other.leaf_;  // to do need to check that belongs to same PTRee
     return leaf_->iterator == other.leaf_->iterator;
@@ -151,67 +143,17 @@ class PTreeConstIterator {
   std::optional<leaf_node_info> leaf_;
 };
 
-template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
-class PTreeIterator : public PTreeConstIterator<ParentNodeDetails, LeafNodeDetails> {
- public:
-  using base = PTreeConstIterator<ParentNodeDetails, LeafNodeDetails>;
-
-  using iterator_category = std::bidirectional_iterator_tag;
-  using difference_type = int;
-  using value_type = base::value_type;
-  using ref_type = base::ref_type;
-
-  using reference = ref_type;
-  using pointer = ref_type*;
-
-  using parent_node_info = base::parent_node_info;
-  using leaf_node_info = base::leaf_node_info;
-
-  PTreeIterator() = default;
-  PTreeIterator(const NodeRefCreator* ptree, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
-      : base(ptree, std::move(parents), std::move(leaf)) {}
-
-  reference operator*() const { return *base::leaf().iterator; }
-  pointer operator->() const& { return base::leaf().iterator.operator->(); }
-
-  PTreeIterator& operator++() {
-    base::operator++();
-    return *this;
-  }
-
-  PTreeIterator& operator--() {
-    base::operator--();
-    return *this;
-  }
-
-  PTreeIterator operator++(int) {
-    PTreeIterator tmp(*this);
-    ++(*this);
-    return tmp;
-  }
-
-  PTreeIterator operator--(int) {
-    PTreeIterator tmp(*this);
-    --(*this);
-    return tmp;
-  }
-
-  bool operator==(const PTreeIterator& other) const { return base::operator==(other); }
-};
-
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails, typename AllocatorArgs>
 class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
  public:
   using iterator = PTreeIterator<ParentNodeDetails, LeafNodeDetails>;
-  using const_iterator = PTreeConstIterator<ParentNodeDetails, LeafNodeDetails>;
-  using reverse_iterator = TreeReverseIterator<iterator>;
-  using const_reverse_iterator = TreeReverseIterator<const_iterator>;
-
   static_assert(std::bidirectional_iterator<iterator>);
-  static_assert(std::bidirectional_iterator<const_iterator>);
 
   using parent_node = PTreeNode<ParentNodeDetails>;
   using leaf_node = PTreeNode<LeafNodeDetails>;
+
+  static_assert(std::ranges::bidirectional_range<parent_node>);
+  static_assert(std::ranges::bidirectional_range<leaf_node>);
 
   PTree(std::shared_ptr<Block> block) : TreeNodesAllocator<AllocatorArgs>(std::move(block)) {}
   virtual ~PTree() = default;
@@ -225,31 +167,64 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
   size_t size() const { return header()->items_count.value(); }
   bool empty() const { return size() == 0; }
 
-  iterator begin() { return begin_impl(); }
-  iterator end() { return end_impl(); }
-  const_iterator begin() const { return begin_impl(); }
-  const_iterator end() const { return end_impl(); }
+  iterator begin() const {
+    if (size() == 0)
+      return {this, {}, std::nullopt};
+    std::vector<typename iterator::parent_node_info> parents;
+    uint16_t node_offset = header()->root_offset.value();
+    for (int i = 0; i < header()->tree_depth.value(); ++i) {
+      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
+      parent.iterator = parent.node->begin();
+      parents.push_back(std::move(parent));
+      node_offset = (*parents.back().iterator).value;
+    }
+    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
+    leaf.iterator = leaf.node->begin();
+    return {this, std::move(parents), std::move(leaf)};
+  }
 
-  reverse_iterator rbegin() { return reverse_iterator{end()}; }
-  reverse_iterator rend() { return reverse_iterator{begin()}; }
-  const_reverse_iterator rbegin() const { return const_reverse_iterator{end()}; }
-  const_reverse_iterator rend() const { return const_reverse_iterator{begin()}; }
+  iterator end() const {
+    if (size() == 0)
+      return {this, {}, std::nullopt};
+    std::vector<typename iterator::parent_node_info> parents;
+    uint16_t node_offset = header()->root_offset.value();
+    for (int i = 0; i < header()->tree_depth.value(); ++i) {
+      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
+      parent.iterator = parent.node->end();
+      --parent.iterator;
+      parents.push_back(std::move(parent));
+      node_offset = (*parents.back().iterator).value;
+    }
+    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
+    leaf.iterator = leaf.node->end();
+    return {this, std::move(parents), std::move(leaf)};
+  }
 
-  const_iterator middle() const {
+  iterator middle() const {
     auto it = begin();
-    for ([[maybe_unused]] auto _ : std::views::iota(0, header()->items_count.value() / 2)) {
+    for ([[maybe_unused]] auto _ : std::views::iota(size_t{0}, size() / 2)) {
       ++it;
     }
     return it;
   }
+  iterator find(key_type key, bool exact_match = true) const {
+    if (size() == 0)
+      return {this, {}, std::nullopt};  // TODO empty tree iterator constructor
+    std::vector<typename iterator::parent_node_info> parents;
+    uint16_t node_offset = header()->root_offset.value();
+    for (int i = 0; i < header()->tree_depth.value(); ++i) {
+      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
+      parent.iterator = parent.node->find(key, false);
+      assert(!parent.iterator.is_end());
+      parents.push_back(std::move(parent));
+      node_offset = (*parents.back().iterator).value;
+    }
+    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
+    leaf.iterator = leaf.node->find(key, exact_match);
+    return {this, std::move(parents), std::move(leaf)};
+  }
 
-  const_iterator cbegin() const { return begin(); }
-  const_iterator cend() const { return end(); }
-
-  iterator find(key_type key, bool exact_match = true) { return find_impl(key, exact_match); }
-  const_iterator find(key_type key, bool exact_match = true) const { return find_impl(key, exact_match); }
-
-  LeafNodeDetails* grow_tree(const const_iterator& pos, key_type split_key) {
+  LeafNodeDetails* grow_tree(const iterator& pos, key_type split_key) {
     uint16_t nodes_to_alloc = 1;
     auto parent = pos.parents().rbegin();
     while (parent != pos.parents().rend() && parent->node->full()) {
@@ -280,7 +255,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
         // We need to insert it first or we will loose the the key. (since we don't store the key for [0])
         new_node.insert(new_node.begin(), {child_split_key, child_node_offset});
       }
-      new_node.insert(new_node.end(), parent_split_pos, parent->node->cend());
+      new_node.insert(new_node.end(), parent_split_pos, parent->node->end());
       parent->node->erase(parent_split_pos, parent->node->end());
       if (child_split_key > split_key) {
         new_node.insert(new_node.begin() + ((parent->iterator - parent_split_pos) + 1),
@@ -309,14 +284,14 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
 
   bool insert(const typename iterator::value_type& key_val) {
     auto pos = find(key_val.key, false);
-    if (!pos.is_end() && pos->key == key_val.key) {
+    if (!pos.is_end() && (*pos).key == key_val.key) {
       // key already exists
       return false;
     }
     return insert(pos, key_val);
   }
 
-  bool insert(const const_iterator& pos, const typename iterator::value_type& key_val) {
+  bool insert(const iterator& pos, const typename iterator::value_type& key_val) {
     auto items_count = header()->items_count.value();
     if (items_count == 0) {
       // first item in tree
@@ -335,7 +310,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
       header->tree_depth = 0;
       return true;
     }
-    auto leaf_pos_to_insert = key_val.key < pos->key ? pos.leaf().iterator : pos.leaf().iterator + 1;
+    auto leaf_pos_to_insert = key_val.key < (*pos).key ? pos.leaf().iterator : pos.leaf().iterator + 1;
     if (!pos.leaf().node->full()) {
       // We have place to add the new key/val
       pos.leaf().node->insert(leaf_pos_to_insert, key_val);
@@ -349,7 +324,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
       return false;
     leaf_node new_node{get_node_ref(this->to_offset(node)), 0};
     new_node.clear(true);
-    new_node.insert(new_node.begin(), split_pos, pos.leaf().node->cend());
+    new_node.insert(new_node.begin(), split_pos, pos.leaf().node->end());
     pos.leaf().node->erase(split_pos, pos.leaf().node->end());
     if (key_val.key >= split_key) {
       new_node.insert(new_node.begin() + (leaf_pos_to_insert - split_pos), key_val);
@@ -360,7 +335,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
     return true;
   }
 
-  bool insert(const const_iterator& it_start, const const_iterator& it_end) {
+  bool insert(const iterator& it_start, const iterator& it_end) {
     for (const auto& val : std::ranges::subrange(it_start, it_end)) {
       if (!insert(val))
         return false;
@@ -368,7 +343,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
     return true;
   }
 
-  bool insert_compact(const const_iterator& it_start, const const_iterator& it_end) {
+  bool insert_compact(const iterator& it_start, const iterator& it_end) {
     if (!empty()) {
       assert(false);
       return false;
@@ -388,7 +363,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
       }
       new_node.insert(new_node.begin(), range_start, it);
       header->items_count += static_cast<uint16_t>(new_node.size());
-      current_nodes.push_back({new_node.begin()->key, this->to_offset(node)});
+      current_nodes.push_back({(*new_node.begin()).key, this->to_offset(node)});
     }
 
     // Create the tree
@@ -415,7 +390,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
     return true;
   }
 
-  void erase(const const_iterator& pos) {
+  void erase(const iterator& pos) {
     pos.leaf().node->erase(pos.leaf().iterator);
     if (pos.leaf().node->empty()) {
       this->Free(pos.leaf().node->node(), 1);
@@ -442,7 +417,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
     ;
   }
 
-  void erase(const const_iterator& it_start, const const_iterator& it_end) {
+  void erase(const iterator& it_start, const iterator& it_end) {
     // Iterating from last to first is safe as the iterator will always be valid after operator--. It isn't true in the
     // other direction.
     auto it = it_end;
@@ -451,70 +426,19 @@ class PTree : public TreeNodesAllocator<AllocatorArgs>, public NodeRefCreator {
     }
   }
 
-  void split(PTree& left, PTree& right, const const_iterator& pos) const {
+  void split(PTree& left, PTree& right, const iterator& pos) const {
     left.insert(begin(), pos);
     right.insert(pos, end());
   }
 
-  void split(PTree& right, const_iterator& pos) {
+  void split(PTree& right, iterator& pos) {
     auto end_pos = end();
     right.insert(pos, end_pos);
     erase(pos, end_pos);
   }
 
-  void split_compact(PTree& left, PTree& right, const const_iterator& pos) const {
+  void split_compact(PTree& left, PTree& right, const iterator& pos) const {
     left.insert_compact(begin(), pos);
     right.insert_compact(pos, end());
-  }
-
- private:
-  iterator begin_impl() const {
-    if (size() == 0)
-      return {this, {}, std::nullopt};
-    std::vector<typename iterator::parent_node_info> parents;
-    uint16_t node_offset = header()->root_offset.value();
-    for (int i = 0; i < header()->tree_depth.value(); ++i) {
-      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
-      parent.iterator = parent.node->begin();
-      parents.push_back(std::move(parent));
-      node_offset = parents.back().iterator->value;
-    }
-    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
-    leaf.iterator = leaf.node->begin();
-    return {this, std::move(parents), std::move(leaf)};
-  }
-
-  iterator end_impl() const {
-    if (size() == 0)
-      return {this, {}, std::nullopt};
-    std::vector<typename iterator::parent_node_info> parents;
-    uint16_t node_offset = header()->root_offset.value();
-    for (int i = 0; i < header()->tree_depth.value(); ++i) {
-      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
-      parent.iterator = parent.node->end();
-      --parent.iterator;
-      parents.push_back(std::move(parent));
-      node_offset = parents.back().iterator->value;
-    }
-    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
-    leaf.iterator = leaf.node->end();
-    return {this, std::move(parents), std::move(leaf)};
-  }
-
-  iterator find_impl(key_type key, bool exact_match = true) const {
-    if (size() == 0)
-      return {this, {}, std::nullopt};  // TODO empty tree iterator constructor
-    std::vector<typename iterator::parent_node_info> parents;
-    uint16_t node_offset = header()->root_offset.value();
-    for (int i = 0; i < header()->tree_depth.value(); ++i) {
-      typename iterator::parent_node_info parent{{get_node_ref(node_offset)}};
-      parent.iterator = parent.node->find(key, false);
-      assert(!parent.iterator.is_end());
-      parents.push_back(std::move(parent));
-      node_offset = parents.back().iterator->value;
-    }
-    typename iterator::leaf_node_info leaf{{get_node_ref(node_offset)}};
-    leaf.iterator = leaf.node->find(key, exact_match);
-    return {this, std::move(parents), std::move(leaf)};
   }
 };

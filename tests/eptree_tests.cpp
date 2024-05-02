@@ -68,7 +68,7 @@ TEST_CASE("EPTreeTests") {
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(eptree.find(i, true)->key == i);
+      REQUIRE((*eptree.find(i, true)).key == i);
     }
   }
 
@@ -110,7 +110,7 @@ TEST_CASE("EPTreeTests") {
     auto it = eptree.begin();
     uint32_t steps = 0;
     while (it != eptree.end()) {
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
       ++it;
       ++steps;
     }
@@ -119,7 +119,7 @@ TEST_CASE("EPTreeTests") {
     while (it != eptree.begin()) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
@@ -127,13 +127,13 @@ TEST_CASE("EPTreeTests") {
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE(it->key == steps);
+      REQUIRE((*it).key == steps);
     }
-    REQUIRE(it->key == 20);
+    REQUIRE((*it).key == 20);
   }
 }
