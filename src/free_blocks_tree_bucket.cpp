@@ -9,47 +9,6 @@
 
 #include <optional>
 
-FreeBlocksTreeBucketIterator& FreeBlocksTreeBucketIterator::operator++() {
-  assert(!is_end());
-  ++ftree_.iterator;
-  while (ftree_.iterator.is_end()) {
-    if ((++eptree_.iterator).is_end()) {
-      --eptree_.iterator;
-      return *this;  // end
-    }
-
-    ftree_ = {{allocator_->LoadAllocatorBlock((*eptree_.iterator).value), block_size_index_}};
-    ftree_.iterator = ftree_.node->begin();
-  }
-  return *this;
-}
-
-FreeBlocksTreeBucketIterator& FreeBlocksTreeBucketIterator::operator--() {
-  assert(!is_begin());
-  while (ftree_.iterator.is_begin()) {
-    if (eptree_.iterator.is_begin()) {
-      return *this;  // begin
-    }
-
-    ftree_ = {{allocator_->LoadAllocatorBlock((*--eptree_.iterator).value), block_size_index_}};
-    ftree_.iterator = ftree_.node->end();
-  }
-  --ftree_.iterator;
-  return *this;
-}
-
-FreeBlocksTreeBucketIterator FreeBlocksTreeBucketIterator::operator++(int) {
-  FreeBlocksTreeBucketIterator tmp(*this);
-  ++(*this);
-  return tmp;
-}
-
-FreeBlocksTreeBucketIterator FreeBlocksTreeBucketIterator::operator--(int) {
-  FreeBlocksTreeBucketIterator tmp(*this);
-  --(*this);
-  return tmp;
-}
-
 bool FreeBlocksTreeBucket::insert(FTree::iterator::value_type key_val) {
   auto pos = find_for_insert(key_val.key);
   if (!pos.is_end() && (*pos).key == key_val.key) {
