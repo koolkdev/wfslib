@@ -15,13 +15,7 @@
 
 class QuotaArea;
 
-struct AttributesRef {
-  std::shared_ptr<Block> block;
-  size_t offset;
-
-  const Attributes* get() const { return block->get_object<Attributes>(offset); }
-  Attributes* get_mutable() const { return block->get_mutable_object<Attributes>(offset); }
-};
+using AttributesRef = Block::DataRef<Attributes>;
 
 class WfsItem {
  public:
@@ -39,6 +33,7 @@ class WfsItem {
                                                                 AttributesRef attributes_ref);
 
  protected:
+  // TODO: Attributes copy as it can change?
   Attributes* mutable_attributes() { return attributes_.get_mutable(); }
   const Attributes* attributes() const { return attributes_.get(); }
   const std::shared_ptr<Block>& attributes_block() const { return attributes_.block; }

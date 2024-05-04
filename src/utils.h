@@ -33,13 +33,25 @@ class big_endian_type {
     *this = value() - val;
     return *this;
   }
-  big_endian_type& operator++(int) {
+  big_endian_type& operator++() {
     *this += 1;
     return *this;
   }
-  big_endian_type& operator--(int) {
+  big_endian_type& operator--() {
     *this += 1;
     return *this;
+  }
+
+  big_endian_type operator++(int) {
+    big_endian_type tmp(*this);
+    ++(*this);
+    return tmp;
+  }
+
+  big_endian_type operator--(int) {
+    big_endian_type tmp(*this);
+    --(*this);
+    return tmp;
   }
 
   T value() const { return convert_endian(*data()); }

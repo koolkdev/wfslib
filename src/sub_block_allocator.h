@@ -24,13 +24,12 @@ class SubBlockAllocatorBase {
   uint16_t Alloc(uint16_t size);
   void Free(uint16_t offset, uint16_t size);
 
+  const std::shared_ptr<Block>& block() const { return block_; }
+
  protected:
   void Init(uint16_t extra_header_size);
 
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader); }
-
-  Block* block() { return block_.get(); }
-  const Block* block() const { return block_.get(); }
 
  private:
   SubBlockAllocatorStruct* mutable_header() {
@@ -47,14 +46,14 @@ class SubBlockAllocatorBase {
 };
 
 template <typename ExtraHeaderType>
-class SubBlockAllocator : SubBlockAllocatorBase {
+class SubBlockAllocator : public SubBlockAllocatorBase {
  public:
   SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
   void Init() { Init(sizeof(ExtraHeaderType)); }
 
   ExtraHeaderType* mutable_extra_header() {
-    return block()->template get_mutable_object<ExtraHeaderType>(header_offset());
+    return block()->template get_mutable_object<ExtraHeaderType>(extra_header_offset());
   }
   const ExtraHeaderType* extra_header() const {
     return block()->template get_object<ExtraHeaderType>(extra_header_offset());

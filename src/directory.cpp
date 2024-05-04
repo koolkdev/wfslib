@@ -7,16 +7,12 @@
 
 #include "directory.h"
 
-#include <ranges>
+#include <numeric>
 #include <utility>
 
 #include "file.h"
 #include "quota_area.h"
 #include "structs.h"
-#include "sub_block_allocator.h"
-
-using NodeState = DirectoryItemsIterator::NodeState;
-using DirectoryTree = SubBlockAllocator<DirectoryTreeHeader>;
 
 Directory::Directory(std::string name,
                      AttributesRef attributes,
@@ -25,10 +21,16 @@ Directory::Directory(std::string name,
     : WfsItem(std::move(name), std::move(attributes)), quota_(std::move(quota)), block_(std::move(block)) {}
 
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
-  const auto attributes_block = FindObjectAttributes(block_, name);
-  if (!attributes_block.has_value())
-    return std::unexpected(attributes_block.error());
-  return WfsItem::Load(quota_, name, *attributes_block);
+  try {
+    // TODO: Case insensitive
+    auto it = find(name);
+    if (it.is_end()) {
+      return std::unexpected(WfsError::kItemNotFound);
+    }
+    return (*it).item;
+  } catch (const WfsException& e) {
+    return std::unexpected(e.error());
+  }
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
@@ -53,114 +55,62 @@ std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::str
   return std::dynamic_pointer_cast<File>(*obj);
 }
 
-std::expected<AttributesRef, WfsError> Directory::FindObjectAttributes(const std::shared_ptr<Block>& block,
-                                                                       const std::string& name) const {
-  DirectoryTree dir_tree{block};
-  auto current_node = block->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
-  auto* header = block->get_object<MetadataBlockHeader>(0);
-  if (header->block_flags.value() & header->Flags::EXTERNAL_DIRECTORY_TREE) {
-    auto pos_in_path = name.begin();
-    while (true) {
-      auto external_node = static_cast<const ExternalDirectoryTreeNode*>(current_node);
-      auto prefix_length = current_node->prefix_length.value();
-      if (prefix_length > static_cast<size_t>(std::distance(pos_in_path, name.end()))) {
-        // not equal.. path too long
-        return std::unexpected(kItemNotFound);
-      }
-      auto case_insensitive_cmp = [](char expected_char, char prefix_char) {
-        // Ignore the case of the input name
-        return std::tolower(expected_char) == prefix_char;
-      };
-      if (prefix_length && !std::ranges::equal(std::ranges::subrange(pos_in_path, pos_in_path + prefix_length),
-                                               current_node->prefix_view(), case_insensitive_cmp)) {
-        // not equal.. not found
-        return std::unexpected(kItemNotFound);
-      }
-      pos_in_path += prefix_length;
-      char next_expected_char = 0;
-      if (pos_in_path < name.end())
-        next_expected_char = static_cast<char>(std::tolower(*pos_in_path));
-      auto choices = current_node->choices();
-      // This is sorted list, so we can find it with lower_bound
-      auto res = std::lower_bound(choices.begin(), choices.end(), std::byte{(uint8_t)next_expected_char});
-      if (res == choices.end() || std::to_integer<char>(*res) != next_expected_char) {
-        // Not found
-        return std::unexpected(kItemNotFound);
-      }
-      auto value_offset = external_node->get_item(res - choices.begin()).value();
-      if (pos_in_path == name.end()) {
-        // We found the attribute!
-        return AttributesRef{block, value_offset};
-      }
-      pos_in_path++;
-      // Go to next node
-      current_node = block->get_object<DirectoryTreeNode>(value_offset);
-    }
-  } else {
-    // Arghh, trees over trees
-    auto node_state = std::make_shared<NodeState>(NodeState{block, current_node, nullptr, 0, current_node->prefix()});
-    // -- because it will be advanced immedialty to 0 when we do ++
-    --node_state->current_index;
-    uint32_t last_block_number = 0;
-    while (true) {
-      if (++(node_state->current_index) == node_state->node->choices_count.value()) {
-        // Got to the end of the node, go up
-        node_state = std::move(node_state->parent);
-        if (!node_state)
-          break;
-        continue;
-      }
-      // Enter nodes until we hit a node that has value
-      while (node_state->node->choices()[node_state->current_index] != std::byte{0}) {
-        auto node_block = node_state->block;
-        uint16_t node_offset = 0;
-        node_offset = static_cast<const InternalDirectoryTreeNode*>(node_state->node)
-                          ->get_item(node_state->current_index)
-                          .value();
-        current_node = block->get_object<DirectoryTreeNode>(node_offset);
-        std::string path =
-            node_state->path +
-            std::string(1, std::to_integer<char>(node_state->node->choices()[node_state->current_index])) +
-            current_node->prefix();
-        node_state = std::make_shared<NodeState>(NodeState{node_block, current_node, std::move(node_state), 0, path});
-      }
-      // Check if our string is lexicographic smaller
-      if (node_state->path.size() &&
-          std::strncmp(&*name.begin(), &*node_state->path.begin(), std::min(name.size(), node_state->path.size())) < 0)
-        break;
-      last_block_number =
-          static_cast<const InternalDirectoryTreeNode*>(node_state->node)->get_next_allocator_block_number().value();
-      if (node_state->path == name)
-        break;  // No need to continue with the search
-    }
-    if (!last_block_number) {
-      // Not found
-      return std::unexpected(kItemNotFound);
-    }
-    auto next_block = quota_->LoadMetadataBlock(last_block_number);
-    if (!next_block.has_value())
-      return std::unexpected(kDirectoryCorrupted);
-    return FindObjectAttributes(std::move(*next_block), name);
+Directory::iterator Directory::begin() const {
+  auto current_block = block_;
+  std::deque<iterator::parent_node_info> parents;
+  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
+    parents.push_back({std::move(current_block)});
+    parents.back().iterator = parents.back().node->begin();
+    assert(!parents.back().iterator.is_end());
+    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value));
   }
+  iterator::leaf_node_info leaf{std::move(current_block)};
+  leaf.iterator = leaf.node->begin();
+  assert(!leaf.iterator.is_end());
+  return {quota_, std::move(parents), std::move(leaf)};
 }
 
-size_t Directory::Size() const {
-  return std::distance(begin(), end());
+Directory::iterator Directory::end() const {
+  auto current_block = block_;
+  std::deque<iterator::parent_node_info> parents;
+  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
+    parents.push_back({std::move(current_block)});
+    parents.back().iterator = parents.back().node->end();
+    assert(!parents.back().iterator.is_begin());
+    current_block = throw_if_error(quota_->LoadMetadataBlock((*--parents.back().iterator).value));
+  }
+  iterator::leaf_node_info leaf{std::move(current_block)};
+  leaf.iterator = leaf.node->end();
+  return {quota_, std::move(parents), std::move(leaf)};
 }
 
-DirectoryItemsIterator Directory::begin() const {
-  DirectoryTree dir_tree{block_};
-  auto current_node = block_->get_object<DirectoryTreeNode>(dir_tree.extra_header()->root.value());
-  if (!current_node->choices_count.value())
+Directory::iterator Directory::find(std::string_view key, bool exact_match) const {
+  if (size() == 0)
     return end();
-  auto node_state = std::make_shared<NodeState>(NodeState{block_, current_node, nullptr, 0, current_node->prefix()});
-  // -- because it will be advanced immedialty to 0 when we do ++
-  --node_state->current_index;
-  auto res = DirectoryItemsIterator(shared_from_this(), std::move(node_state));
-  ++res;
-  return res;
+  auto current_block = block_;
+  std::deque<iterator::parent_node_info> parents;
+  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
+    parents.push_back({std::move(current_block)});
+    parents.back().iterator = parents.back().node->find(key, /*exact_match=*/false);
+    assert(!parents.back().iterator.is_end());
+    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value));
+  }
+  iterator::leaf_node_info leaf{std::move(current_block)};
+  leaf.iterator = leaf.node->find(key, exact_match);
+  return {quota_, std::move(parents), std::move(leaf)};
 }
 
-DirectoryItemsIterator Directory::end() const {
-  return DirectoryItemsIterator(shared_from_this(), nullptr);
-}
+size_t Directory::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const {
+  if (block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+      MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE) {
+    return DirectoryLeafTree{std::move(block)}.size();
+  } else {
+    DirectoryParentTree tree{std::move(block)};
+    return std::accumulate(tree.begin(), tree.end(), size_t{0}, [&](auto acc, const auto& node) {
+      return acc + CalcSizeOfDirectoryBlock(throw_if_error(quota_->LoadMetadataBlock(node.value)));
+    });
+  }
+};
