@@ -44,7 +44,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + 1);
     *res = key_val;
     ++node_->keys_count;
-    assert(node_.node_size == node_.get_node_size());
+    assert(node_.node_size == node_.get_node_size(node_.get()));
     return res;
   }
 
@@ -61,7 +61,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + items);
     std::copy(start_it, end_it, res);
     node_->keys_count += items;
-    assert(node_.node_size == node_.get_node_size());
+    assert(node_.node_size == node_.get_node_size(node_.get()));
     return res;
   }
 
@@ -72,7 +72,7 @@ class DirectoryTreeNode {
     std::copy(pos + 1, end(), res);
     std::fill(new_end, end(), 0);
     --node_->keys_count;
-    assert(node_.node_size == node_.get_node_size());
+    assert(node_.node_size == node_.get_node_size(node_.get()));
     return res;
   }
 

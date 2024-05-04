@@ -22,6 +22,7 @@ Directory::Directory(std::string name,
 
 std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std::string& name) const {
   try {
+    // TODO: Case insensitive
     auto it = find(name);
     if (it.is_end()) {
       return std::unexpected(WfsError::kItemNotFound);

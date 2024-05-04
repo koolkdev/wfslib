@@ -17,6 +17,8 @@ DirectoryIterator::DirectoryIterator(std::shared_ptr<QuotaArea> quota,
 
 DirectoryIterator::reference DirectoryIterator::operator*() const {
   auto val = *leaf_.iterator;
+  // TODO: return key case sensitive?
+  // TODO: Maybe have an attributes iteration and a wrapper for WfsItem iteration
   return {val.key, WfsItem::Load(quota_, val.key, attributes())};
 }
 
