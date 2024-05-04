@@ -17,8 +17,42 @@
 
 class BlocksDevice;
 
+class Block;
+
+template <typename T>
+concept BlockRefObj = requires(const T& block_ref) {
+                        { block_ref.operator->() } -> std::same_as<Block*>;
+                      };
+
+template <typename T>
+concept BlockRef = std::same_as<T, Block*> || BlockRefObj<T>;
+
 class Block {
  public:
+  template <typename T, BlockRef BlockRefType>
+  struct DataRefBase {
+    BlockRefType block;
+    size_t offset;
+
+    const T* get() const { return block->template get_object<T>(offset); }
+    T* get_mutable() const { return block->template get_mutable_object<T>(offset); }
+
+    auto operator<=>(const DataRefBase& other) const {
+      if (const auto res = block <=> other.block; res != 0)
+        return res;
+      return offset <=> other.offset;
+    }
+    bool operator==(const DataRefBase& other) const { return block == other.block && offset == other.offset; }
+
+    const T* operator->() const { return get(); }
+    T* operator->() { return get_mutable(); }
+  };
+
+  template <typename T>
+  struct DataRef : public DataRefBase<T, std::shared_ptr<Block>> {};
+  template <typename T>
+  struct RawDataRef : public DataRefBase<T, Block*> {};
+
   enum BlockSize {
     Basic = 12,
     Regular = 13,

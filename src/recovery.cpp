@@ -225,15 +225,13 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
     throw std::logic_error("Failed to find /usr/save/system");
   }
   std::shared_ptr<const Area> sub_area;
-  for (auto [name, item_or_error] : *system_save_dir) {
-    if (item_or_error.has_value())
-      continue;
+  for (auto it = system_save_dir->begin(); it != system_save_dir->end(); ++it) {
     // this is probably a corrupted quota, let's check
-    const auto attributes = system_save_dir->FindObjectAttributes(system_save_dir->block_, name);
-    if (!attributes.has_value() || !attributes->get()->is_quota())
+    const auto attributes = it.attributes();
+    if (!attributes.get()->is_quota())
       continue;
     // ok this is quota
-    auto new_quota = system_save_dir->quota()->LoadQuotaArea(attributes->get()->directory_block_number.value(),
+    auto new_quota = system_save_dir->quota()->LoadQuotaArea(attributes.get()->directory_block_number.value(),
                                                              Block::BlockSize::Regular);
     if (!new_quota.has_value())
       return std::unexpected(new_quota.error());

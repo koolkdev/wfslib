@@ -26,11 +26,12 @@ struct MetadataBlockHeader {
   enum Flags : uint32_t {
     AREA = 0x00400000,
     ROOT_AREA = 0x00800000,
-    EXTERNAL_DIRECTORY_TREE = 0x20000000,
-    UNKNOWN = 0x40000000,
+    DIRECTORY_LEAF_TREE = 0x20000000,
+    DIRECTORY_ROOT_TREE = 0x40000000,
     DIRECTORY = 0x80000000,
   };
-  uint32_be_t block_flags;  // 20 least bits ignored
+  uint32_be_t
+      block_flags;  // 20 least bits ignored, they are used as some kind of unique id to track directory iterators
   uint8_be_t hash[20];
 };
 static_assert(sizeof(MetadataBlockHeader) == 0x18, "Incorrect sizeof MetadataBlockHeader");
@@ -195,43 +196,11 @@ struct DirectoryTreeHeader {
 };
 static_assert(sizeof(DirectoryTreeHeader) == 0x4, "Incorrect sizeofDirectoryTreeHeader");
 
-struct DirectoryTreeNode {
+struct DirectoryTreeNodeHeader {
   uint8_be_t prefix_length;
-  uint8_be_t choices_count;
-
- public:
-  std::string prefix() const { return {prefix_view().begin(), prefix_view().end()}; }
-  std::string_view prefix_view() const { return {reinterpret_cast<const char*>(this + 1), prefix_length.value()}; }
-  std::span<const std::byte> choices() const {
-    return {reinterpret_cast<const std::byte*>(this + 1) + prefix_length.value(), choices_count.value()};
-  }
+  uint8_be_t keys_count;
 };
-static_assert(sizeof(DirectoryTreeNode) == 0x2, "Incorrect sizeof DirectoryTreeNode");
-
-struct ExternalDirectoryTreeNode : DirectoryTreeNode {
- private:
-  size_t size() const;
-
- public:
-  uint16_be_t get_item(size_t index) const {
-    return reinterpret_cast<const uint16_be_t*>(reinterpret_cast<const std::byte*>(this) +
-                                                size())[-static_cast<int>(index) - 1];
-  }
-};
-
-struct InternalDirectoryTreeNode : DirectoryTreeNode {
- private:
-  size_t size() const;
-
- public:
-  uint16_be_t get_item(size_t index) const {
-    return reinterpret_cast<const uint16_be_t*>(reinterpret_cast<const std::byte*>(this) + size() -
-                                                (choices()[0] == std::byte{0} ? 2 : 0))[-static_cast<int>(index) - 1];
-  }
-  uint32_be_t get_next_allocator_block_number() const {
-    return reinterpret_cast<const uint32_be_t*>(reinterpret_cast<const std::byte*>(this) + size())[-1];
-  }
-};
+static_assert(sizeof(DirectoryTreeNodeHeader) == 0x2, "Incorrect sizeof DirectoryTreeNodeHeader");
 
 struct FreeBlocksAllocatorHeader {
   uint32_be_t free_blocks_count;

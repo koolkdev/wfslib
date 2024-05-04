@@ -11,10 +11,10 @@
 
 #include "area.h"
 #include "errors.h"
+#include "wfs_item.h"
 
 class Directory;
 class FreeBlocksAllocator;
-struct AttributesRef;
 
 class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
  public:

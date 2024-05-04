@@ -30,6 +30,8 @@ class WfsException : public std::exception {
   WfsException(WfsError error) : error_(error) {}
   virtual char const* what() const noexcept override;
 
+  WfsError error() const { return error_; }
+
  private:
   WfsError error_;
 };
