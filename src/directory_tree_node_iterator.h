@@ -16,7 +16,7 @@ struct dir_tree_node_ref : public Block::RawDataRef<DirectoryTreeNodeHeader> {
 
   template <typename LeafValueType>
   static dir_tree_node_ref create(Block* block, uint16_t offset) {
-    return {block, offset, get_node_size<LeafValueType>(block->get_object<DirectoryTreeNodeHeader>(offset))};
+    return {{block, offset}, get_node_size<LeafValueType>(block->get_object<DirectoryTreeNodeHeader>(offset))};
   }
 
   dir_tree_key_type* mutable_key_ref(size_t index) { return get_key_ref(get_mutable(), index); }
