@@ -155,6 +155,8 @@ struct dir_tree_node_key_ref : protected dir_tree_node_item_ref_base {
 
 template <typename LeafValueType>
 struct dir_tree_node_value_ref : protected dir_tree_node_item_ref_base {
+  dir_tree_node_value_ref(const dir_tree_node_value_ref<LeafValueType>&) = default;
+
   operator dir_tree_value_type() const { return value_ref<LeafValueType>(index)->value(); }
 
   operator LeafValueType() const
