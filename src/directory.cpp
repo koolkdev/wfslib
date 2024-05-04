@@ -28,7 +28,7 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> Directory::GetObject(const std
       return std::unexpected(WfsError::kItemNotFound);
     }
     return (*it).item;
-  } catch (WfsException e) {
+  } catch (const WfsException& e) {
     return std::unexpected(e.error());
   }
 }
