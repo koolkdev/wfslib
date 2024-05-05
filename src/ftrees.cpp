@@ -68,7 +68,7 @@ FTrees::iterator FTrees::find(key_type key, bool exact_match) const {
     index = iterator::find_next_extent_index(before_keys, /*max=*/true);
     for (auto& before_it : before_keys) {
       // The rest of the before items should need to be after
-      if (before_it.node->index() != index)
+      if (before_it.node.index() != index)
         ++before_it.iterator;
     }
   } else {

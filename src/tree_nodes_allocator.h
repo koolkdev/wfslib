@@ -44,6 +44,7 @@ class TreeNodesAllocator {
 
   static_assert(entry_size >= sizeof(HeapFreelistEntry));
 
+  TreeNodesAllocator() = default;
   TreeNodesAllocator(const std::shared_ptr<Block>& block) : block_(block) {}
 
   void Init() {

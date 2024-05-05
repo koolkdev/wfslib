@@ -52,12 +52,12 @@ class PTreeIterator {
       uint16_t node_offset = (*rparent->iterator).value();
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{{block_, node_offset}}};
-        new_parent.iterator = new_parent.node->begin();
+        new_parent.iterator = new_parent.node.begin();
         *parent = std::move(new_parent);
         node_offset = (*parent->iterator).value();
       }
       leaf_node_info new_leaf{{{block_, node_offset}}};
-      new_leaf.iterator = new_leaf.node->begin();
+      new_leaf.iterator = new_leaf.node.begin();
       leaf_ = std::move(new_leaf);
     }
     return *this;
@@ -76,13 +76,13 @@ class PTreeIterator {
       uint16_t node_offset = (*--rparent->iterator).value();
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
         parent_node_info new_parent{{{block_, node_offset}}};
-        new_parent.iterator = new_parent.node->end();
+        new_parent.iterator = new_parent.node.end();
         --new_parent.iterator;
         *parent = std::move(new_parent);
         node_offset = (*parent->iterator).value();
       }
       leaf_node_info new_leaf{{{block_, node_offset}}};
-      new_leaf.iterator = new_leaf.node->end();
+      new_leaf.iterator = new_leaf.node.end();
       leaf_ = std::move(new_leaf);
     }
     --leaf_->iterator;

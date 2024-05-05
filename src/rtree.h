@@ -22,6 +22,7 @@ using EPTreeBlock = TreeNodesAllocator<EPTreeBlockArgs>;
 
 class RTree : public PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs> {
  public:
+  RTree() = default;
   RTree(std::shared_ptr<Block> block)
       : PTree<PTreeNode_details, RTreeLeaf_details, EPTreeBlockArgs>(std::move(block)) {}
 

@@ -16,6 +16,7 @@ class EPTree : public EPTreeBlock {
  public:
   using iterator = EPTreeIterator;
 
+  EPTree() = default;
   EPTree(FreeBlocksAllocator* allocator) : EPTreeBlock(allocator->root_block()), allocator_(allocator) {}
 
   void Init(uint32_t block_number);
@@ -27,7 +28,7 @@ class EPTree : public EPTreeBlock {
 
   bool insert(const iterator::value_type& key_value);
   bool insert(const RTree::iterator& it_start, const RTree::iterator& it_end);
-  void erase(const iterator& pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete);
+  void erase(iterator& pos, std::vector<FreeBlocksRangeInfo>& blocks_to_delete);
   bool erase(key_type key, std::vector<FreeBlocksRangeInfo>& blocks_to_delete);
 
  private:

@@ -18,6 +18,7 @@ class FTrees {
  public:
   using iterator = FTreesIterator;
 
+  FTrees() = default;
   FTrees(std::shared_ptr<Block> block)
       : ftrees_(CreateFTreeArray(std::move(block), std::make_index_sequence<kSizeBuckets.size()>{})) {}
 

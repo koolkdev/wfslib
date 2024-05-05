@@ -39,6 +39,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
   static_assert(std::ranges::bidirectional_range<parent_node>);
   static_assert(std::ranges::bidirectional_range<leaf_node>);
 
+  PTree() = default;
   PTree(std::shared_ptr<Block> block) : TreeNodesAllocator<AllocatorArgs>(std::move(block)) {}
   virtual ~PTree() = default;
 
@@ -55,12 +56,12 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     uint16_t node_offset = header()->root_offset.value();
     for (int i = 0; i < header()->tree_depth.value(); ++i) {
       typename iterator::parent_node_info parent{{{this->block().get(), node_offset}}};
-      parent.iterator = parent.node->begin();
+      parent.iterator = parent.node.begin();
       parents.push_back(std::move(parent));
       node_offset = (*parents.back().iterator).value();
     }
     typename iterator::leaf_node_info leaf{{{this->block().get(), node_offset}}};
-    leaf.iterator = leaf.node->begin();
+    leaf.iterator = leaf.node.begin();
     return {this->block().get(), std::move(parents), std::move(leaf)};
   }
 
@@ -71,13 +72,13 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     uint16_t node_offset = header()->root_offset.value();
     for (int i = 0; i < header()->tree_depth.value(); ++i) {
       typename iterator::parent_node_info parent{{{this->block().get(), node_offset}}};
-      parent.iterator = parent.node->end();
+      parent.iterator = parent.node.end();
       --parent.iterator;
       parents.push_back(std::move(parent));
       node_offset = (*parents.back().iterator).value();
     }
     typename iterator::leaf_node_info leaf{{{this->block().get(), node_offset}}};
-    leaf.iterator = leaf.node->end();
+    leaf.iterator = leaf.node.end();
     return {this->block().get(), std::move(parents), std::move(leaf)};
   }
 
@@ -95,20 +96,20 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     uint16_t node_offset = header()->root_offset.value();
     for (int i = 0; i < header()->tree_depth.value(); ++i) {
       typename iterator::parent_node_info parent{{{this->block().get(), node_offset}}};
-      parent.iterator = parent.node->find(key, false);
+      parent.iterator = parent.node.find(key, false);
       assert(!parent.iterator.is_end());
       parents.push_back(std::move(parent));
       node_offset = (*parents.back().iterator).value();
     }
     typename iterator::leaf_node_info leaf{{{this->block().get(), node_offset}}};
-    leaf.iterator = leaf.node->find(key, exact_match);
+    leaf.iterator = leaf.node.find(key, exact_match);
     return {this->block().get(), std::move(parents), std::move(leaf)};
   }
 
-  LeafNodeDetails* grow_tree(const iterator& pos, key_type split_key) {
+  LeafNodeDetails* grow_tree(iterator& pos, key_type split_key) {
     uint16_t nodes_to_alloc = 1;
     auto parent = pos.parents().rbegin();
-    while (parent != pos.parents().rend() && parent->node->full()) {
+    while (parent != pos.parents().rend() && parent->node.full()) {
       ++nodes_to_alloc;
       ++parent;
     }
@@ -127,22 +128,23 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     auto* node = &nodes[1];
     auto child_node_offset = this->to_offset(new_child_node);
     auto child_split_key = split_key;
-    for (parent = pos.parents().rbegin(); parent != pos.parents().rend() && parent->node->full(); ++parent) {
-      auto parent_split_pos = split_point(*parent->node, parent->iterator, split_key);
+    for (parent = pos.parents().rbegin(); parent != pos.parents().rend() && parent->node.full(); ++parent) {
+      auto parent_split_pos = split_point(parent->node, parent->iterator, split_key);
       uint16_t node_offset = this->to_offset(node++);
-      parent_node new_node{{this->block().get(), node_offset}, 0};
-      new_node.clear(true);
+      parent_node new_node{{this->block().get(), node_offset}};
+      new_node.clear();
+      auto new_node_it = new_node.begin();
       if (child_split_key == split_key) {
         // We need to insert it first or we will loose the the key. (since we don't store the key for [0])
-        new_node.insert(new_node.begin(), {child_split_key, child_node_offset});
+        new_node_it = new_node.insert(new_node_it, {child_split_key, child_node_offset}) + 1;
       }
-      new_node.insert(new_node.end(), parent_split_pos, parent->node->end());
-      parent->node->erase(parent_split_pos, parent->node->end());
+      new_node.insert(new_node_it, parent_split_pos, parent->node.end());
+      parent->node.erase(parent_split_pos, parent->node.end());
       if (child_split_key > split_key) {
         new_node.insert(new_node.begin() + ((parent->iterator - parent_split_pos) + 1),
                         {child_split_key, child_node_offset});
       } else if (child_split_key < split_key) {
-        parent->node->insert(parent->iterator + 1, {child_split_key, child_node_offset});
+        parent->node.insert(parent->iterator + 1, {child_split_key, child_node_offset});
       }
       child_node_offset = node_offset;
       child_split_key = split_key;
@@ -150,14 +152,14 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     if (parent == pos.parents().rend()) {
       // new root
       uint16_t node_offset = this->to_offset(node++);
-      parent_node new_node{{this->block().get(), node_offset}, 0};
-      new_node.clear(true);
-      new_node.insert(new_node.end(), {0, header()->root_offset.value()});
+      parent_node new_node{{this->block().get(), node_offset}};
+      new_node.clear();
+      new_node.insert(new_node.begin(), {0, header()->root_offset.value()});
       new_node.insert(new_node.end(), {child_split_key, child_node_offset});
       mutable_header()->root_offset = node_offset;
       mutable_header()->tree_depth = header()->tree_depth.value() + 1;
     } else {
-      parent->node->insert(parent->iterator + 1, {child_split_key, child_node_offset});
+      parent->node.insert(parent->iterator + 1, {child_split_key, child_node_offset});
     }
     assert(node - new_child_node == nodes_to_alloc);
     return reinterpret_cast<LeafNodeDetails*>(new_child_node);
@@ -172,7 +174,7 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     return insert(pos, key_val);
   }
 
-  bool insert(const iterator& pos, const typename iterator::value_type& key_val) {
+  bool insert(iterator& pos, const typename iterator::value_type& key_val) {
     auto items_count = header()->items_count.value();
     if (items_count == 0) {
       // first item in tree
@@ -182,8 +184,8 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
         return false;
       }
       uint16_t node_offset = this->to_offset(node);
-      leaf_node new_node{{this->block().get(), node_offset}, 0};
-      new_node.clear(true);
+      leaf_node new_node{{this->block().get(), node_offset}};
+      new_node.clear();
       new_node.insert(new_node.begin(), key_val);
       auto* header = mutable_header();
       header->items_count = 1;
@@ -192,25 +194,25 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
       return true;
     }
     auto leaf_pos_to_insert = key_val.key < (*pos).key() ? pos.leaf().iterator : pos.leaf().iterator + 1;
-    if (!pos.leaf().node->full()) {
+    if (!pos.leaf().node.full()) {
       // We have place to add the new key/val
-      pos.leaf().node->insert(leaf_pos_to_insert, key_val);
+      pos.leaf().node.insert(leaf_pos_to_insert, key_val);
       mutable_header()->items_count = items_count + 1;
       return true;
     }
     auto split_key = key_val.key;
-    auto split_pos = split_point(*pos.leaf().node, leaf_pos_to_insert, split_key);
+    auto split_pos = split_point(pos.leaf().node, leaf_pos_to_insert, split_key);
     auto* node = grow_tree(pos, split_key);
     if (!node)
       return false;
-    leaf_node new_node{{this->block().get(), this->to_offset(node)}, 0};
-    new_node.clear(true);
-    new_node.insert(new_node.begin(), split_pos, pos.leaf().node->end());
-    pos.leaf().node->erase(split_pos, pos.leaf().node->end());
+    leaf_node new_node{{this->block().get(), this->to_offset(node)}};
+    new_node.clear();
+    new_node.insert(new_node.begin(), split_pos, pos.leaf().node.end());
+    pos.leaf().node.erase(split_pos, pos.leaf().node.end());
     if (key_val.key >= split_key) {
       new_node.insert(new_node.begin() + (leaf_pos_to_insert - split_pos), key_val);
     } else {
-      pos.leaf().node->insert(leaf_pos_to_insert, key_val);
+      pos.leaf().node.insert(leaf_pos_to_insert, key_val);
     }
     mutable_header()->items_count = items_count + 1;
     return true;
@@ -236,8 +238,8 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     std::vector<typename PTreeNodeIterator<ParentNodeDetails>::value_type> current_nodes;
     for (auto it = it_start; it != it_end;) {
       auto* node = this->template Alloc<LeafNodeDetails>(1);
-      leaf_node new_node{{this->block().get(), this->to_offset(node)}, 0};
-      new_node.clear(true);
+      leaf_node new_node{{this->block().get(), this->to_offset(node)}};
+      new_node.clear();
       auto range_start = it;
       uint16_t added_items = 0;
       for (; added_items < 5 && it != it_end; ++added_items, ++it) {
@@ -253,8 +255,8 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
       std::vector<typename PTreeNodeIterator<ParentNodeDetails>::value_type> new_nodes;
       for (auto it = current_nodes.begin(); it != current_nodes.end();) {
         auto* node = this->template Alloc<ParentNodeDetails>(1);
-        parent_node new_node{{this->block().get(), this->to_offset(node)}, 0};
-        new_node.clear(true);
+        parent_node new_node{{this->block().get(), this->to_offset(node)}};
+        new_node.clear();
         auto range_start = it;
         it += std::min<size_t>(5, current_nodes.end() - it);
         new_node.insert(new_node.begin(), range_start, it);
@@ -271,16 +273,14 @@ class PTree : public TreeNodesAllocator<AllocatorArgs> {
     return true;
   }
 
-  void erase(const iterator& pos) {
-    pos.leaf().node->erase(pos.leaf().iterator);
-    if (pos.leaf().node->empty()) {
-      this->Free(pos.leaf().node->node(), 1);
+  void erase(iterator& pos) {
+    if (pos.leaf().node.erase(pos.leaf().iterator)) {
+      this->Free(pos.leaf().node.node(), 1);
       auto parent = pos.parents().rbegin();
       for (; parent != pos.parents().rend(); parent++) {
-        parent->node->erase(parent->iterator);
-        if (!parent->node->empty())
+        if (!parent->node.erase(parent->iterator))
           break;
-        this->Free(parent->node->node(), 1);
+        this->Free(parent->node.node(), 1);
       }
       if (parent == pos.parents().rend()) {
         mutable_header()->tree_depth = 0;

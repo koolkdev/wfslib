@@ -22,15 +22,14 @@ class PTreeNode {
 
   using reference = typename iterator::reference;
 
-  PTreeNode(node_ref<T> node) : PTreeNode(node, node_values_size(*node.get())) {}
-  PTreeNode(node_ref<T> node, size_t size) : node_(node), size_(size) {}
+  PTreeNode() = default;
+  PTreeNode(node_ref<T> node) : node_(node) {}
 
-  size_t size() const { return size_; }
+  size_t size() const { return node_values_size(*node_.get()); }
   iterator begin() const { return iterator(node_, 0); }
-  iterator end() const { return iterator(node_, size_); }
+  iterator end() const { return iterator(node_, size()); }
 
-  bool full() const { return size_ == node_values_capacity<T>::value; }
-  bool empty() const { return size_ == 0; }
+  bool full() const { return size() == node_values_capacity<T>::value; }
 
   iterator find(key_type key, bool exact_match) {
     auto it = std::upper_bound(begin(), end(), key);
@@ -42,13 +41,12 @@ class PTreeNode {
   }
 
   iterator insert(const iterator& pos, const typename iterator::value_type& key_val) {
-    if (size_ >= node_values_capacity<T>::value)
-      return end();
+    assert(size() < node_values_capacity<T>::value);
     assert(begin() <= pos && pos <= end());
+    auto old_end = end();
     iterator res = begin() + (pos - begin());
-    std::copy_backward(res, end(), end() + 1);
+    std::copy_backward(res, old_end, old_end + 1);
     *res = key_val;
-    size_++;
     return res;
   }
 
@@ -60,42 +58,39 @@ class PTreeNode {
   template <typename InputIt>
   iterator insert(const iterator& pos, const InputIt& start_it, const InputIt& end_it) {
     auto items = static_cast<typename iterator::difference_type>(std::distance(start_it, end_it));
-    if (size_ + items > node_values_capacity<T>::value)
-      return end();
+    assert(size() + items <= node_values_capacity<T>::value);
     assert(begin() <= pos && pos <= end());
+    auto old_end = end();
     iterator res = begin() + (pos - begin());
-    std::copy_backward(res, end(), end() + items);
+    std::copy_backward(res, old_end, old_end + items);
     std::copy(start_it, end_it, res);
-    size_ += items;
     return res;
   }
 
-  iterator erase(const iterator& pos) {
+  // Return true if the tree is empty after erasing
+  bool erase(const iterator& pos) {
     assert(begin() <= pos && pos < end());
-    auto new_end = end() - 1;
+    auto old_end = end();
+    auto new_end = old_end - 1;
     iterator res = begin() + (pos - begin());
-    std::copy(pos + 1, end(), res);
-    std::fill(new_end, end(), 0);
-    --size_;
-    return res;
+    std::copy(pos + 1, old_end, res);
+    std::fill(new_end, old_end, 0);
+    return new_end == begin();
   }
 
-  iterator erase(const iterator& it_start, const iterator& it_end) {
+  bool erase(const iterator& it_start, const iterator& it_end) {
     assert(begin() <= it_start && it_start <= end());
     assert(begin() <= it_end && it_end <= end());
     assert(it_start <= it_end);
     iterator res = begin() + (it_start - begin());
-    auto new_end = res + (end() - it_end);
-    std::copy(it_end, end(), res);
-    std::fill(new_end, end(), 0);
-    size_ -= it_end - it_start;
-    return res;
+    auto old_end = end();
+    auto new_end = res + (old_end - it_end);
+    std::copy(it_end, old_end, res);
+    std::fill(new_end, old_end, 0);
+    return new_end == begin();
   }
 
-  void clear(bool full = false) {
-    std::fill(begin(), full ? (begin() + node_values_capacity<T>::value) : end(), 0);
-    size_ = 0;
-  }
+  void clear() { std::fill(begin(), begin() + node_values_capacity<T>::value, 0); }
 
   bool operator==(const PTreeNode& other) const { return node_ == other.node_; }
 
@@ -103,5 +98,4 @@ class PTreeNode {
 
  private:
   node_ref<T> node_;
-  size_t size_;
 };

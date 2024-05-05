@@ -157,7 +157,6 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
   FreeBlocksTreeBucket::iterator join_before_iter;
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   auto pos = bucket.find(range_in_size.block_number, false);
-  auto ftree = pos.ftree();
   bool joined = false;
   if (!pos.is_end()) {
     // Join with prev if:
@@ -292,12 +291,12 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
   // eptree is empty (aka have only initial FTreee), resize it to one eptree
   auto nodes = last.nodes();
   for (auto& [node_level, node_it] : std::views::reverse(nodes)) {
-    if (node_level->header() == &eptree.tree_header()->current_tree) {
+    if (node_level.header() == &eptree.tree_header()->current_tree) {
       // this is the root, reinitialize it
-      node_level->Init(1, node_level->tree_header()->block_number.value());
-      node_level->insert({0, last_value});
+      node_level.Init(1, node_level.tree_header()->block_number.value());
+      node_level.insert({0, last_value});
     } else {
-      blocks_to_delete.push_back({node_level->tree_header()->block_number.value(), 1});
+      blocks_to_delete.push_back({node_level.tree_header()->block_number.value(), 1});
     }
   }
   std::ranges::for_each(blocks_to_delete, std::bind(&FreeBlocksAllocator::AddFreeBlocks, this, std::placeholders::_1));
