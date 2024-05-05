@@ -144,14 +144,14 @@ TEST_CASE("RTreeTests") {
     REQUIRE(std::ranges::equal(
         std::views::transform(rtree,
                               [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key, extent.value};
+                                return {extent.key(), extent.value()};
                               }),
         std::views::transform(std::views::iota(0, static_cast<int>(index)), [](int i) -> std::pair<uint32_t, uint32_t> {
           return {i, i + 1};
         })));
 
     for (uint32_t i = 0; i < index; ++i) {
-      REQUIRE((*rtree.find(i, true)).key == i);
+      REQUIRE((*rtree.find(i, true)).key() == i);
     }
   }
 
@@ -163,14 +163,14 @@ TEST_CASE("RTreeTests") {
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(rtree, [](const auto& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(rtree, [](const auto& extent) -> uint32_t { return extent.key(); });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(keys, sorted_keys));
 
     REQUIRE(std::ranges::equal(std::views::transform(rtree,
                                                      [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                                       return {extent.key, extent.value};
+                                                       return {extent.key(), extent.value()};
                                                      }),
                                std::views::transform(std::views::iota(0, static_cast<int>(kItemsCount)),
                                                      [](int i) -> std::pair<uint32_t, uint32_t> {
@@ -194,7 +194,7 @@ TEST_CASE("RTreeTests") {
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE(rtree.insert({i, 0}));
     }
-    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key; }),
+    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key(); }),
                                std::ranges::iota_view(0, kItemsCount)));
   }
 
@@ -213,7 +213,7 @@ TEST_CASE("RTreeTests") {
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key; }),
+    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key(); }),
                                sorted_upper_half));
 
     // Remove the second half

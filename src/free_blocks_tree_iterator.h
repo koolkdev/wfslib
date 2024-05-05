@@ -22,7 +22,7 @@ class FreeBlocksTreeIterator {
   using value_type = typename FTrees::iterator::value_type;
   using ref_type = typename FTrees::iterator::ref_type;
 
-  using reference = value_type;
+  using reference = ref_type;
 
   using eptree_node_info = node_iterator_info<EPTree>;
   using ftrees_node_info = node_iterator_info<FTrees>;

@@ -33,6 +33,11 @@ struct FreeBlocksExtentInfo {
   size_t bucket_index;
 
   uint32_t end_block_number() const { return block_number + blocks_count; }
+
+  bool operator==(const FreeBlocksExtentInfo& other) const {
+    return block_number == other.block_number && blocks_count == other.blocks_count &&
+           bucket_index == other.bucket_index;
+  }
 };
 
 struct FreeBlocksRangeInfo {

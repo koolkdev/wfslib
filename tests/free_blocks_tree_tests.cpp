@@ -27,8 +27,6 @@ TEST_CASE("FreeBlocksTreeTests") {
 
   FreeBlocksTree tree{&allocator};
 
-  using value_type = FreeBlocksTree::iterator::value_type;
-
   SECTION("iterate empty tree") {
     REQUIRE(std::distance(tree.begin(), tree.end()) == 0);
   }
@@ -41,15 +39,15 @@ TEST_CASE("FreeBlocksTreeTests") {
 
     REQUIRE(std::ranges::equal(
         std::views::transform(tree,
-                              [](const value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {extent.key, extent.value, extent.bucket_index};
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                                return {extent.key(), extent.value(), extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
           return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*tree.find(i)).key == i);
+      REQUIRE((*tree.find(i)).key() == i);
     }
   }
 
@@ -61,7 +59,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(tree, [](const value_type& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(tree, [](const auto& extent) -> uint32_t { return extent.key(); });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(sorted_keys, keys));
@@ -69,15 +67,15 @@ TEST_CASE("FreeBlocksTreeTests") {
     // Check the values
     REQUIRE(std::ranges::equal(
         std::views::transform(tree,
-                              [](const value_type& extent) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {extent.key, extent.value, extent.bucket_index};
+                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
+                                return {extent.key(), extent.value(), extent.bucket_index};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
           return {i, static_cast<nibble>(i % 16), static_cast<size_t>(i % kSizeBuckets.size())};
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*tree.find(i)).key == i);
+      REQUIRE((*tree.find(i)).key() == i);
     }
   }
 
@@ -97,7 +95,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
+    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const auto& extent) -> int { return extent.key(); }),
                                sorted_upper_half));
 
     // Remove the second half
@@ -147,24 +145,24 @@ TEST_CASE("FreeBlocksTreeTests") {
     REQUIRE(ftree2.empty());
     REQUIRE(ftree3.empty());
     REQUIRE(tree.find(150, false) != tree.end());
-    REQUIRE((*tree.find(150, false)).key == 50);
-    REQUIRE((*tree.find(25, false)).key == 50);
-    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
+    REQUIRE((*tree.find(150, false)).key() == 50);
+    REQUIRE((*tree.find(25, false)).key() == 50);
+    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const auto& extent) -> int { return extent.key(); }),
                                std::list<uint32_t>{50}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(tree), [](const value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(tree), [](const auto& extent) -> int { return extent.key(); }),
         std::list<uint32_t>{50}));
 
     REQUIRE(bucket.insert({160, nibble{0}}));
     REQUIRE(ftree1.size() == 1);
     REQUIRE(ftree2.size() == 1);
     REQUIRE(ftree3.empty());
-    REQUIRE((*tree.find(150, false)).key == 50);
-    REQUIRE((*tree.find(250, false)).key == 160);
-    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
+    REQUIRE((*tree.find(150, false)).key() == 50);
+    REQUIRE((*tree.find(250, false)).key() == 160);
+    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const auto& extent) -> int { return extent.key(); }),
                                std::list<uint32_t>{50, 160}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(tree), [](const value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(tree), [](const auto& extent) -> int { return extent.key(); }),
         std::list<uint32_t>{160, 50}));
 
     std::vector<FreeBlocksRangeInfo> blocks_to_delete;
@@ -173,13 +171,13 @@ TEST_CASE("FreeBlocksTreeTests") {
     REQUIRE(ftree1.empty());
     REQUIRE(ftree2.size() == 1);
     REQUIRE(ftree3.empty());
-    REQUIRE((*tree.find(150, false)).key == 160);
-    REQUIRE((*tree.find(250, false)).key == 160);
-    REQUIRE((*tree.find(25, false)).key == 160);
-    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const value_type& extent) -> int { return extent.key; }),
+    REQUIRE((*tree.find(150, false)).key() == 160);
+    REQUIRE((*tree.find(250, false)).key() == 160);
+    REQUIRE((*tree.find(25, false)).key() == 160);
+    REQUIRE(std::ranges::equal(std::views::transform(tree, [](const auto& extent) -> int { return extent.key(); }),
                                std::list<uint32_t>{160}));
     REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(tree), [](const value_type& extent) -> int { return extent.key; }),
+        std::views::transform(std::views::reverse(tree), [](const auto& extent) -> int { return extent.key(); }),
         std::list<uint32_t>{160}));
   }
 
@@ -192,7 +190,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     auto it = tree.begin();
     uint32_t steps = 0;
     while (it != tree.end()) {
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
       ++it;
       ++steps;
     }
@@ -201,7 +199,7 @@ TEST_CASE("FreeBlocksTreeTests") {
     while (it != tree.begin()) {
       --it;
       --steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
@@ -209,13 +207,13 @@ TEST_CASE("FreeBlocksTreeTests") {
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
-    REQUIRE((*it).key == 20);
+    REQUIRE((*it).key() == 20);
   }
 }

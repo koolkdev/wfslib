@@ -22,8 +22,8 @@ class PTreeNode {
 
   using reference = typename iterator::reference;
 
-  PTreeNode(node_ref node) : PTreeNode(node, node_values_size(*node.get<T>())) {}
-  PTreeNode(node_ref node, size_t size) : node_(node), size_(size) {}
+  PTreeNode(node_ref<T> node) : PTreeNode(node, node_values_size(*node.get())) {}
+  PTreeNode(node_ref<T> node, size_t size) : node_(node), size_(size) {}
 
   size_t size() const { return size_; }
   iterator begin() const { return iterator(node_, 0); }
@@ -36,7 +36,7 @@ class PTreeNode {
     auto it = std::upper_bound(begin(), end(), key);
     if (it != begin())
       --it;
-    if (exact_match && (it == end() || (*it).key != key))
+    if (exact_match && (it == end() || (*it).key() != key))
       return end();
     return it;
   }
@@ -99,9 +99,9 @@ class PTreeNode {
 
   bool operator==(const PTreeNode& other) const { return node_ == other.node_; }
 
-  const T* node() { return node_.get<T>(); }
+  const T* node() { return node_.get(); }
 
  private:
-  node_ref node_;
+  node_ref<T> node_;
   size_t size_;
 };

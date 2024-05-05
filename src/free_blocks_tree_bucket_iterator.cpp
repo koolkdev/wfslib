@@ -16,7 +16,7 @@ FreeBlocksTreeBucketIterator& FreeBlocksTreeBucketIterator::operator++() {
       return *this;  // end
     }
 
-    ftree_ = {{allocator_->LoadAllocatorBlock((*eptree_.iterator).value), block_size_index_}};
+    ftree_ = {{allocator_->LoadAllocatorBlock((*eptree_.iterator).value()), block_size_index_}};
     ftree_.iterator = ftree_.node->begin();
   }
   return *this;
@@ -29,7 +29,7 @@ FreeBlocksTreeBucketIterator& FreeBlocksTreeBucketIterator::operator--() {
       return *this;  // begin
     }
 
-    ftree_ = {{allocator_->LoadAllocatorBlock((*--eptree_.iterator).value), block_size_index_}};
+    ftree_ = {{allocator_->LoadAllocatorBlock((*--eptree_.iterator).value()), block_size_index_}};
     ftree_.iterator = ftree_.node->end();
   }
   --ftree_.iterator;
