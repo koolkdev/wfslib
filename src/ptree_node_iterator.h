@@ -31,6 +31,7 @@ struct node_item_ref {
  public:
   node_item_ref() = default;
   node_item_ref(node_ref<T> node, size_t index) : node(node), index(index) {}
+  node_item_ref(const node_item_ref& other) = default;
 
   key_type key() const { return node_get_full_key(*node.get(), index); }
   typename node_value_type<T>::type value() const { return node_get_value(*node.get(), index); }

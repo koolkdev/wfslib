@@ -119,7 +119,7 @@ class PTreeIterator {
   bool is_end() const { return !leaf_ || leaf_->iterator.is_end(); }
 
  private:
-  Block* block_;
+  Block* block_{nullptr};
   std::vector<parent_node_info> parents_;
   std::optional<leaf_node_info> leaf_;
 };
