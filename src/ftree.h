@@ -33,8 +33,6 @@ class FTree : public PTree<PTreeNode_details, FTreeLeaf_details, FTreesBlockArgs
 
   size_t index() const { return block_size_index_; }
 
-  uint16_t extra_info() const override { return static_cast<uint16_t>(block_size_index_); }
-
  private:
   size_t block_size_index_;
 };

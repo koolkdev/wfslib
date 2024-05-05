@@ -212,7 +212,7 @@ void FreeBlocksAllocator::AddFreeBlocksForSize(FreeBlocksRangeInfo range, size_t
            sub_range.blocks_count / size_blocks_count <= 0x10);
     auto new_value = static_cast<nibble>(sub_range.blocks_count / size_blocks_count - 1);
     if (join_before && sub_range.block_number == range_in_size.block_number) {
-      (*join_before_iter).value = new_value;
+      (*join_before_iter).set_value(new_value);
     } else {
       // Don't use pos to insert because:
       // 1. Our find may go back so it isn't the exact location to insert it.
@@ -284,9 +284,9 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
     return;
   }
   auto last = eptree.end()--;
-  if ((*last).key || (*last).value != 2)
+  if ((*last).key() || (*last).value() != 2)
     return;
-  uint32_t last_value = (*last).value;
+  uint32_t last_value = (*last).value();
   assert(last_value == 2);
   std::vector<FreeBlocksRangeInfo> blocks_to_delete;
   // eptree is empty (aka have only initial FTreee), resize it to one eptree

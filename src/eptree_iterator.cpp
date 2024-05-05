@@ -19,11 +19,11 @@ EPTreeIterator& EPTreeIterator::operator++() {
       return *this;  // end
     }
   }
-  uint32_t node_block_number = (*rnode->iterator).value;
+  uint32_t node_block_number = (*rnode->iterator).value();
   for (auto node = rnode.base(); node != nodes_.end(); ++node) {
     *node = {allocator_->LoadAllocatorBlock(node_block_number)};
     node->iterator = node->node->begin();
-    node_block_number = (*node->iterator).value;
+    node_block_number = (*node->iterator).value();
   }
   return *this;
 }
@@ -35,11 +35,11 @@ EPTreeIterator& EPTreeIterator::operator--() {
     if (rnode == nodes_.rend())
       return *this;  // begin
   }
-  uint32_t node_block_number = (*--rnode->iterator).value;
+  uint32_t node_block_number = (*--rnode->iterator).value();
   for (auto node = rnode.base(); node != nodes_.end(); ++node) {
     *node = {allocator_->LoadAllocatorBlock(node_block_number)};
     node->iterator = node->node->end();
-    node_block_number = (*--node->iterator).value;
+    node_block_number = (*--node->iterator).value();
   }
   return *this;
 }

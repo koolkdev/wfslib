@@ -27,7 +27,7 @@ bool EPTree::insert(const iterator::value_type& key_value) {
     auto depth = node_level->tree_header()->depth.value();
     // Where to split the level
     auto split_point = node_level->middle();
-    key_type split_point_key = (*split_point).key;
+    key_type split_point_key = (*split_point).key();
     // Alloc new right side tree
     auto right_block_number = AllocBlockForTree(node_level->tree_header()->block_number.value(), allocated_extents);
     RTree new_right(allocator_->LoadAllocatorBlock(right_block_number, /*new_block=*/true));
@@ -112,7 +112,7 @@ EPTree::iterator EPTree::begin() const {
   assert(tree_header()->depth.value() >= 1);
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_end());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value())};
     node.iterator = node.node->begin();
     nodes.push_back(std::move(node));
   }
@@ -125,7 +125,7 @@ EPTree::iterator EPTree::end() const {
   assert(tree_header()->depth.value() >= 1);
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_begin());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*--nodes.back().iterator).value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*--nodes.back().iterator).value())};
     node.iterator = node.node->end();
     nodes.push_back(std::move(node));
   }
@@ -137,7 +137,7 @@ EPTree::iterator EPTree::find(key_type key, bool exact_match) const {
   nodes.reserve(tree_header()->depth.value());
   for (int i = 0; i < tree_header()->depth.value(); i++) {
     assert(i == 0 || !nodes.back().iterator.is_end());
-    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value)};
+    iterator::node_info node{i == 0 ? block() : allocator_->LoadAllocatorBlock((*nodes.back().iterator).value())};
     node.iterator = node.node->find(key, exact_match && i + 1 == tree_header()->depth.value());
     nodes.push_back(std::move(node));
   }

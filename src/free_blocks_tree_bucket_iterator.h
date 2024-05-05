@@ -36,7 +36,7 @@ class FreeBlocksTreeBucketIterator {
         eptree_(std::move(eptree)),
         ftree_(std::move(ftree)) {}
 
-  reference operator*() const { return {(*ftree_.iterator)._base}; }
+  reference operator*() const { return {*ftree_.iterator, block_size_index_}; }
 
   FreeBlocksTreeBucketIterator& operator++();
   FreeBlocksTreeBucketIterator& operator--();

@@ -28,7 +28,7 @@ PTreeNode<RTreeLeaf_details>::iterator split_point(const PTreeNode<RTreeLeaf_det
       res = node.begin() + 3;
       break;
   }
-  split_key = (*res).key;
+  split_key = (*res).key();
   return res;
 }
 

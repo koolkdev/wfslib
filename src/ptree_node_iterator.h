@@ -28,30 +28,34 @@ struct node_item {
 
 template <is_node_details T>
 struct node_item_ref {
-  union {
-    node_item_ref_base _base;
-    node_key_ref<T> key;
-    node_value_ref<T> value;
-  };
+ public:
+  node_item_ref() = default;
+  node_item_ref(node_ref<T> node, size_t index) : node(node), index(index) {}
+  node_item_ref(const node_item_ref& other) = default;
 
-  node_item_ref& operator=(const node_item_ref& other) {
-    key = other.key;
-    value = other.value;
+  key_type key() const { return node_get_full_key(*node.get(), index); }
+  typename node_value_type<T>::type value() const { return node_get_value(*node.get(), index); }
+  void set_key(key_type key) { node_set_full_key(*node.get_mutable(), index, key); }
+  void set_value(typename node_value_type<T>::type value) { node_set_value(*node.get_mutable(), index, value); }
+
+  node_item_ref& operator=(const node_item_ref<T>& other) {
+    set_key(other.key());
+    set_value(other.value());
     return *this;
   }
 
   node_item_ref& operator=(const node_item<T>& val) {
-    key = val.key;
-    value = val.value;
+    set_key(val.key);
+    set_value(val.value);
     return *this;
   }
 
   node_item_ref& operator=(key_type val) {
-    key = val;
+    set_key(val);
     return *this;
   }
 
-  operator node_item<T>() const { return {key, value}; }
+  operator node_item<T>() const { return {key(), value()}; }
 
   auto operator<=>(const node_item_ref& other) const {
     return static_cast<node_item<T>>(*this) <=> static_cast<node_item<T>>(other);
@@ -59,8 +63,12 @@ struct node_item_ref {
   bool operator==(const node_item_ref& other) const {
     return static_cast<node_item<T>>(*this) == static_cast<node_item<T>>(other);
   }
-  auto operator<=>(key_type other_key) const { return static_cast<key_type>(this->key) <=> other_key; }
-  bool operator==(key_type other_key) const { return static_cast<key_type>(this->key) == other_key; }
+  auto operator<=>(key_type other_key) const { return this->key() <=> other_key; }
+  bool operator==(key_type other_key) const { return this->key() == other_key; }
+
+ private:
+  node_ref<T> node;
+  size_t index;
 };
 
 template <is_node_details T>
@@ -68,27 +76,27 @@ class PTreeNodeIterator {
  public:
   using iterator_category = std::random_access_iterator_tag;
   using difference_type = int;
-  using value_type = node_item<T>;
 
+  using value_type = node_item<T>;
   using ref_type = node_item_ref<T>;
 
   using reference = ref_type;
 
   PTreeNodeIterator() = default;
-  PTreeNodeIterator(node_ref node, size_t index) : PTreeNodeIterator(node_item_ref_base{node, index}) {}
-  PTreeNodeIterator(node_item_ref_base node_item) : node_item_(node_item) {
-    assert(node_item_.index <= node_values_capacity<T>::value);
+  PTreeNodeIterator(node_ref<T> node, size_t index) : node_(node), index_(index) {}
+
+  reference operator*() const {
+    assert(index_ < node_values_capacity<T>::value);
+    return {node_, index_};
   }
 
-  reference operator*() const { return {node_item_}; }
-
   PTreeNodeIterator& operator++() {
-    ++node_item_.index;
+    ++index_;
     return *this;
   }
 
   PTreeNodeIterator& operator--() {
-    --node_item_.index;
+    --index_;
     return *this;
   }
 
@@ -104,13 +112,13 @@ class PTreeNodeIterator {
     return tmp;
   }
   PTreeNodeIterator& operator+=(difference_type n) {
-    node_item_.index += n;
-    assert(node_item_.index <= node_values_capacity<T>::value);
+    index_ += n;
+    assert(index_ <= node_values_capacity<T>::value);
     return *this;
   }
   PTreeNodeIterator& operator-=(difference_type n) {
-    node_item_.index -= n;
-    assert(node_item_.index <= node_values_capacity<T>::value);
+    index_ -= n;
+    assert(index_ <= node_values_capacity<T>::value);
     return *this;
   }
 
@@ -127,28 +135,28 @@ class PTreeNodeIterator {
   }
 
   difference_type operator-(const PTreeNodeIterator& other) const {
-    assert(node_item_.get<T>() == other.node_item_.template get<T>());
-    return static_cast<difference_type>(node_item_.index) - static_cast<difference_type>(other.node_item_.index);
+    assert(node_.get() == other.node_.get());
+    return static_cast<difference_type>(index_) - static_cast<difference_type>(other.index_);
   }
 
   auto operator<=>(const PTreeNodeIterator& other) const {
-    if (const auto res = node_item_.get<T>() <=> other.node_item_.template get<T>(); res != 0)
+    if (const auto res = node_.get() <=> other.node_.get(); res != 0)
       return res;
-    return node_item_.index <=> other.node_item_.index;
+    return index_ <=> other.index_;
   }
 
-  bool operator==(const PTreeNodeIterator& other) const { return node_item_ == other.node_item_; }
+  bool operator==(const PTreeNodeIterator& other) const { return node_ == other.node_ && index_ == other.index_; }
 
   reference operator[](difference_type n) const { return *(*this + n); }
 
-  bool is_begin() const { return node_item_.index == 0; }
+  bool is_begin() const { return index_ == 0; }
   bool is_end() const {
-    return node_item_.index == node_values_capacity<T>::value ||
-           (node_item_.index > 0 && node_get_full_key(*node_item_.get<T>(), node_item_.index) == 0);
+    return index_ == node_values_capacity<T>::value || (index_ > 0 && node_get_full_key(*node_.get(), index_) == 0);
   }
 
  private:
-  node_item_ref_base node_item_;
+  node_ref<T> node_;
+  size_t index_;
 };
 
 template <is_node_details T>

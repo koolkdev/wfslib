@@ -37,7 +37,7 @@ TEST_CASE("EPTreeTests") {
     REQUIRE(std::ranges::equal(
         std::views::transform(eptree,
                               [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key, extent.value};
+                                return {extent.key(), extent.value()};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
           return {i, i + 1};
@@ -52,7 +52,7 @@ TEST_CASE("EPTreeTests") {
     }
 
     // Check that the tree is sorted
-    auto keys = std::views::transform(eptree, [](const auto& extent) -> uint32_t { return extent.key; });
+    auto keys = std::views::transform(eptree, [](const auto& extent) -> uint32_t { return extent.key(); });
     auto sorted_keys = unsorted_keys;
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(sorted_keys, keys));
@@ -61,14 +61,14 @@ TEST_CASE("EPTreeTests") {
     REQUIRE(std::ranges::equal(
         std::views::transform(eptree,
                               [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key, extent.value};
+                                return {extent.key(), extent.value()};
                               }),
         std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
           return {i, i + 1};
         })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*eptree.find(i, true)).key == i);
+      REQUIRE((*eptree.find(i, true)).key() == i);
     }
   }
 
@@ -88,7 +88,7 @@ TEST_CASE("EPTreeTests") {
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(eptree, [](const auto& extent) -> int { return extent.key; }),
+    REQUIRE(std::ranges::equal(std::views::transform(eptree, [](const auto& extent) -> int { return extent.key(); }),
                                sorted_upper_half));
 
     // Remove the second half
@@ -110,7 +110,7 @@ TEST_CASE("EPTreeTests") {
     auto it = eptree.begin();
     uint32_t steps = 0;
     while (it != eptree.end()) {
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
       ++it;
       ++steps;
     }
@@ -119,7 +119,7 @@ TEST_CASE("EPTreeTests") {
     while (it != eptree.begin()) {
       --it;
       --steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
     REQUIRE(steps == 0);
     REQUIRE(it.is_begin());
@@ -127,13 +127,13 @@ TEST_CASE("EPTreeTests") {
     for (int i = 0; i < 40; ++i) {
       ++it;
       ++steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
     for (int i = 0; i < 20; ++i) {
       --it;
       --steps;
-      REQUIRE((*it).key == steps);
+      REQUIRE((*it).key() == steps);
     }
-    REQUIRE((*it).key == 20);
+    REQUIRE((*it).key() == 20);
   }
 }

@@ -16,11 +16,6 @@
 #include "ptree_node.h"
 #include "tree_utils.h"
 
-class NodeRefCreator {
- public:
-  virtual node_ref get_node_ref(uint16_t offset) const = 0;
-};
-
 template <is_parent_node_details ParentNodeDetails, is_leaf_node_details LeafNodeDetails>
 class PTreeIterator {
  public:
@@ -35,8 +30,8 @@ class PTreeIterator {
   using leaf_node_info = node_iterator_info<PTreeNode<LeafNodeDetails>>;
 
   PTreeIterator() = default;
-  PTreeIterator(const NodeRefCreator* ptree, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
-      : ptree_(ptree), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
+  PTreeIterator(Block* block, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
+      : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
   reference operator*() const { return *leaf_->iterator; }
 
@@ -54,14 +49,14 @@ class PTreeIterator {
           return *this;  // end
         }
       }
-      uint16_t node_offset = (*rparent->iterator).value;
+      uint16_t node_offset = (*rparent->iterator).value();
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
-        parent_node_info new_parent{{ptree_->get_node_ref(node_offset)}};
+        parent_node_info new_parent{{{block_, node_offset}}};
         new_parent.iterator = new_parent.node->begin();
         *parent = std::move(new_parent);
-        node_offset = (*parent->iterator).value;
+        node_offset = (*parent->iterator).value();
       }
-      leaf_node_info new_leaf{{ptree_->get_node_ref(node_offset)}};
+      leaf_node_info new_leaf{{{block_, node_offset}}};
       new_leaf.iterator = new_leaf.node->begin();
       leaf_ = std::move(new_leaf);
     }
@@ -78,15 +73,15 @@ class PTreeIterator {
         if (++rparent == parents_.rend())
           return *this;  // begin
       }
-      uint16_t node_offset = (*--rparent->iterator).value;
+      uint16_t node_offset = (*--rparent->iterator).value();
       for (auto parent = rparent.base(); parent != parents_.end(); ++parent) {
-        parent_node_info new_parent{{ptree_->get_node_ref(node_offset)}};
+        parent_node_info new_parent{{{block_, node_offset}}};
         new_parent.iterator = new_parent.node->end();
         --new_parent.iterator;
         *parent = std::move(new_parent);
-        node_offset = (*parent->iterator).value;
+        node_offset = (*parent->iterator).value();
       }
-      leaf_node_info new_leaf{{ptree_->get_node_ref(node_offset)}};
+      leaf_node_info new_leaf{{{block_, node_offset}}};
       new_leaf.iterator = new_leaf.node->end();
       leaf_ = std::move(new_leaf);
     }
@@ -124,7 +119,7 @@ class PTreeIterator {
   bool is_end() const { return !leaf_ || leaf_->iterator.is_end(); }
 
  private:
-  const NodeRefCreator* ptree_{nullptr};
+  Block* block_{nullptr};
   std::vector<parent_node_info> parents_;
   std::optional<leaf_node_info> leaf_;
 };
