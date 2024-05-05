@@ -229,7 +229,7 @@ static_assert(node_values_capacity<FTreeLeaf_details>::value == 7);
 template <typename T>
 struct node_iterator_info {
   T node;
-  typename T::iterator iterator;
+  typename T::iterator iterator{};
 };
 
 template <is_node_details T>
