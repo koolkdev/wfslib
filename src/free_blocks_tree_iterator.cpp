@@ -18,7 +18,7 @@ FreeBlocksTreeIterator& FreeBlocksTreeIterator::operator++() {
     }
 
     ftrees_ = {allocator_->LoadAllocatorBlock((*eptree_.iterator).value())};
-    ftrees_.iterator = ftrees_.node->begin();
+    ftrees_.iterator = ftrees_.node.begin();
   }
   return *this;
 }
@@ -32,7 +32,7 @@ FreeBlocksTreeIterator& FreeBlocksTreeIterator::operator--() {
     }
 
     ftrees_ = {allocator_->LoadAllocatorBlock((*--eptree_.iterator).value())};
-    ftrees_.iterator = ftrees_.node->end();
+    ftrees_.iterator = ftrees_.node.end();
   }
   --ftrees_.iterator;
   return *this;

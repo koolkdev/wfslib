@@ -69,12 +69,12 @@ class FTreesIterator {
   template <typename Range>
   static size_t find_next_extent_index(Range& ftrees, bool max, std::bitset<kSizeBuckets.size()> reverse_end = {}) {
     auto iterated_ftrees = ftrees | std::views::filter([&reverse_end](const ftree_info& ftree) {
-                             return !ftree.iterator.is_end() && !reverse_end.test(ftree.node->index());
+                             return !ftree.iterator.is_end() && !reverse_end.test(ftree.node.index());
                            });
     auto res = std::ranges::max_element(iterated_ftrees, [max](const ftree_info& a, const ftree_info& b) {
       return max ^ ((*a.iterator).key() > (*b.iterator).key());
     });
-    return res != std::ranges::end(iterated_ftrees) ? res->node->index() : 0;
+    return res != std::ranges::end(iterated_ftrees) ? res->node.index() : 0;
   }
 
   const std::array<ftree_info, kSizeBuckets.size()>& ftrees() const { return ftrees_; }

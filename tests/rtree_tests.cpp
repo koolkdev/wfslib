@@ -38,7 +38,7 @@ TEST_CASE("RTreeTests") {
     // No parent nodes yet
     REQUIRE(rtree.header()->tree_depth.value() == 0);
     REQUIRE(rtree.begin().parents().size() == 0);
-    REQUIRE(rtree.begin().leaf().node->full());
+    REQUIRE(rtree.begin().leaf().node.full());
 
     // for (auto [i, extent] : std::views::enumerate(rtree)) {
     //  REQUIRE(extent.key == static_cast<uint32_t>(i));
@@ -51,13 +51,13 @@ TEST_CASE("RTreeTests") {
     auto it = rtree.begin();
     REQUIRE(rtree.header()->tree_depth.value() == 1);
     REQUIRE(it.parents().size() == 1);
-    REQUIRE(it.parents()[0].node->size() == 2);  // the two splitted nodes
+    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
     // Should have splitted it to 3/1 + plus the new one
-    REQUIRE(it.leaf().node->size() == 3);
+    REQUIRE(it.leaf().node.size() == 3);
     // Go to next node
     for (int i = 0; i < 3; ++i)
       ++it;
-    REQUIRE(it.leaf().node->size() == 2);
+    REQUIRE(it.leaf().node.size() == 2);
 
     // Now fill the second one 5 more times
     for (int i = 0; i < 3 * 5 - 1; ++i) {
@@ -68,8 +68,8 @@ TEST_CASE("RTreeTests") {
     // Still one parent, but it is full now
     it = rtree.end();
     REQUIRE(rtree.header()->tree_depth.value() == 1);
-    REQUIRE(it.parents()[0].node->full());
-    REQUIRE(it.leaf().node->full());
+    REQUIRE(it.parents()[0].node.full());
+    REQUIRE(it.leaf().node.full());
 
     REQUIRE(rtree.insert({index, index + 1}));
     ++index;
@@ -77,9 +77,9 @@ TEST_CASE("RTreeTests") {
     it = rtree.end();
     REQUIRE(rtree.header()->tree_depth.value() == 2);
     REQUIRE(it.parents().size() == 2);
-    REQUIRE(it.parents()[0].node->size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node->size() == 3);  // should have been splitted 4/2 + the new one
-    REQUIRE(it.leaf().node->size() == 2);
+    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
+    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2 + the new one
+    REQUIRE(it.leaf().node.size() == 2);
 
     // Now fill our parent again 4 X 5 times
     for (int i = 0; i < 3 * 4 * 5 - 1; ++i) {
@@ -91,9 +91,9 @@ TEST_CASE("RTreeTests") {
     // our parents should be full now
     REQUIRE(rtree.header()->tree_depth.value() == 2);
     REQUIRE(it.parents().size() == 2);
-    REQUIRE(it.parents()[0].node->full());
-    REQUIRE(it.parents()[1].node->full());
-    REQUIRE(it.leaf().node->full());
+    REQUIRE(it.parents()[0].node.full());
+    REQUIRE(it.parents()[1].node.full());
+    REQUIRE(it.leaf().node.full());
 
     // Now we should grow by another depth
     REQUIRE(rtree.insert({index, index + 1}));
@@ -102,10 +102,10 @@ TEST_CASE("RTreeTests") {
     it = rtree.end();
     REQUIRE(rtree.header()->tree_depth.value() == 3);
     REQUIRE(it.parents().size() == 3);
-    REQUIRE(it.parents()[0].node->size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node->size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[2].node->size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.leaf().node->size() == 2);
+    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
+    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2
+    REQUIRE(it.parents()[2].node.size() == 3);  // should have been splitted 4/2
+    REQUIRE(it.leaf().node.size() == 2);
 
     // Now fill our parent again 4 X 4 X 5 times
     for (int i = 0; i < 3 * 4 * 4 * 5 - 1; ++i) {
@@ -117,10 +117,10 @@ TEST_CASE("RTreeTests") {
     // our parents should be full now
     REQUIRE(rtree.header()->tree_depth.value() == 3);
     REQUIRE(it.parents().size() == 3);
-    REQUIRE(it.parents()[0].node->full());
-    REQUIRE(it.parents()[1].node->full());
-    REQUIRE(it.parents()[2].node->full());
-    REQUIRE(it.leaf().node->full());
+    REQUIRE(it.parents()[0].node.full());
+    REQUIRE(it.parents()[1].node.full());
+    REQUIRE(it.parents()[2].node.full());
+    REQUIRE(it.leaf().node.full());
 
     // Now we should grow by another depth
     REQUIRE(rtree.insert({index, index + 1}));
@@ -129,17 +129,17 @@ TEST_CASE("RTreeTests") {
     it = rtree.end();
     REQUIRE(rtree.header()->tree_depth.value() == 4);
     REQUIRE(it.parents().size() == 4);
-    REQUIRE(it.parents()[0].node->size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node->size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[2].node->size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[3].node->size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.leaf().node->size() == 2);
+    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
+    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2
+    REQUIRE(it.parents()[2].node.size() == 3);  // should have been splitted 4/2
+    REQUIRE(it.parents()[3].node.size() == 3);  // should have been splitted 4/2
+    REQUIRE(it.leaf().node.size() == 2);
 
     // Now fill our tree until full
     while (rtree.insert({index, index + 1})) {
       ++index;
     }
-    REQUIRE(!rtree.begin().parents()[0].node->full());
+    REQUIRE(!rtree.begin().parents()[0].node.full());
 
     REQUIRE(std::ranges::equal(
         std::views::transform(rtree,

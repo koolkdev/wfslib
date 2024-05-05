@@ -228,25 +228,8 @@ static_assert(node_values_capacity<FTreeLeaf_details>::value == 7);
 
 template <typename T>
 struct node_iterator_info {
-  std::shared_ptr<T> node;
-  typename T::iterator iterator;
-
-  node_iterator_info() = default;
-  node_iterator_info(const node_iterator_info& other) : node(other.node), iterator(other.iterator) {}
-  node_iterator_info(node_iterator_info&& other) : node(std::move(other.node)), iterator(std::move(other.iterator)) {}
-  node_iterator_info(std::shared_ptr<T> n, typename T::iterator it) : node(std::move(n)), iterator(std::move(it)) {}
-  node_iterator_info(const T& n, typename T::iterator it) : node(std::make_shared<T>(n)), iterator(std::move(it)) {}
-  node_iterator_info(T&& n, typename T::iterator it)
-      : node(std::make_shared<T>(std::move(n))), iterator(std::move(it)) {}
-  node_iterator_info(const T& n) : node(std::make_shared<T>(n)) {}
-  node_iterator_info(T&& n) : node(std::make_shared<T>(std::move(n))) {}
-  // template <typename... Args>
-  // node_iterator_info(Args&&... args) : node(std::make_shared<T>(std::forward<Args>(args)...)) {}
-  node_iterator_info& operator=(const node_iterator_info& other) {
-    node = other.node;
-    iterator = other.iterator;
-    return *this;
-  }
+  T node;
+  typename T::iterator iterator{};
 };
 
 template <is_node_details T>
