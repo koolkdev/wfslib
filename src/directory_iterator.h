@@ -53,7 +53,7 @@ class DirectoryIterator {
   bool is_begin() const;
   bool is_end() const { return leaf_.iterator.is_end(); }
 
-  Block::DataRef<Attributes> attributes() const { return {leaf_.node->block(), uint16_t{(*leaf_.iterator).value}}; }
+  Block::DataRef<Attributes> attributes() const { return {leaf_.node.block(), uint16_t{(*leaf_.iterator).value()}}; }
 
  private:
   std::shared_ptr<QuotaArea> quota_;
