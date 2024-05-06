@@ -22,8 +22,8 @@ struct node_item {
     return value <=> other.value;
   }
   bool operator==(const node_item& other) const { return key == other.key && value == other.value; }
-  auto operator<=>(key_type key) const { return key <=> key; }
-  bool operator==(key_type key) const { return key == key; }
+  auto operator<=>(key_type key) const { return this->key <=> key; }
+  bool operator==(key_type key) const { return this->key == key; }
 };
 
 template <is_node_details T>
