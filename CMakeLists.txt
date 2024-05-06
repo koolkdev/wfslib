@@ -28,6 +28,8 @@ add_library(${PROJECT_NAME}
     src/blocks_device.cpp
     src/device_encryption.cpp
     src/directory_iterator.cpp
+    src/directory_map_iterator.cpp
+    src/directory_map.cpp
     src/directory.cpp
     src/eptree_iterator.cpp
     src/eptree.cpp

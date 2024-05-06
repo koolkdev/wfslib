@@ -7,9 +7,7 @@
 
 #pragma once
 
-#include "block.h"
-#include "directory_leaf_tree.h"
-#include "directory_parent_tree.h"
+#include "directory_map_iterator.h"
 #include "errors.h"
 
 class QuotaArea;
@@ -30,11 +28,8 @@ class DirectoryIterator {
 
   using reference = ref_type;
 
-  using parent_node_info = dir_node_iterator_info<DirectoryParentTree>;
-  using leaf_node_info = dir_node_iterator_info<DirectoryLeafTree>;
-
   DirectoryIterator() = default;
-  DirectoryIterator(std::shared_ptr<QuotaArea> quota, std::deque<parent_node_info> parents, leaf_node_info leaf);
+  DirectoryIterator(DirectoryMapIterator base);
 
   reference operator*() const;
 
@@ -43,20 +38,14 @@ class DirectoryIterator {
   DirectoryIterator operator++(int);
   DirectoryIterator operator--(int);
 
-  bool operator==(const DirectoryIterator& other) const { return leaf_.iterator == other.leaf_.iterator; }
+  bool operator==(const DirectoryIterator& other) const { return base_ == other.base_; }
 
-  std::deque<parent_node_info>& parents() { return parents_; };
-  const std::deque<parent_node_info>& parents() const { return parents_; };
-  leaf_node_info& leaf() { return leaf_; };
-  const leaf_node_info& leaf() const { return leaf_; };
+  DirectoryMapIterator& base() { return base_; };
+  const DirectoryMapIterator& base() const { return base_; };
 
-  bool is_begin() const;
-  bool is_end() const { return leaf_.iterator.is_end(); }
-
-  Block::DataRef<Attributes> attributes() const { return {leaf_.node.block(), uint16_t{(*leaf_.iterator).value()}}; }
+  bool is_begin() const { return base_.is_begin(); }
+  bool is_end() const { return base_.is_end(); }
 
  private:
-  std::shared_ptr<QuotaArea> quota_;
-  std::deque<parent_node_info> parents_;
-  leaf_node_info leaf_;
+  DirectoryMapIterator base_;
 };
