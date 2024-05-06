@@ -49,6 +49,7 @@ class SubBlockAllocatorBase {
 template <typename ExtraHeaderType>
 class SubBlockAllocator : public SubBlockAllocatorBase {
  public:
+  SubBlockAllocator() = default;
   SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
   void Init() { Init(sizeof(ExtraHeaderType)); }
