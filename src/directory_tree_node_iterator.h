@@ -172,6 +172,10 @@ struct dir_tree_parent_node_item_ref : public dir_tree_node_item_ref<LeafValueTy
   dir_tree_parent_node_item_ref(dir_tree_node_ref<LeafValueType> node, size_t index)
       : dir_tree_node_item_ref<LeafValueType, dir_tree_value_type>(node, index) {}
   dir_tree_parent_node_item_ref(const dir_tree_parent_node_item_ref& other) = default;
+  dir_tree_parent_node_item_ref& operator=(const dir_tree_parent_node_item_ref& other) {
+    dir_tree_node_item_ref<LeafValueType, dir_tree_value_type>::operator=(other);
+    return *this;
+  }
 };
 
 template <typename LeafValueType>
@@ -180,6 +184,10 @@ struct dir_tree_leaf_node_item_ref : public dir_tree_node_item_ref<LeafValueType
   dir_tree_leaf_node_item_ref(dir_tree_node_ref<LeafValueType> node, size_t index)
       : dir_tree_node_item_ref<LeafValueType, LeafValueType>(node, index) {}
   dir_tree_leaf_node_item_ref(const dir_tree_leaf_node_item_ref& other) = default;
+  dir_tree_leaf_node_item_ref& operator=(const dir_tree_leaf_node_item_ref& other) {
+    dir_tree_node_item_ref<LeafValueType, LeafValueType>::operator=(other);
+    return *this;
+  }
 };
 
 template <typename LeafValueType>
