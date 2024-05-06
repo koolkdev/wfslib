@@ -17,6 +17,7 @@ class DirectoryTreeNode {
  public:
   using iterator = DirectoryTreeNodeIterator<LeafValueType>;
 
+  DirectoryTreeNode() = default;
   DirectoryTreeNode(dir_tree_node_ref<LeafValueType> node) : node_(node) {}
 
   bool has_leaf() const { return node_.has_leaf_value(); }

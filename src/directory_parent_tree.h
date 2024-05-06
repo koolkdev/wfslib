@@ -11,5 +11,6 @@
 
 class DirectoryParentTree : public DirectoryTree<dir_parent_tree_value_type> {
  public:
+  DirectoryParentTree() = default;
   DirectoryParentTree(std::shared_ptr<Block> block) : DirectoryTree(std::move(block)) {}
 };

@@ -21,6 +21,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
 
   using node = DirectoryTreeNode<LeafValueType>;
 
+  DirectoryTree() = default;
   DirectoryTree(std::shared_ptr<Block> block) : SubBlockAllocator<DirectoryTreeHeader>(std::move(block)) {}
   virtual ~DirectoryTree() = default;
 
