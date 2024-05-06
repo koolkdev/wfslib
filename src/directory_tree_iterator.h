@@ -95,11 +95,12 @@ class DirectoryTreeIterator {
     leaf_.reset();
 
     while (parents_.back().iterator.is_begin()) {
-      if (parents_.back().node.has_leaf()) {
-        leaf_ = parents_.back().node.leaf();
+      auto parent = parents_.back();
+      parents_.pop_back();
+      if (parent.node.has_leaf()) {
+        leaf_ = parent.node.leaf();
         return *this;
       }
-      parents_.pop_back();
     }
 
     while (true) {
@@ -139,7 +140,8 @@ class DirectoryTreeIterator {
   const leaf_node_info& leaf() const { return *leaf_; }
 
   bool is_begin() const {
-    return std::ranges::all_of(parents_, [](const auto& parent) { return parent.iterator.is_begin(); });
+    return parents_.empty() ||
+           (leaf_ && std::ranges::all_of(parents_, [](const auto& parent) { return parent.iterator.is_begin(); }));
   }
   bool is_end() const { return !leaf_.has_value(); }
 
