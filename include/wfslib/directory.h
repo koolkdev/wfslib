@@ -12,6 +12,7 @@
 #include <string>
 
 #include "directory_iterator.h"
+#include "directory_map.h"
 #include "errors.h"
 #include "wfs_item.h"
 
@@ -30,21 +31,20 @@ class Directory : public WfsItem, public std::enable_shared_from_this<Directory>
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(const std::string& name) const;
   std::expected<std::shared_ptr<File>, WfsError> GetFile(const std::string& name) const;
 
-  size_t size() const { return CalcSizeOfDirectoryBlock(block_); }
+  size_t size() const { return map_.size(); }
 
-  iterator begin() const;
-  iterator end() const;
+  iterator begin() const { return {map_.begin()}; }
+  iterator end() const { return {map_.end()}; }
 
-  iterator find(std::string_view key, bool exact_match = true) const;
+  iterator find(std::string key) const;
 
   const std::shared_ptr<QuotaArea>& quota() const { return quota_; }
 
  private:
   friend class Recovery;
 
-  size_t CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const;
-
   std::shared_ptr<QuotaArea> quota_;
-
   std::shared_ptr<Block> block_;
+
+  DirectoryMap map_;
 };
