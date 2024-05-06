@@ -22,11 +22,21 @@ struct DiretoryTreeItem {
 template <typename LeafValueType>
 class DirectoryTreeIterator {
  public:
-  struct item_ref {
-    const std::string key;
-    dir_tree_node_value_ref<LeafValueType> value;
+  using parent_node_info = dir_node_iterator_info<DirectoryTreeNode<LeafValueType>>;
+  using leaf_node_info = dir_tree_leaf_node_item_ref<LeafValueType>;
 
-    operator DiretoryTreeItem<LeafValueType>() const { return {key, value}; }
+  struct item_ref {
+    item_ref() = default;
+    item_ref(std::string key, leaf_node_info leaf) : key_(std::move(key)), leaf_(leaf) {}
+
+    const std::string& key() const { return key_; }
+    LeafValueType value() const { return leaf_.value(); }
+
+    operator DiretoryTreeItem<LeafValueType>() const { return {key(), value()}; }
+
+   private:
+    const std::string key_;
+    leaf_node_info leaf_;
   };
 
   using iterator_category = std::bidirectional_iterator_tag;
@@ -37,49 +47,72 @@ class DirectoryTreeIterator {
 
   using reference = ref_type;
 
-  using node_info = dir_node_iterator_info<DirectoryTreeNode<LeafValueType>>;
-
   DirectoryTreeIterator() = default;
-  DirectoryTreeIterator(Block* block, std::deque<node_info> nodes) : block_(block), nodes_(std::move(nodes)) {}
+  DirectoryTreeIterator(Block* block, std::deque<parent_node_info> parents, std::optional<leaf_node_info> leaf)
+      : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
-  reference operator*() const { return {key(), (*nodes_.back().iterator).value}; }
+  reference operator*() const { return {key(), *leaf_}; }
 
   DirectoryTreeIterator& operator++() {
     assert(!is_end());
-    if (std::ranges::all_of(nodes_, [](const auto& node) { return (node.iterator + 1).is_end(); })) {
-      // end
-      ++nodes_.back().iterator;
-      return *this;
+
+    parents_.push_back({leaf_->get_node()});
+    parents_.back().iterator = parents_.back().node.begin();
+    leaf_.reset();
+
+    if (parents_.back().iterator.is_end()) {
+      std::deque<parent_node_info> removed_parents;
+      do {
+        removed_parents.push_back(std::move(parents_.back()));
+        parents_.pop_back();
+      } while (!parents_.empty() && (++parents_.back().iterator).is_end());
+
+      if (parents_.empty()) {
+        // end
+        for (auto& parent : removed_parents) {
+          if (parent.iterator != parent.node.begin())
+            --parent.iterator;
+          parents_.push_front(std::move(parent));
+        }
+        return *this;
+      }
     }
 
-    while ((++nodes_.back().iterator).is_end()) {
-      nodes_.pop_back();
+    while (true) {
+      uint16_t node_offset = (*parents_.back().iterator).value();
+      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::create(block_, node_offset)};
+      if (parent.has_leaf()) {
+        leaf_ = parent.leaf();
+        return *this;
+      }
+      parents_.push_back({parent, parent.begin()});
     }
-
-    do {
-      uint16_t node_offset = (*nodes_.back().iterator).value;
-      nodes_.push_back({dir_tree_node_ref::create<LeafValueType>(block_, node_offset)});
-      nodes_.back().iterator = nodes_.back().node->begin();
-    } while (!nodes_.back().iterator.is_leaf_value());
-
-    return *this;
   }
 
   DirectoryTreeIterator& operator--() {
     assert(!is_begin());
-    while (nodes_.back().iterator.is_begin()) {
-      nodes_.pop_back();
+
+    leaf_.reset();
+
+    while (parents_.back().iterator.is_begin()) {
+      if (parents_.back().node.has_leaf()) {
+        leaf_ = parents_.back().node.leaf();
+        return *this;
+      }
+      parents_.pop_back();
     }
 
-    --nodes_.back().iterator;
-    while (!nodes_.back().iterator.is_leaf_value()) {
-      uint16_t node_offset = (*nodes_.back().iterator).value;
-      nodes_.push_back({dir_tree_node_ref::create<LeafValueType>(block_, node_offset)});
-      nodes_.back().iterator = nodes_.back().node->end();
-      --nodes_.back().iterator;
+    while (true) {
+      --parents_.back().iterator;
+      uint16_t node_offset = (*parents_.back().iterator).value();
+      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::create(block_, node_offset)};
+      if (parent.size() == 0) {
+        assert(parent.has_leaf());
+        leaf_ = parent.leaf();
+        return *this;
+      }
+      parents_.push_back({parent, parent.end()});
     }
-
-    return *this;
   }
 
   DirectoryTreeIterator operator++(int) {
@@ -95,29 +128,31 @@ class DirectoryTreeIterator {
   }
 
   bool operator==(const DirectoryTreeIterator& other) const {
-    if (nodes_.empty() || other.nodes_.empty())
-      return nodes_.empty() && other.nodes_.empty();  // to do need to check that belongs to same PTRee
-    return nodes_.back().iterator == other.nodes_.back().iterator;
+    if (!leaf_.has_value() || !other.leaf_.has_value())
+      return !leaf_.has_value() && !other.leaf_.has_value();  // to do need to check that belongs to same tree
+    return leaf_->get_node() == other.leaf_->get_node();
   }
 
-  std::deque<node_info>& nodes() { return nodes_; };
-  const std::deque<node_info>& nodes() const { return nodes_; };
+  std::deque<parent_node_info>& parents() { return parents_; };
+  const std::deque<parent_node_info>& parents() const { return parents_; };
+  leaf_node_info& leaf() { return *leaf_; }
+  const leaf_node_info& leaf() const { return *leaf_; }
 
   bool is_begin() const {
-    return std::ranges::all_of(nodes_, [](const auto& node) { return node.iterator.is_begin(); });
+    return std::ranges::all_of(parents_, [](const auto& parent) { return parent.iterator.is_begin(); });
   }
-  bool is_end() const { return nodes_.empty() || nodes_.back().iterator.is_end(); }
+  bool is_end() const { return !leaf_.has_value(); }
 
  private:
   std::string key() const {
-    return nodes_ | std::views::transform([](const auto& node) {
-             char key = (*node.iterator).key;
-             auto prefix = node.node->prefix() | std::ranges::to<std::string>();
-             return key ? prefix + key : prefix;
-           }) |
-           std::views::join | std::ranges::to<std::string>();
+    return (parents_ | std::views::transform([](const auto& parent) {
+              return (parent.node.prefix() | std::ranges::to<std::string>()) + (*parent.iterator).key();
+            }) |
+            std::views::join | std::ranges::to<std::string>()) +
+           (leaf_->get_node().prefix() | std::ranges::to<std::string>());
   };
 
   Block* block_;
-  std::deque<node_info> nodes_;
+  std::deque<parent_node_info> parents_;
+  std::optional<leaf_node_info> leaf_;
 };

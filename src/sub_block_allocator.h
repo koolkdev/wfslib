@@ -19,6 +19,7 @@ class SubBlockAllocatorBase {
   static constexpr int MAX_BLOCK_SIZE =
       BLOCK_SIZE_QUANTA + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
 
+  SubBlockAllocatorBase() = default;
   SubBlockAllocatorBase(std::shared_ptr<Block> block) : block_(std::move(block)) {}
 
   uint16_t Alloc(uint16_t size);
@@ -48,6 +49,7 @@ class SubBlockAllocatorBase {
 template <typename ExtraHeaderType>
 class SubBlockAllocator : public SubBlockAllocatorBase {
  public:
+  SubBlockAllocator() = default;
   SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
   void Init() { Init(sizeof(ExtraHeaderType)); }

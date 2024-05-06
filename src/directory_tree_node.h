@@ -8,6 +8,7 @@
 #pragma once
 
 #include <algorithm>
+#include <optional>
 
 #include "directory_tree_node_iterator.h"
 
@@ -16,11 +17,19 @@ class DirectoryTreeNode {
  public:
   using iterator = DirectoryTreeNodeIterator<LeafValueType>;
 
-  DirectoryTreeNode(dir_tree_node_ref node) : node_(node) {}
+  DirectoryTreeNode() = default;
+  DirectoryTreeNode(dir_tree_node_ref<LeafValueType> node) : node_(node) {}
 
-  size_t size() const { return node_->keys_count.value(); }
+  bool has_leaf() const { return node_.has_leaf_value(); }
+  std::optional<dir_tree_leaf_node_item_ref<LeafValueType>> leaf() const {
+    if (!has_leaf())
+      return std::nullopt;
+    return dir_tree_leaf_node_item_ref<LeafValueType>{node_, 0};
+  }
 
-  iterator begin() const { return iterator(node_, 0); }
+  size_t size() const { return node_->keys_count.value() - node_.has_leaf_value(); }
+
+  iterator begin() const { return iterator(node_, node_.has_leaf_value()); }
   iterator end() const { return iterator(node_, node_.get()->keys_count.value()); }
 
   bool empty() const { return size() == 0; }
@@ -33,7 +42,7 @@ class DirectoryTreeNode {
     auto it = std::upper_bound(begin(), end(), key);
     if (it != begin())
       --it;
-    if (exact_match && (it == end() || (*it).key != key))
+    if (exact_match && (it == end() || (*it).key() != key))
       return end();
     return it;
   }
@@ -44,7 +53,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + 1);
     *res = key_val;
     ++node_->keys_count;
-    assert(node_.node_size == node_.get_node_size<LeafValueType>(node_.get()));
+    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
     return res;
   }
 
@@ -61,7 +70,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + items);
     std::copy(start_it, end_it, res);
     node_->keys_count += items;
-    assert(node_.node_size == node_.get_node_size<LeafValueType>(node_.get()));
+    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
     return res;
   }
 
@@ -72,7 +81,7 @@ class DirectoryTreeNode {
     std::copy(pos + 1, end(), res);
     std::fill(new_end, end(), 0);
     --node_->keys_count;
-    assert(node_.node_size == node_.get_node_size<LeafValueType>(node_.get()));
+    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
     return res;
   }
 
@@ -97,5 +106,5 @@ class DirectoryTreeNode {
   std::string_view prefix() const { return node_.prefix(); }
 
  private:
-  dir_tree_node_ref node_;
+  dir_tree_node_ref<LeafValueType> node_;
 };

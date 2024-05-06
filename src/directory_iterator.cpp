@@ -19,7 +19,7 @@ DirectoryIterator::reference DirectoryIterator::operator*() const {
   auto val = *leaf_.iterator;
   // TODO: return key case sensitive?
   // TODO: Maybe have an attributes iteration and a wrapper for WfsItem iteration (call it DirectoryAttributesIterator?)
-  return {val.key, WfsItem::Load(quota_, val.key, attributes())};
+  return {val.key(), WfsItem::Load(quota_, val.key(), attributes())};
 }
 
 DirectoryIterator& DirectoryIterator::operator++() {
@@ -34,20 +34,20 @@ DirectoryIterator& DirectoryIterator::operator++() {
       // end
       for (auto& parent : removed_parents) {
         --parent.iterator;
-        removed_parents.push_front(std::move(parent));
+        parents_.push_front(std::move(parent));
       }
       return *this;
     }
-    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value));
+    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value()));
     while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
              MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
       parents_.push_back({std::move(current_block)});
-      parents_.back().iterator = parents_.back().node->begin();
+      parents_.back().iterator = parents_.back().node.begin();
       assert(!parents_.back().iterator.is_end());
-      current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value));
+      current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value()));
     }
     leaf_ = {std::move(current_block)};
-    leaf_.iterator = leaf_.node->begin();
+    leaf_.iterator = leaf_.node.begin();
     assert(!leaf_.iterator.is_end());
   }
   return *this;
@@ -56,28 +56,19 @@ DirectoryIterator& DirectoryIterator::operator++() {
 DirectoryIterator& DirectoryIterator::operator--() {
   assert(!is_begin());
   if (leaf_.iterator.is_begin()) {
-    std::deque<parent_node_info> removed_parents;
     while (!parents_.empty() && parents_.back().iterator.is_begin()) {
-      removed_parents.push_back(std::move(parents_.back()));
       parents_.pop_back();
     }
-    if (parents_.empty()) {
-      // begin
-      for (auto& parent : removed_parents) {
-        removed_parents.push_front(std::move(parent));
-      }
-      return *this;
-    }
-    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value));
+    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value()));
     while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
              MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
       parents_.push_back({std::move(current_block)});
-      parents_.back().iterator = parents_.back().node->end();
+      parents_.back().iterator = parents_.back().node.end();
       assert(!parents_.back().iterator.is_begin());
-      current_block = throw_if_error(quota_->LoadMetadataBlock((*--parents_.back().iterator).value));
+      current_block = throw_if_error(quota_->LoadMetadataBlock((*--parents_.back().iterator).value()));
     }
     leaf_ = {std::move(current_block)};
-    leaf_.iterator = leaf_.node->end();
+    leaf_.iterator = leaf_.node.end();
     assert(!leaf_.iterator.is_begin());
   }
   --leaf_.iterator;
