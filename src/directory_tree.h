@@ -404,10 +404,10 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     auto new_node = *new_tree.alloc_new_node(node.prefix(), std::ranges::subrange(start, end), leaf);
     if (leaf) {
       copy_value(new_tree, new_node, *leaf);
-      new_tree.extra_header()->records_count += 1;
+      new_tree.mutable_extra_header()->records_count += 1;
     }
     if (new_parents.empty()) {
-      new_tree.extra_header()->root = new_node.offset();
+      new_tree.mutable_extra_header()->root = new_node.offset();
     } else {
       *(new_parents.back().iterator).set_value(new_node.offset());
     }
@@ -448,10 +448,10 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         *new_tree.alloc_new_node(merge_prefix.empty() ? node.prefix() : merge_prefix + node.prefix(), node, leaf);
     if (leaf) {
       copy_value(new_tree, new_node, *leaf);
-      new_tree.extra_header()->records_count += 1;
+      new_tree.mutable_extra_header()->records_count += 1;
     }
     if (new_parents.empty()) {
-      new_tree.extra_header()->root = new_node.offset();
+      new_tree.mutable_extra_header()->root = new_node.offset();
     } else {
       *(new_parents.back().iterator).set_value(new_node.offset());
     }
