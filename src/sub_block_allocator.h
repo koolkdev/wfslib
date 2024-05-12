@@ -15,7 +15,7 @@ struct SubBlockAllocatorStruct;
 
 class SubBlockAllocatorBase {
  public:
-  static const int BLOCK_SIZE_QUANTA = 3;  // 1 << 3
+  static constexpr int BLOCK_SIZE_QUANTA = 3;  // 1 << 3
   static constexpr int MAX_BLOCK_SIZE =
       BLOCK_SIZE_QUANTA + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
 
