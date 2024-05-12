@@ -71,6 +71,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     // The caller to it:
     // while (!insert(pos, key_val)) {
     //   split() // check
+    //   update left right keys
     //}
     if (size() == 0) {
       auto new_node = alloc_new_node(key_val.key, {}, key_val.value);
@@ -393,7 +394,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     } else if (left && parents.size() == split_parents.size() && parents.back().node == split_parents.back().node &&
                parents.back().iterator == split_parents.back().iterator) {
       // Just copy the last value
-      assert(laef.has_value());
+      assert(leaf.has_value());
       end = start;
     }
     auto new_node = *new_tree.alloc_new_node(node.prefix(), std::ranges::subrange(start, end), leaf);
