@@ -7,6 +7,9 @@
 
 #pragma once
 
+// TODO move to source
+#include <cstring>
+
 #include "directory_tree.h"
 
 class DirectoryLeafTree : public DirectoryTree<dir_leaf_tree_value_type> {

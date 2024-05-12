@@ -25,12 +25,12 @@ class big_endian_type {
     return *this;
   }
 
-  big_endian_type& operator+=(T val) {
-    *this = value() + val;
+  big_endian_type& operator+=(int val) {
+    *this = value() + static_cast<T>(val);
     return *this;
   }
-  big_endian_type& operator-=(T val) {
-    *this = value() - val;
+  big_endian_type& operator-=(int val) {
+    *this = value() - static_cast<T>(val);
     return *this;
   }
   big_endian_type& operator++() {
