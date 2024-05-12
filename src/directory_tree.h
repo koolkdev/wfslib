@@ -291,6 +291,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       node.set_leaf(*leaf_value, /*check_size=*/false);
     }
     node.insert(node.begin(), childs, /*check_size=*/false);
+    assert(node.allocated_size() == dir_tree_node_ref<LeafValueType>::get_node_size(node.node()));
   }
 
   std::optional<parent_node> alloc_new_node(std::string_view prefix,

@@ -53,6 +53,10 @@ struct dir_tree_node_ref : public Block::RawDataRef<DirectoryTreeNodeHeader> {
 
   bool has_leaf_value() const { return has_leaf_value(get()); }
 
+  static size_t get_node_size(const DirectoryTreeNodeHeader* node) {
+    return calc_node_size<LeafValueType>(node->prefix_length.value(), node->keys_count.value(), has_leaf_value(node));
+  }
+
  private:
   static dir_tree_key_type* get_key_ref(DirectoryTreeNodeHeader* node, size_t index) {
     assert(index < node->keys_count.value());
@@ -79,10 +83,6 @@ struct dir_tree_node_ref : public Block::RawDataRef<DirectoryTreeNodeHeader> {
 
   static bool has_leaf_value(const DirectoryTreeNodeHeader* node) {
     return *get_key_ref(const_cast<DirectoryTreeNodeHeader*>(node), 0) == '\0';
-  }
-
-  static size_t get_node_size(const DirectoryTreeNodeHeader* node) {
-    return calc_node_size<LeafValueType>(node->prefix_length.value(), node->keys_count.value(), has_leaf_value(node));
   }
 };
 

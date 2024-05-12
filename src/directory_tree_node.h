@@ -26,6 +26,7 @@ class DirectoryTreeNode {
       return std::nullopt;
     return dir_tree_leaf_node_item_ref<LeafValueType>{node_, 0};
   }
+
   bool set_leaf(LeafValueType value, bool check_size = true) {
     dir_tree_leaf_node_item_ref<LeafValueType> leaf_ref{node_, 0};
     if (!has_leaf()) {
@@ -38,6 +39,7 @@ class DirectoryTreeNode {
       insert(begin(), old_keys_values);
     }
     leaf_ref.set_value(value);
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
 
@@ -52,6 +54,7 @@ class DirectoryTreeNode {
     auto old_keys_values = std::ranges::to<std::vector<typename iterator::value_type>>(*this);
     clear();
     insert(begin(), old_keys_values, /*check_size=*/false);
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
 
@@ -80,7 +83,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + 1);
     *res = key_val;
     ++node_->keys_count;
-    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
 
@@ -100,7 +103,7 @@ class DirectoryTreeNode {
     std::copy_backward(res, end(), end() + items);
     std::copy(start_it, end_it, res);
     node_->keys_count += static_cast<uint8_t>(items);
-    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
 
@@ -114,11 +117,11 @@ class DirectoryTreeNode {
     std::copy(pos + 1, end(), res);
     std::fill(new_end, end(), 0);
     --node_->keys_count;
-    assert(node_.node_size == node_.template get_node_size<LeafValueType>(node_.get()));
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
 
-  iterator erase(const iterator& it_start, const iterator& it_end, bool check_size = true) {
+  bool erase(const iterator& it_start, const iterator& it_end, bool check_size = true) {
     auto items = static_cast<typename iterator::difference_type>(std::distance(it_start, it_end));
     if (check_size && allocated_size() != calc_new_node_size(prefix().size(), size() - items, has_leaf())) {
       return false;
@@ -131,7 +134,8 @@ class DirectoryTreeNode {
     std::copy(it_end, end(), res);
     std::fill(new_end, end(), 0);
     node_->keys_count -= items;
-    return res;
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
+    return true;
   }
 
   void clear() { node_->keys_count = 0; }
@@ -156,6 +160,8 @@ class DirectoryTreeNode {
       set_leaf(*old_leaf_value, /*check_size=*/false);
     }
     insert(begin(), old_keys_values, /*check_size=*/false);
+    assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
+    return true;
   }
 
   static size_t calc_new_node_size(size_t new_prefix_length, size_t new_childs_length, bool has_leaf) {
