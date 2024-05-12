@@ -15,8 +15,12 @@ template <typename LeafValueType>
 struct dir_tree_node_ref : public Block::RawDataRef<DirectoryTreeNodeHeader> {
   size_t node_size;
 
-  static dir_tree_node_ref create(Block* block, uint16_t offset) {
+  static dir_tree_node_ref load(Block* block, uint16_t offset) {
     return {{block, offset}, get_node_size(block->get_object<DirectoryTreeNodeHeader>(offset))};
+  }
+
+  static dir_tree_node_ref create(Block* block, uint16_t offset, size_t node_size) {
+    return {{block, offset}, node_size};
   }
 
   dir_tree_key_type* mutable_key_ref(size_t index) { return get_key_ref(get_mutable(), index); }
@@ -176,6 +180,10 @@ struct dir_tree_parent_node_item_ref : public dir_tree_node_item_ref<LeafValueTy
     dir_tree_node_item_ref<LeafValueType, dir_tree_value_type>::operator=(other);
     return *this;
   }
+  dir_tree_parent_node_item_ref& operator=(const dir_tree_parent_node_item& other) {
+    dir_tree_node_item_ref<LeafValueType, dir_tree_value_type>::operator=(other);
+    return *this;
+  }
 };
 
 template <typename LeafValueType>
@@ -185,6 +193,10 @@ struct dir_tree_leaf_node_item_ref : public dir_tree_node_item_ref<LeafValueType
       : dir_tree_node_item_ref<LeafValueType, LeafValueType>(node, index) {}
   dir_tree_leaf_node_item_ref(const dir_tree_leaf_node_item_ref& other) = default;
   dir_tree_leaf_node_item_ref& operator=(const dir_tree_leaf_node_item_ref& other) {
+    dir_tree_node_item_ref<LeafValueType, LeafValueType>::operator=(other);
+    return *this;
+  }
+  dir_tree_leaf_node_item_ref& operator=(const dir_tree_leaf_node_item<LeafValueType>& other) {
     dir_tree_node_item_ref<LeafValueType, LeafValueType>::operator=(other);
     return *this;
   }

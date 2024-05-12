@@ -80,7 +80,7 @@ class DirectoryTreeIterator {
 
     while (true) {
       uint16_t node_offset = (*parents_.back().iterator).value();
-      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::create(block_, node_offset)};
+      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::load(block_, node_offset)};
       if (parent.has_leaf()) {
         leaf_ = parent.leaf();
         return *this;
@@ -106,7 +106,7 @@ class DirectoryTreeIterator {
     while (true) {
       --parents_.back().iterator;
       uint16_t node_offset = (*parents_.back().iterator).value();
-      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::create(block_, node_offset)};
+      decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::load(block_, node_offset)};
       if (parent.size() == 0) {
         assert(parent.has_leaf());
         leaf_ = parent.leaf();
