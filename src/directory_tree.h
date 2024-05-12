@@ -86,7 +86,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
 
     // Find the position to insert at
-    std::deque<typename iterator::parent_node_info> parents;
+    std::optional<typename iterator::parent_node_info> last_parent;
     uint16_t node_offset = extra_header()->root.value();
     auto current_key = key_val.key.begin();
     while (true) {
@@ -104,7 +104,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
           }
           // Insert value
           if (!parent.set_value(key_val.value)) {
-            if (!recreate_node(parents, parent, parent.prefix(), parent, key_val.value)) {
+            if (!recreate_node(last_parent, parent, parent.prefix(), parent, key_val.value)) {
               return false;
             }
           }
@@ -118,7 +118,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
           // Found match to the next key char
           current_key = key_it + 1;
           node_offset = (*iterator).value();
-          parents.push_back({parent, iterator});
+          last_parent.emplace(parent, iterator);
           continue;
         }
         // Insert new key to parent
@@ -129,7 +129,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         if (!parent.insert(iterator, {*key_it, new_node->offset()})) {
           auto vals = std::ranges::to<std::vector<dir_tree_parent_node_item>>(parent);
           vals.insert(vals.begin() + (iterator - parent.begin()), {*key_it, new_node->offset()});
-          if (!recreate_node(parents, parent, prefix, vals, parent.leaf())) {
+          if (!recreate_node(last_parent, parent, prefix, vals, parent.leaf())) {
             Free(new_node.offset());
             return false;
           }
@@ -161,7 +161,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
           new_nodes.push_front(new_value_pair);
         }
       }
-      if (!recreate_node(parents, parent, {prefix.begin(), prefix_it}, new_nodes, std::nullopt)) {
+      if (!recreate_node(last_parent, parent, {prefix.begin(), prefix_it}, new_nodes, std::nullopt)) {
         assert(false);  // Should always success because of shrinking
         return false;
       }
@@ -173,9 +173,10 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   void erase(iterator& pos) {
     // Remove currnet parent leaf
     auto parents = pos.parents();
+    std::optional<typename iterator::parent_node_info> last_parent = parents.back();
     parent_node current_parent{pos.leaf()->get_node()};
     if (!current_parent.remove_leaf()) {
-      if (!recreate_node(parents, current_parent, current_parent.prefix(), current_parent, std::nullopt)) {
+      if (!recreate_node(last_parent, current_parent, current_parent.prefix(), current_parent, std::nullopt)) {
         assert(false);  // Always can shrink
         return;
       }
@@ -186,23 +187,27 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         return;
       } else if (current_parent.size() == 1) {
         // Can merge with child node
-        merge_empty_node(parents, current_parent);
+        merge_empty_node(last_parent, current_parent);
         return;
       }
       // Empty node, remove
       Free(current_parent.offset());
-      if (parents.empty()) {
+      if (!last_parent) {
         // Removed last node
         assert(size() == 0);
         return;
       }
       auto parent = parents.back();
       parents.pop_back();
+      if (parents.empty())
+        last_parent.reset();
+      else
+        last_parent = parents.back();
       current_parent = parent.node;
       if (!current_parent.erase(parent.iterator)) {
         auto vals = std::ranges::to<std::vector<dir_tree_parent_node_item>>(current_parent);
         vals.erase(vals.begin() + (parent.iterator - parent.begin()));
-        if (!recreate_node(parents, parent, current_parent.prefix(), vals, current_parent.leaf())) {
+        if (!recreate_node(last_parent, parent, current_parent.prefix(), vals, current_parent.leaf())) {
           assert(false);  // Always can shrink
           return;
         }
@@ -212,14 +217,11 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
 
   void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const {
     // Implemented in a totally different way then original because it is way too complex for no reason.
-    std::deque<typename iterator::parent_node_info> parents, new_parents;
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
-    split_copy(right, parents, new_parents, root_node, pos.parents(),
-               /*left=*/false);
+    split_copy(right, {}, root_node, pos.parents(), /*left=*/false);
     if (!pos.is_begin()) {
       --pos;
-      split_copy(left, parents, new_parents, root_node, pos.parents(),
-                 /*left=*/true);
+      split_copy(left, {}, root_node, pos.parents(), /*left=*/true);
     }
   }
 
@@ -312,7 +314,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   }
 
   template <typename Range>
-  bool recreate_node(std::deque<typename iterator::parent_node_info>& parents,
+  bool recreate_node(std::optional<typename iterator::parent_node_info> parent,
                      parent_node& current_node,
                      std::string_view prefix,
                      Range& childs,
@@ -335,8 +337,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     } else {
       new_node = dir_tree_node_ref<LeafValueType>::create(block().get(), new_offset, new_size);
     }
-    if (parents.size())
-      (*parents.back().iterator).set_value(new_offset);
+    if (parent)
+      (*parent->iterator).set_value(new_offset);
     else
       mutable_extra_header()->root = new_offset;
     init_new_node(new_node, prefix, childs, leaf_value);
@@ -345,7 +347,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     return true;
   }
 
-  void merge_empty_node(std::deque<typename iterator::parent_node_info>& parents,
+  void merge_empty_node(std::optional<typename iterator::parent_node_info> parent,
                         parent_node& current_node,
                         bool reallocate = true) {
     assert(current_node.size() == 1 && !current_node.has_leaf());
@@ -356,12 +358,12 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     new_prefix += child.prefix();
     if (child.set_prefix(new_prefix)) {
       Free(current_node.offset());
-      if (parents.size())
-        (*parents.back().iterator).set_value(val.value());
+      if (parent)
+        (*parent->iterator).set_value(val.value());
       else
         mutable_extra_header()->root = val.value();
       return;
-    } else if (recreate_node(parents, child, new_prefix, child, child.leaf())) {
+    } else if (recreate_node(parent, child, new_prefix, child, child.leaf())) {
       // We gave our parents, so it already updated the new offset.
       Free(current_node.offset());
       return;
@@ -371,32 +373,32 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       return;
     }
     // Ok we failed to alloc, we need to reallocate the whole tree.
-    std::deque<typename iterator::parent_node_info> old_parents, new_parents;
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
     // TODO: detach and reinitialize tree
     DirectoryTree new_tree;
     new_tree.Init();
-    merge_copy(new_tree, old_parents, new_parents, root_node, current_node);
+    merge_copy(new_tree, root_node, current_node);
   }
 
   void split_copy(DirectoryTree& new_tree,
-                  std::deque<typename iterator::parent_node_info>& new_parents,
-                  std::deque<typename iterator::parent_node_info>& parents,
+                  std::optional<typename iterator::parent_node_info> parent,
                   const parent_node& node,
                   const std::deque<typename iterator::parent_node_info>& split_parents,
-                  bool left) {
+                  bool left,
+                  int depth = 0,
+                  std::optional<typename iterator::parent_node_info> new_parent = {}) {
     auto start = node.begin();
     auto end = node.end();
     auto leaf = node.leaf();
-    if (parents.size() < split_parents.size() && split_parents[parents.size()].node == node) {
+    if (depth < split_parents.size() && split_parents[depth].node == node) {
       if (left) {
-        end = split_parents[parents.size()].iterator + 1;
+        end = split_parents[depth].iterator + 1;
       } else {
-        start = split_parents[parents.size()].iterator;
+        start = split_parents[depth].iterator;
         leaf = std::nullopt;
       }
-    } else if (left && parents.size() == split_parents.size() && parents.back().node == split_parents.back().node &&
-               parents.back().iterator == split_parents.back().iterator) {
+    } else if (left && parent && depth == split_parents.size() && parent->node == split_parents.back().node &&
+               parent->iterator == split_parents.back().iterator) {
       // Just copy the last value
       assert(leaf.has_value());
       end = start;
@@ -406,41 +408,33 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       copy_value(new_tree, new_node, *leaf);
       new_tree.mutable_extra_header()->records_count += 1;
     }
-    if (new_parents.empty()) {
-      new_tree.mutable_extra_header()->root = new_node.offset();
+    if (new_parent) {
+      *(new_parent->iterator).set_value(new_node.offset());
     } else {
-      *(new_parents.back().iterator).set_value(new_node.offset());
+      new_tree.mutable_extra_header()->root = new_node.offset();
     }
     int i = 0;
     for (auto it = start; it != end; ++it) {
-      parents.push_back({node, it});
-      new_parents.push_back({new_node, new_node.begin() + i++});
-      split_copy(new_tree, new_parents, parents, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*it).value())},
-                 split_parents, left);
-      parents.pop_back();
-      new_parents.pop_back();
+      split_copy(new_tree, {node, it}, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*it).value())},
+                 split_parents, left, depth + 1, {new_node, new_node.begin() + i++});
     }
     if (!new_node.has_leaf() && new_node.size() == 1) {
-      new_tree.merge_empty_node(new_parents, new_node, /*rellocate=*/false);
+      new_tree.merge_empty_node(new_parent, new_node, /*rellocate=*/false);
     }
   }
 
   void merge_copy(DirectoryTree& new_tree,
-                  std::deque<typename iterator::parent_node_info>& new_parents,
-                  std::deque<typename iterator::parent_node_info>& parents,
                   const parent_node& node,
                   const parent_node& merge_node,
+                  std::optional<typename iterator::parent_node_info> new_parent = {},
                   std::string_view merge_prefix = {}) {
     if (merge_node == node) {
       assert(!node.has_leaf() && node.size() == 1);
       std::string merge_prefix;
       merge_prefix += node.prefix();
       merge_prefix += (*node.begin()).key();
-      parents.push_back({node, node.begin()});
-      merge_copy(new_tree, new_parents, parents,
-                 {dir_tree_node_ref<LeafValueType>::load(block().get(), (*node.begin()).value())}, merge_node,
-                 merge_prefix);
-      parents.pop_back();
+      merge_copy(new_tree, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*node.begin()).value())}, merge_node,
+                 new_parent, merge_prefix);
       return;
     }
     auto leaf = node.leaf();
@@ -450,19 +444,15 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       copy_value(new_tree, new_node, *leaf);
       new_tree.mutable_extra_header()->records_count += 1;
     }
-    if (new_parents.empty()) {
-      new_tree.mutable_extra_header()->root = new_node.offset();
+    if (new_parent) {
+      *(new_parent->iterator).set_value(new_node.offset());
     } else {
-      *(new_parents.back().iterator).set_value(new_node.offset());
+      new_tree.mutable_extra_header()->root = new_node.offset();
     }
     int i = 0;
     for (auto it = node.begin(); it != node.end(); ++it) {
-      parents.push_back({node, it});
-      new_parents.push_back({new_node, new_node.begin() + i++});
-      merge_copy(new_tree, new_parents, parents, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*it).value())},
-                 merge_node);
-      parents.pop_back();
-      new_parents.pop_back();
+      merge_copy(new_tree, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*it).value())}, merge_node,
+                 {new_node, new_node.begin() + i++});
     }
   }
 };
