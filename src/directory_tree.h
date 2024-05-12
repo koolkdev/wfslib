@@ -67,7 +67,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     return it;
   }
 
-  bool insert(iterator& pos, const typename iterator::value_type& key_val) {
+  bool insert(const typename iterator::value_type& key_val) {
     // The caller to it:
     // while (!insert(pos, key_val)) {
     //   split() // check
@@ -368,12 +368,12 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       return;
     }
     // Ok we failed to alloc, we need to reallocate the whole tree.
-    std::deque<typename iterator::parent_node_info> parents, new_parents;
+    std::deque<typename iterator::parent_node_info> old_parents, new_parents;
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
     // TODO: detach and reinitialize tree
     DirectoryTree new_tree;
     new_tree.Init();
-    merge_copy(new_tree, parents, new_parents, root_node, current_node);
+    merge_copy(new_tree, old_parents, new_parents, root_node, current_node);
   }
 
   void split_copy(DirectoryTree& new_tree,
@@ -437,6 +437,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       merge_copy(new_tree, new_parents, parents,
                  {dir_tree_node_ref<LeafValueType>::load(block().get(), (*node.begin()).value())}, merge_node,
                  merge_prefix);
+      parents.pop_back();
       return;
     }
     auto leaf = node.leaf();
