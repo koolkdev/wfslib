@@ -34,7 +34,7 @@ class DirectoryMap {
 
   size_t CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const;
 
-  std::pair<std::deque<iterator::parent_node_info>, DirectoryLeafTree> find_leaf_tree(std::string_view key) const;
+  std::pair<std::vector<iterator::parent_node_info>, DirectoryLeafTree> find_leaf_tree(std::string_view key) const;
 
   std::shared_ptr<QuotaArea> quota_;
   std::shared_ptr<Block> root_block_;

@@ -8,7 +8,6 @@
 #pragma once
 
 #include <algorithm>
-#include <deque>
 #include <ranges>
 
 #include "directory_tree_node.h"
@@ -49,7 +48,7 @@ class DirectoryTreeIterator {
   using reference = ref_type;
 
   DirectoryTreeIterator() = default;
-  DirectoryTreeIterator(Block* block, std::deque<parent_node_info> parents, std::optional<leaf_node_info> leaf)
+  DirectoryTreeIterator(Block* block, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
       : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
   reference operator*() const { return {key(), *leaf_}; }
@@ -62,7 +61,7 @@ class DirectoryTreeIterator {
     leaf_.reset();
 
     if (parents_.back().iterator.is_end()) {
-      std::deque<parent_node_info> removed_parents;
+      std::vector<parent_node_info> removed_parents;
       do {
         removed_parents.push_back(std::move(parents_.back()));
         parents_.pop_back();
@@ -70,10 +69,10 @@ class DirectoryTreeIterator {
 
       if (parents_.empty()) {
         // end
-        for (auto& parent : removed_parents) {
+        for (auto& parent : std::views::reverse(removed_parents)) {
           if (parent.iterator != parent.node.begin())
             --parent.iterator;
-          parents_.push_front(std::move(parent));
+          parents_.push_back(std::move(parent));
         }
         return *this;
       }
@@ -135,8 +134,8 @@ class DirectoryTreeIterator {
     return leaf_->get_node() == other.leaf_->get_node();
   }
 
-  std::deque<parent_node_info>& parents() { return parents_; };
-  const std::deque<parent_node_info>& parents() const { return parents_; };
+  std::vector<parent_node_info>& parents() { return parents_; };
+  const std::vector<parent_node_info>& parents() const { return parents_; };
   leaf_node_info& leaf() { return *leaf_; }
   const leaf_node_info& leaf() const { return *leaf_; }
 
@@ -156,6 +155,6 @@ class DirectoryTreeIterator {
   };
 
   Block* block_;
-  std::deque<parent_node_info> parents_;
+  std::vector<parent_node_info> parents_;
   std::optional<leaf_node_info> leaf_;
 };

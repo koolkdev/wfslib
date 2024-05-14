@@ -31,7 +31,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   iterator begin() const {
     if (size() == 0)
       return {block().get(), {}, {}};
-    std::deque<typename iterator::parent_node_info> parents;
+    std::vector<typename iterator::parent_node_info> parents;
     uint16_t node_offset = extra_header()->root.value();
     while (true) {
       parent_node parent{dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset)};
@@ -46,7 +46,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   iterator end() const {
     if (size() == 0)
       return {block().get(), {}, {}};
-    std::deque<typename iterator::parent_node_info> parents;
+    std::vector<typename iterator::parent_node_info> parents;
     uint16_t node_offset = extra_header()->root.value();
     while (true) {
       parents.emplace_back(dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset));
@@ -151,14 +151,13 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         return false;
       }
       std::string_view new_prefix{prefix.begin(), prefix_it};
-      std::deque<typename DirectoryTreeNode<LeafValueType>::iterator::value_type> new_nodes;
+      std::vector<typename DirectoryTreeNode<LeafValueType>::iterator::value_type> new_nodes;
       new_nodes.emplace_back(*prefix_it, new_child->offset());
       if (new_node) {
-        typename iterator::value_type new_value_pair{};
         if (*prefix_it < *key_it) {
-          new_nodes.emplace_back(*key_it, new_node->offset());
+          new_nodes = {new_nodes[0], {*key_it, new_node->offset()}};
         } else {
-          new_nodes.emplace_front(*key_it, new_node->offset());
+          new_nodes = {{*key_it, new_node->offset()}, new_nodes[0]};
         }
       }
       if (!recreate_node(last_parent, parent, {prefix.begin(), prefix_it}, new_nodes, std::nullopt)) {
@@ -229,7 +228,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   iterator find(std::string_view key, bool exact_match = true) const {
     if (size() == 0)
       return end();
-    std::deque<typename iterator::parent_node_info> parents;
+    std::vector<typename iterator::parent_node_info> parents;
     uint16_t node_offset = extra_header()->root.value();
     auto current_key = key.begin();
     while (true) {
@@ -385,7 +384,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   void split_copy(DirectoryTree& new_tree,
                   std::optional<typename iterator::parent_node_info> parent,
                   const parent_node& node,
-                  const std::deque<typename iterator::parent_node_info>& split_parents,
+                  const std::vector<typename iterator::parent_node_info>& split_parents,
                   bool left,
                   int depth = 0,
                   std::optional<typename iterator::parent_node_info> new_parent = std::nullopt) const {
