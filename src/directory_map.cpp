@@ -46,10 +46,20 @@ DirectoryMap::iterator DirectoryMap::end() const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
-DirectoryMap::iterator DirectoryMap::find(std::string_view key, bool exact_match) const {
-  auto [parents, leaf_tree] = find_leaf_tree(key);
-  iterator::leaf_node_info leaf{std::move(leaf_tree)};
-  leaf.iterator = leaf.node.find(key, exact_match);
+DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
+  if (size() == 0)
+    return end();
+  auto current_block = root_block_;
+  std::vector<iterator::parent_node_info> parents;
+  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
+    parents.push_back({std::move(current_block)});
+    parents.back().iterator = parents.back().node.find(key, /*exact_match=*/false);
+    assert(!parents.back().iterator.is_end());
+    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
+  }
+  iterator::leaf_node_info leaf{{current_block}};
+  leaf.iterator = leaf.node.find(key);
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
@@ -66,11 +76,13 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
 };
 
 bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
-  auto [parents, leaf_tree] = find_leaf_tree(name);
-  if (!leaf_tree.find(name).is_end()) {
+  auto it = find(name);
+  if (!it.is_end()) {
     // Already in tree
     return false;
   }
+  auto parents = it.parents();
+  auto leaf_tree = it.leaf().node;
   while (true) {
     auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
     auto new_offset = leaf_tree.Alloc(size);
@@ -86,20 +98,21 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
   }
 }
 
-std::pair<std::vector<DirectoryMap::iterator::parent_node_info>, DirectoryLeafTree> DirectoryMap::find_leaf_tree(
-    std::string_view key) const {
-  auto current_block = root_block_;
-  if (size() == 0)
-    return {{}, {std::move(current_block)}};
-  std::vector<iterator::parent_node_info> parents;
-  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
-           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
-    parents.push_back({std::move(current_block)});
-    parents.back().iterator = parents.back().node.find(key, /*exact_match=*/false);
-    assert(!parents.back().iterator.is_end());
-    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
+bool DirectoryMap::erase(std::string_view name) {
+  auto it = find(name);
+  if (!it.is_end()) {
+    // Not in tree
+    return false;
   }
-  return {parents, {std::move(current_block)}};
+  auto parents = it.parents();
+  it.leaf().node.erase(it.leaf().iterator);
+  bool last_empty = it.leaf().node.empty();
+  while (last_empty) {
+    parents.back().node.erase(parents.back().iterator);
+    last_empty = parents.back().node.empty();
+    parents.pop_back();
+  }
+  return true;
 }
 
 template <DirectoryTreeImpl TreeType>

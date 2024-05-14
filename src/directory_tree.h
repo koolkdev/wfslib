@@ -68,11 +68,6 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   }
 
   bool insert(const typename iterator::value_type& key_val) {
-    // The caller to it:
-    // while (!insert(pos, key_val)) {
-    //   split() // check
-    //   update left right keys
-    //}
     std::optional<parent_node> new_node;
     if (size() == 0) {
       new_node = alloc_new_node<>(key_val.key, {}, key_val.value);
@@ -173,7 +168,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     // Remove currnet parent leaf
     auto parents = pos.parents();
     std::optional<typename iterator::parent_node_info> last_parent = parents.back();
-    parent_node current_parent{pos.leaf()->get_node()};
+    parent_node current_parent{pos.leaf().get_node()};
     if (!current_parent.remove_leaf()) {
       if (!recreate_node(last_parent, current_parent, current_parent.prefix(), current_parent, std::nullopt)) {
         assert(false);  // Always can shrink
@@ -190,7 +185,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         return;
       }
       // Empty node, remove
-      Free(current_parent.offset());
+      Free(current_parent.offset(), current_parent.allocated_size());
       if (!last_parent) {
         // Removed last node
         assert(size() == 0);
@@ -205,8 +200,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       current_parent = parent.node;
       if (!current_parent.erase(parent.iterator)) {
         auto vals = std::ranges::to<std::vector<dir_tree_parent_node_item>>(current_parent);
-        vals.erase(vals.begin() + (parent.iterator - parent.begin()));
-        if (!recreate_node(last_parent, parent, current_parent.prefix(), vals, current_parent.leaf())) {
+        vals.erase(vals.begin() + (parent.iterator - parent.node.begin()));
+        if (!recreate_node(last_parent, current_parent, current_parent.prefix(), vals, current_parent.leaf())) {
           assert(false);  // Always can shrink
           return;
         }
