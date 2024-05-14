@@ -22,7 +22,7 @@ class DirectoryTreeNode {
 
   bool has_leaf() const { return node_.has_leaf_value(); }
   dir_tree_leaf_node_item_ref<LeafValueType> leaf_ref() const {
-    assert(has_leaf(0));
+    assert(has_leaf());
     return dir_tree_leaf_node_item_ref<LeafValueType>{node_, 0};
   }
   std::optional<LeafValueType> leaf() const {
@@ -150,7 +150,7 @@ class DirectoryTreeNode {
 
   std::string_view prefix() const { return node_.prefix(); }
   bool set_prefix(std::string_view prefix, bool check_size = true) {
-    assert(prefix.size() < std::numeric_limits<uint8_t>::max);
+    assert(prefix.size() < std::numeric_limits<uint8_t>::max());
     if (check_size && allocated_size() != calc_new_node_size(prefix.size(), size(), has_leaf())) {
       return false;
     }
