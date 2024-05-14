@@ -26,17 +26,11 @@ class DirectoryMap {
   iterator find(std::string_view key, bool exact_match = true) const;
 
   bool insert(std::string_view name, const Attributes* attributes);
+  bool erase(std::string_view name);
 
  private:
   template <DirectoryTreeImpl TreeType>
-  TreeType split_tree(const std::deque<iterator::parent_node_info>& parents,
-                      const TreeType& tree,
-                      std::string_view for_key);
-
-  bool insert_to_parent(const std::deque<iterator::parent_node_info>& parents,
-                        DirectoryParentTree& tree,
-                        std::string_view key,
-                        uint32_t block_number);
+  bool split_tree(std::vector<iterator::parent_node_info>& parents, TreeType& tree, std::string_view for_key);
 
   size_t CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const;
 

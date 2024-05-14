@@ -66,7 +66,8 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
 };
 
 bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
-  auto [parents, leaf_tree] = find_leaf_tree(name);
+  auto [nparents, leaf_tree] = find_leaf_tree(name);
+  auto parents = nparents | std::ranges::to<std::vector>();
   if (!leaf_tree.find(name).is_end()) {
     // Already in tree
     return false;
@@ -78,13 +79,12 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
       Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), new_offset};
       if (leaf_tree.insert({name | std::ranges::to<std::string>(), new_offset})) {
         std::memcpy(new_attributes.get_mutable(), attributes, size);
-        break;
+        return true;
       }
       leaf_tree.Free(new_offset, size);
     }
-    leaf_tree = split_tree(parents, leaf_tree, name);
+    split_tree(parents, leaf_tree, name);
   }
-  return true;
 }
 
 std::pair<std::deque<DirectoryMap::iterator::parent_node_info>, DirectoryLeafTree> DirectoryMap::find_leaf_tree(
@@ -100,25 +100,13 @@ std::pair<std::deque<DirectoryMap::iterator::parent_node_info>, DirectoryLeafTre
     assert(!parents.back().iterator.is_end());
     current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
   }
-  return {std::move(parents), {std::move(current_block)}};
-}
-
-bool DirectoryMap::insert_to_parent(const std::deque<iterator::parent_node_info>& parents,
-                                    DirectoryParentTree& tree,
-                                    std::string_view key,
-                                    uint32_t block_number) {
-  while (true) {
-    if (tree.insert({key | std::ranges::to<std::string>(), block_number})) {
-      return true;
-    }
-    tree = split_tree(parents, tree, key);
-  }
+  return {parents, {std::move(current_block)}};
 }
 
 template <DirectoryTreeImpl TreeType>
-TreeType DirectoryMap::split_tree(const std::deque<iterator::parent_node_info>& parents,
-                                  const TreeType& tree,
-                                  std::string_view for_key) {
+bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
+                              TreeType& tree,
+                              std::string_view for_key) {
   auto old_block = tree.block();
   old_block->Detach();
   std::shared_ptr<Block> new_left_block;
@@ -144,11 +132,19 @@ TreeType DirectoryMap::split_tree(const std::deque<iterator::parent_node_info>& 
     new_root_tree.Init();
     new_root_tree.insert({"", new_left_block_number});
     new_root_tree.insert({middle_key, new_right_block_number});
+    parents.emplace_back(new_root_tree);
   } else {
-    (*parents.back().iterator).set_value(new_left_block_number);
-    auto parent = parents.back().node;
-    insert_to_parent({parents.begin(), parents.end() - 1}, parent, middle_key, new_right_block_number);
+    auto parent = parents.back();
+    parents.pop_back();
+    (*parent.iterator).set_value(new_left_block_number);
+    while (!parent.node.insert({middle_key, new_right_block_number})) {
+      split_tree(parents, parent.node, middle_key);
+    }
+    parents.push_back(parent);
+    // TODO: Maybe insert should return iterator so we won't need to find it again?
   }
+  parents.back().iterator = parents.back().node.find(middle_key);
 
-  return std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+  tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+  return true;
 }
