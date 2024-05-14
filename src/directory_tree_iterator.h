@@ -31,6 +31,7 @@ class DirectoryTreeIterator {
 
     const std::string& key() const { return key_; }
     LeafValueType value() const { return leaf_.value(); }
+    void set_value(LeafValueType value) { leaf_.set_value(value); }
 
     operator DiretoryTreeItem<LeafValueType>() const { return {key(), value()}; }
 
@@ -82,7 +83,7 @@ class DirectoryTreeIterator {
       uint16_t node_offset = (*parents_.back().iterator).value();
       decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::load(block_, node_offset)};
       if (parent.has_leaf()) {
-        leaf_ = parent.leaf();
+        leaf_ = parent.leaf_ref();
         return *this;
       }
       parents_.push_back({parent, parent.begin()});
@@ -98,7 +99,7 @@ class DirectoryTreeIterator {
       auto parent = parents_.back();
       parents_.pop_back();
       if (parent.node.has_leaf()) {
-        leaf_ = parent.node.leaf();
+        leaf_ = parent.node.leaf_ref();
         return *this;
       }
     }
@@ -109,7 +110,7 @@ class DirectoryTreeIterator {
       decltype(parent_node_info::node) parent{dir_tree_node_ref<LeafValueType>::load(block_, node_offset)};
       if (parent.size() == 0) {
         assert(parent.has_leaf());
-        leaf_ = parent.leaf();
+        leaf_ = parent.leaf_ref();
         return *this;
       }
       parents_.push_back({parent, parent.end()});

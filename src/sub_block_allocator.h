@@ -53,7 +53,7 @@ class SubBlockAllocator : public SubBlockAllocatorBase {
   SubBlockAllocator() = default;
   SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
-  void Init() { Init(sizeof(ExtraHeaderType)); }
+  void Init() { SubBlockAllocatorBase::Init(sizeof(ExtraHeaderType)); }
 
   ExtraHeaderType* mutable_extra_header() {
     return block()->template get_mutable_object<ExtraHeaderType>(extra_header_offset());

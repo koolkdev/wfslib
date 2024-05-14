@@ -21,10 +21,14 @@ class DirectoryTreeNode {
   DirectoryTreeNode(dir_tree_node_ref<LeafValueType> node) : node_(node) {}
 
   bool has_leaf() const { return node_.has_leaf_value(); }
-  std::optional<dir_tree_leaf_node_item_ref<LeafValueType>> leaf() const {
+  dir_tree_leaf_node_item_ref<LeafValueType> leaf_ref() const {
+    assert(has_leaf(0));
+    return dir_tree_leaf_node_item_ref<LeafValueType>{node_, 0};
+  }
+  std::optional<LeafValueType> leaf() const {
     if (!has_leaf())
       return std::nullopt;
-    return dir_tree_leaf_node_item_ref<LeafValueType>{node_, 0};
+    return leaf_ref().value();
   }
 
   bool set_leaf(LeafValueType value, bool check_size = true) {
@@ -143,15 +147,16 @@ class DirectoryTreeNode {
   bool operator==(const DirectoryTreeNode& other) const { return node_ == other.node_; }
 
   const DirectoryTreeNodeHeader* node() const { return node_.get(); }
-  size_t offset() const { return node_.offset; }
-  size_t allocated_size() const { return node_.node_size; }
+  uint16_t offset() const { return static_cast<uint16_t>(node_.offset); }
+  uint16_t allocated_size() const { return static_cast<uint16_t>(node_.node_size); }
 
   std::string_view prefix() const { return node_.prefix(); }
   bool set_prefix(std::string_view prefix, bool check_size = true) {
+    assert(prefix.size() < std::numeric_limits<uint8_t>::max);
     if (check_size && allocated_size() != calc_new_node_size(prefix.size(), size(), has_leaf())) {
       return false;
     }
-    node_.get_mutable()->prefix_length = prefix.size();
+    node_.get_mutable()->prefix_length = static_cast<uint8_t>(prefix.size());
     std::ranges::copy(prefix, node_.mutable_prefix().begin());
     auto old_leaf_value = leaf();
     auto old_keys_values = std::ranges::to<std::vector<typename iterator::value_type>>(*this);
