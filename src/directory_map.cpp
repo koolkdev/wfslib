@@ -47,18 +47,8 @@ DirectoryMap::iterator DirectoryMap::end() const {
 }
 
 DirectoryMap::iterator DirectoryMap::find(std::string_view key, bool exact_match) const {
-  if (size() == 0)
-    return end();
-  auto current_block = root_block_;
-  std::deque<iterator::parent_node_info> parents;
-  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
-           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
-    parents.push_back({std::move(current_block)});
-    parents.back().iterator = parents.back().node.find(key, /*exact_match=*/false);
-    assert(!parents.back().iterator.is_end());
-    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
-  }
-  iterator::leaf_node_info leaf{std::move(current_block)};
+  auto [parents, leaf_tree] = find_leaf_tree(key);
+  iterator::leaf_node_info leaf{std::move(leaf_tree)};
   leaf.iterator = leaf.node.find(key, exact_match);
   return {quota_, std::move(parents), std::move(leaf)};
 }
@@ -74,3 +64,91 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
     });
   }
 };
+
+bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
+  auto [parents, leaf_tree] = find_leaf_tree(name);
+  if (!leaf_tree.find(name).is_end()) {
+    // Already in tree
+    return false;
+  }
+  while (true) {
+    auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
+    auto new_offset = leaf_tree.Alloc(size);
+    if (new_offset) {
+      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), new_offset};
+      if (leaf_tree.insert({name | std::ranges::to<std::string>(), new_offset})) {
+        std::memcpy(new_attributes.get_mutable(), attributes, size);
+        break;
+      }
+      leaf_tree.Free(new_offset, size);
+    }
+    leaf_tree = split_tree(parents, leaf_tree, name);
+  }
+  return true;
+}
+
+std::pair<std::deque<DirectoryMap::iterator::parent_node_info>, DirectoryLeafTree> DirectoryMap::find_leaf_tree(
+    std::string_view key) const {
+  auto current_block = root_block_;
+  if (size() == 0)
+    return {{}, {std::move(current_block)}};
+  std::deque<iterator::parent_node_info> parents;
+  while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+           MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
+    parents.push_back({std::move(current_block)});
+    parents.back().iterator = parents.back().node.find(key, /*exact_match=*/false);
+    assert(!parents.back().iterator.is_end());
+    current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
+  }
+  return {std::move(parents), {std::move(current_block)}};
+}
+
+bool DirectoryMap::insert_to_parent(const std::deque<iterator::parent_node_info>& parents,
+                                    DirectoryParentTree& tree,
+                                    std::string_view key,
+                                    uint32_t block_number) {
+  while (true) {
+    if (tree.insert({key | std::ranges::to<std::string>(), block_number})) {
+      return true;
+    }
+    tree = split_tree(parents, tree, key);
+  }
+}
+
+template <DirectoryTreeImpl TreeType>
+TreeType DirectoryMap::split_tree(const std::deque<iterator::parent_node_info>& parents,
+                                  const TreeType& tree,
+                                  std::string_view for_key) {
+  auto old_block = tree.block();
+  old_block->Detach();
+  std::shared_ptr<Block> new_left_block;
+  // TODO: What happens if no space for new block? currently there is an exception.
+  if (old_block == root_block_) {
+    new_left_block = throw_if_error(quota_->AllocMetadataBlock());
+  } else {
+    new_left_block = throw_if_error(
+        quota_->LoadMetadataBlock(quota_->to_area_block_number(old_block->device_block_number()), /*new_block=*/true));
+  }
+  auto new_right_block = throw_if_error(quota_->AllocMetadataBlock());
+  auto new_left_block_number = quota_->to_area_block_number(new_left_block->device_block_number());
+  auto new_right_block_number = quota_->to_area_block_number(new_right_block->device_block_number());
+
+  TreeType new_left_tree{new_left_block}, new_right_tree{new_right_block};
+  auto middle = tree.middle();
+  auto middle_key = (*middle).key();
+  tree.split(new_left_tree, new_right_tree, middle);
+  if (old_block == root_block_) {
+    root_block_ = throw_if_error(quota_->LoadMetadataBlock(
+        quota_->to_area_block_number(root_block_->device_block_number()), /*new_block=*/true));
+    DirectoryParentTree new_root_tree{root_block_};
+    new_root_tree.Init();
+    new_root_tree.insert({"", new_left_block_number});
+    new_root_tree.insert({middle_key, new_right_block_number});
+  } else {
+    (*parents.back().iterator).set_value(new_left_block_number);
+    auto parent = parents.back().node;
+    insert_to_parent({parents.begin(), parents.end() - 1}, parent, middle_key, new_right_block_number);
+  }
+
+  return std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+}
