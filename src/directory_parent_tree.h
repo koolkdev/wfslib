@@ -16,4 +16,7 @@ class DirectoryParentTree : public DirectoryTree<dir_parent_tree_value_type> {
 
  private:
   void copy_value(DirectoryTree&, parent_node&, dir_parent_tree_value_type) const override {}
+  std::shared_ptr<DirectoryTree<dir_parent_tree_value_type>> create(std::shared_ptr<Block> block) const override {
+    return std::make_shared<DirectoryParentTree>(std::move(block));
+  }
 };

@@ -26,4 +26,8 @@ class DirectoryLeafTree : public DirectoryTree<dir_leaf_tree_value_type> {
     std::memcpy(new_attributes.get_mutable(), attributes.get(), size);
     new_node.set_leaf(new_offset);
   }
+
+  std::shared_ptr<DirectoryTree<dir_leaf_tree_value_type>> create(std::shared_ptr<Block> block) const override {
+    return std::make_shared<DirectoryLeafTree>(std::move(block));
+  }
 };

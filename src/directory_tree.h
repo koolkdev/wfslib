@@ -278,6 +278,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
 
  protected:
   virtual void copy_value(DirectoryTree& new_tree, parent_node& new_node, LeafValueType value) const = 0;
+  virtual std::shared_ptr<DirectoryTree<LeafValueType>> create(std::shared_ptr<Block> block) const = 0;
 
  private:
   template <typename Range>
@@ -370,10 +371,9 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
     // Ok we failed to alloc, we need to reallocate the whole tree.
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
-    // TODO: detach and reinitialize tree
-    DirectoryTree* new_tree = nullptr;
-    new_tree->Init();
-    merge_copy(*new_tree, root_node, current_node);
+    auto old_tree = create(Block::CreateDetached(block()->data() | std::ranges::to<std::vector>()));
+    Init();
+    old_tree->merge_copy(*this, root_node, current_node);
   }
 
   void split_copy(DirectoryTree& new_tree,
