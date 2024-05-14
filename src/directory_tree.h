@@ -381,7 +381,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
                   const parent_node& node,
                   const std::vector<typename iterator::parent_node_info>& split_parents,
                   bool left,
-                  int depth = 0,
+                  size_t depth = 0,
                   std::optional<typename iterator::parent_node_info> new_parent = std::nullopt) const {
     auto start = node.begin();
     auto end = node.end();

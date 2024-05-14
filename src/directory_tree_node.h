@@ -116,7 +116,6 @@ class DirectoryTreeNode {
       return false;
     }
     assert(begin() <= pos && pos < end());
-    auto new_end = end() - 1;
     iterator res = begin() + (pos - begin());
     std::copy(pos + 1, end(), res);
     --node_->keys_count;
@@ -133,7 +132,6 @@ class DirectoryTreeNode {
     assert(begin() <= it_end && it_end <= end());
     assert(it_start <= it_end);
     iterator res = begin() + (it_start - begin());
-    auto new_end = res + (end() - it_end);
     std::copy(it_end, end(), res);
     node_->keys_count -= items;
     assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
