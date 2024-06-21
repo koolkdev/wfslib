@@ -10,7 +10,7 @@
 #include "quota_area.h"
 
 DirectoryMapIterator::DirectoryMapIterator(std::shared_ptr<QuotaArea> quota,
-                                           std::deque<parent_node_info> parents,
+                                           std::vector<parent_node_info> parents,
                                            leaf_node_info leaf)
     : quota_(quota), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
 
@@ -22,16 +22,16 @@ DirectoryMapIterator::reference DirectoryMapIterator::operator*() const {
 DirectoryMapIterator& DirectoryMapIterator::operator++() {
   assert(!is_end());
   if ((++leaf_.iterator).is_end()) {
-    std::deque<parent_node_info> removed_parents;
+    std::vector<parent_node_info> removed_parents;
     while (!parents_.empty() && (++parents_.back().iterator).is_end()) {
       removed_parents.push_back(std::move(parents_.back()));
       parents_.pop_back();
     }
     if (parents_.empty()) {
       // end
-      for (auto& parent : removed_parents) {
+      for (auto& parent : std::views::reverse(removed_parents)) {
         --parent.iterator;
-        parents_.push_front(std::move(parent));
+        parents_.push_back(std::move(parent));
       }
       return *this;
     }

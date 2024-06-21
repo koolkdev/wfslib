@@ -15,7 +15,7 @@ struct SubBlockAllocatorStruct;
 
 class SubBlockAllocatorBase {
  public:
-  static const int BLOCK_SIZE_QUANTA = 3;  // 1 << 3
+  static constexpr int BLOCK_SIZE_QUANTA = 3;  // 1 << 3
   static constexpr int MAX_BLOCK_SIZE =
       BLOCK_SIZE_QUANTA + std::extent<decltype(SubBlockAllocatorStruct::free_list)>::value - 1;
 
@@ -24,6 +24,7 @@ class SubBlockAllocatorBase {
 
   uint16_t Alloc(uint16_t size);
   void Free(uint16_t offset, uint16_t size);
+  void Shrink(uint16_t offset, uint16_t old_size, uint16_t new_size);
 
   const std::shared_ptr<Block>& block() const { return block_; }
 
@@ -52,7 +53,7 @@ class SubBlockAllocator : public SubBlockAllocatorBase {
   SubBlockAllocator() = default;
   SubBlockAllocator(const std::shared_ptr<Block>& block) : SubBlockAllocatorBase(block) {}
 
-  void Init() { Init(sizeof(ExtraHeaderType)); }
+  void Init() { SubBlockAllocatorBase::Init(sizeof(ExtraHeaderType)); }
 
   ExtraHeaderType* mutable_extra_header() {
     return block()->template get_mutable_object<ExtraHeaderType>(extra_header_offset());

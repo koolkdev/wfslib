@@ -77,6 +77,7 @@ class Block {
         uint32_t iv,
         HashRef hash_ref,
         bool encrypted);
+  Block(std::vector<std::byte> data);
   virtual ~Block();
 
   bool Fetch(bool check_hash = true);
@@ -137,6 +138,8 @@ class Block {
                                                                            uint32_t iv,
                                                                            bool load_data = true,
                                                                            bool check_hash = true);
+
+  static std::shared_ptr<Block> CreateDetached(std::vector<std::byte> data);
 
  private:
   uint32_t GetAlignedSize(uint32_t size) const;
