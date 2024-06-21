@@ -7,9 +7,6 @@
 
 #pragma once
 
-// TODO move to source
-#include <cstring>
-
 #include "directory_tree.h"
 
 class DirectoryLeafTree : public DirectoryTree<dir_leaf_tree_value_type> {
@@ -18,15 +15,7 @@ class DirectoryLeafTree : public DirectoryTree<dir_leaf_tree_value_type> {
   DirectoryLeafTree(std::shared_ptr<Block> block) : DirectoryTree(std::move(block)) {}
 
  private:
-  void copy_value(DirectoryTree& new_tree, parent_node& new_node, dir_leaf_tree_value_type value) const override {
-    Block::RawDataRef<Attributes> attributes{block().get(), value};
-    auto size = 1 << attributes.get()->entry_log2_size.value();
-    auto new_offset = new_tree.Alloc(static_cast<uint16_t>(size));
-    Block::RawDataRef<Attributes> new_attributes{new_tree.block().get(), new_offset};
-    std::memcpy(new_attributes.get_mutable(), attributes.get(), size);
-    new_node.set_leaf(new_offset);
-  }
-
+  void copy_value(DirectoryTree& new_tree, parent_node& new_node, dir_leaf_tree_value_type value) const override;
   std::shared_ptr<DirectoryTree<dir_leaf_tree_value_type>> create(std::shared_ptr<Block> block) const override {
     return std::make_shared<DirectoryLeafTree>(std::move(block));
   }
