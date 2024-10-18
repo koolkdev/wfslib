@@ -7,6 +7,7 @@
 
 #include "directory_map.h"
 
+#include <cstring>
 #include <numeric>
 #include <utility>
 
@@ -18,7 +19,7 @@ DirectoryMap::DirectoryMap(std::shared_ptr<QuotaArea> quota, std::shared_ptr<Blo
 
 DirectoryMap::iterator DirectoryMap::begin() const {
   auto current_block = root_block_;
-  std::deque<iterator::parent_node_info> parents;
+  std::vector<iterator::parent_node_info> parents;
   while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
            MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
     parents.push_back({std::move(current_block)});
@@ -33,7 +34,7 @@ DirectoryMap::iterator DirectoryMap::begin() const {
 
 DirectoryMap::iterator DirectoryMap::end() const {
   auto current_block = root_block_;
-  std::deque<iterator::parent_node_info> parents;
+  std::vector<iterator::parent_node_info> parents;
   while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
            MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
     parents.push_back({std::move(current_block)});
@@ -46,11 +47,11 @@ DirectoryMap::iterator DirectoryMap::end() const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
-DirectoryMap::iterator DirectoryMap::find(std::string_view key, bool exact_match) const {
+DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
   if (size() == 0)
     return end();
   auto current_block = root_block_;
-  std::deque<iterator::parent_node_info> parents;
+  std::vector<iterator::parent_node_info> parents;
   while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
            MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
     parents.push_back({std::move(current_block)});
@@ -58,8 +59,8 @@ DirectoryMap::iterator DirectoryMap::find(std::string_view key, bool exact_match
     assert(!parents.back().iterator.is_end());
     current_block = throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()));
   }
-  iterator::leaf_node_info leaf{std::move(current_block)};
-  leaf.iterator = leaf.node.find(key, exact_match);
+  iterator::leaf_node_info leaf{{current_block}};
+  leaf.iterator = leaf.node.find(key);
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
@@ -74,3 +75,89 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
     });
   }
 };
+
+bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
+  auto it = find(name);
+  if (!it.is_end()) {
+    // Already in tree
+    return false;
+  }
+  auto parents = it.parents();
+  auto leaf_tree = it.leaf().node;
+  while (true) {
+    auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
+    auto new_offset = leaf_tree.Alloc(size);
+    if (new_offset) {
+      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), new_offset};
+      if (leaf_tree.insert({name | std::ranges::to<std::string>(), new_offset})) {
+        std::memcpy(new_attributes.get_mutable(), attributes, size);
+        return true;
+      }
+      leaf_tree.Free(new_offset, size);
+    }
+    split_tree(parents, leaf_tree, name);
+  }
+}
+
+bool DirectoryMap::erase(std::string_view name) {
+  auto it = find(name);
+  if (!it.is_end()) {
+    // Not in tree
+    return false;
+  }
+  auto parents = it.parents();
+  it.leaf().node.erase(it.leaf().iterator);
+  bool last_empty = it.leaf().node.empty();
+  while (last_empty) {
+    parents.back().node.erase(parents.back().iterator);
+    last_empty = parents.back().node.empty();
+    parents.pop_back();
+  }
+  return true;
+}
+
+template <DirectoryTreeImpl TreeType>
+bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
+                              TreeType& tree,
+                              std::string_view for_key) {
+  auto old_block = tree.block();
+  old_block->Detach();
+  std::shared_ptr<Block> new_left_block;
+  // TODO: What happens if no space for new block? currently there is an exception.
+  if (old_block == root_block_) {
+    new_left_block = throw_if_error(quota_->AllocMetadataBlock());
+  } else {
+    new_left_block = throw_if_error(
+        quota_->LoadMetadataBlock(quota_->to_area_block_number(old_block->device_block_number()), /*new_block=*/true));
+  }
+  auto new_right_block = throw_if_error(quota_->AllocMetadataBlock());
+  auto new_left_block_number = quota_->to_area_block_number(new_left_block->device_block_number());
+  auto new_right_block_number = quota_->to_area_block_number(new_right_block->device_block_number());
+
+  TreeType new_left_tree{new_left_block}, new_right_tree{new_right_block};
+  auto middle = tree.middle();
+  auto middle_key = (*middle).key();
+  tree.split(new_left_tree, new_right_tree, middle);
+  if (old_block == root_block_) {
+    root_block_ = throw_if_error(quota_->LoadMetadataBlock(
+        quota_->to_area_block_number(root_block_->device_block_number()), /*new_block=*/true));
+    DirectoryParentTree new_root_tree{root_block_};
+    new_root_tree.Init();
+    new_root_tree.insert({"", new_left_block_number});
+    new_root_tree.insert({middle_key, new_right_block_number});
+    parents.emplace_back(new_root_tree);
+  } else {
+    auto [parent, parent_it] = parents.back();
+    parents.pop_back();
+    (*parent_it).set_value(new_left_block_number);
+    while (!parent.insert({middle_key, new_right_block_number})) {
+      split_tree(parents, parent, middle_key);
+    }
+    parents.emplace_back(parent);
+    // TODO: Maybe insert should return iterator so we won't need to find it again?
+  }
+  parents.back().iterator = parents.back().node.find(middle_key);
+
+  tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+  return true;
+}

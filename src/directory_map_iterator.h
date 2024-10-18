@@ -33,7 +33,7 @@ class DirectoryMapIterator {
   using leaf_node_info = dir_node_iterator_info<DirectoryLeafTree>;
 
   DirectoryMapIterator() = default;
-  DirectoryMapIterator(std::shared_ptr<QuotaArea> quota, std::deque<parent_node_info> parents, leaf_node_info leaf);
+  DirectoryMapIterator(std::shared_ptr<QuotaArea> quota, std::vector<parent_node_info> parents, leaf_node_info leaf);
 
   reference operator*() const;
 
@@ -44,8 +44,8 @@ class DirectoryMapIterator {
 
   bool operator==(const DirectoryMapIterator& other) const { return leaf_.iterator == other.leaf_.iterator; }
 
-  std::deque<parent_node_info>& parents() { return parents_; };
-  const std::deque<parent_node_info>& parents() const { return parents_; };
+  std::vector<parent_node_info>& parents() { return parents_; };
+  const std::vector<parent_node_info>& parents() const { return parents_; };
   leaf_node_info& leaf() { return leaf_; };
   const leaf_node_info& leaf() const { return leaf_; };
 
@@ -56,6 +56,6 @@ class DirectoryMapIterator {
 
  private:
   std::shared_ptr<QuotaArea> quota_;
-  std::deque<parent_node_info> parents_;
+  std::vector<parent_node_info> parents_;
   leaf_node_info leaf_;
 };

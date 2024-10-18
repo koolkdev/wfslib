@@ -9,6 +9,9 @@
 
 #include "directory_map_iterator.h"
 
+template <typename T>
+concept DirectoryTreeImpl = std::same_as<T, DirectoryLeafTree> || std::same_as<T, DirectoryParentTree>;
+
 class DirectoryMap {
  public:
   using iterator = DirectoryMapIterator;
@@ -20,9 +23,15 @@ class DirectoryMap {
   iterator begin() const;
   iterator end() const;
 
-  iterator find(std::string_view key, bool exact_match = true) const;
+  iterator find(std::string_view key) const;
+
+  bool insert(std::string_view name, const Attributes* attributes);
+  bool erase(std::string_view name);
 
  private:
+  template <DirectoryTreeImpl TreeType>
+  bool split_tree(std::vector<iterator::parent_node_info>& parents, TreeType& tree, std::string_view for_key);
+
   size_t CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const;
 
   std::shared_ptr<QuotaArea> quota_;

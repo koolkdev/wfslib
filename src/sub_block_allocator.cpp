@@ -107,6 +107,18 @@ void SubBlockAllocatorBase::Free(uint16_t offset, uint16_t size) {
   free_entry->free_mark = free_entry->FREE_MARK_CONST;
 }
 
+void SubBlockAllocatorBase::Shrink(uint16_t offset, uint16_t old_size, uint16_t new_size) {
+  assert(new_size < old_size);
+  int old_size_log2 = GetSizeGroup(old_size);
+  int new_size_log2 = GetSizeGroup(new_size);
+  uint16_t free_offset = offset + (1 << new_size_log2);
+  while (free_offset < offset + (1 << old_size_log2)) {
+    Free(free_offset, 1 << new_size_log2);
+    free_offset += 1 << new_size_log2++;
+  }
+  assert(free_offset == offset + (1 << old_size_log2));
+}
+
 void SubBlockAllocatorBase::Unlink(const SubBlockAllocatorFreeListEntry* entry, int size_index) {
   auto* prev_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(entry->prev.value());
   auto* next_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(entry->next.value());

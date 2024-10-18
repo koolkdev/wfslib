@@ -28,6 +28,16 @@ Block::Block(std::shared_ptr<BlocksDevice> device,
       hash_ref_(std::move(hash_ref)),
       data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
+Block::Block(std::vector<std::byte> data)
+    : device_block_number_(0),
+      size_category_(Block::BlockSize::Basic),
+      data_size_(0),
+      iv_(0),
+      encrypted_(false),
+      detached_(true),
+      hash_ref_{},
+      data_(std::move(data)) {}
+
 Block::~Block() {
   Flush();
   Detach();
@@ -115,4 +125,8 @@ std::expected<std::shared_ptr<Block>, WfsError> Block::LoadMetadataBlock(std::sh
                                                                          bool check_hash) {
   return LoadDataBlock(std::move(device), block_number, size_category, 1 << size_category, iv,
                        {nullptr, offsetof(MetadataBlockHeader, hash)}, /*encrypted=*/true, load_data, check_hash);
+}
+
+std::shared_ptr<Block> Block::CreateDetached(std::vector<std::byte> data) {
+  return std::make_shared<Block>(std::move(data));
 }
