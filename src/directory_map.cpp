@@ -7,6 +7,7 @@
 
 #include "directory_map.h"
 
+#include <cstring>
 #include <numeric>
 #include <utility>
 
