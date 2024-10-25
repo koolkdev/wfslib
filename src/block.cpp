@@ -31,7 +31,7 @@ Block::Block(std::shared_ptr<BlocksDevice> device,
 Block::Block(std::vector<std::byte> data)
     : device_block_number_(0),
       size_category_(Block::BlockSize::Basic),
-      data_size_(0),
+      data_size_(static_cast<uint32_t>(data.size())),
       iv_(0),
       encrypted_(false),
       detached_(true),
