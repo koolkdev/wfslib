@@ -15,7 +15,8 @@ void DirectoryLeafTree::copy_value(DirectoryTree& new_tree,
   Block::RawDataRef<Attributes> attributes{block().get(), value};
   auto size = 1 << attributes.get()->entry_log2_size.value();
   auto new_offset = new_tree.Alloc(static_cast<uint16_t>(size));
-  Block::RawDataRef<Attributes> new_attributes{new_tree.block().get(), new_offset};
+  assert(new_offset.has_value());
+  Block::RawDataRef<Attributes> new_attributes{new_tree.block().get(), *new_offset};
   std::memcpy(new_attributes.get_mutable(), attributes.get(), size);
-  new_node.set_leaf(new_offset);
+  new_node.set_leaf(*new_offset);
 }

@@ -22,7 +22,7 @@ class SubBlockAllocatorBase {
   SubBlockAllocatorBase() = default;
   SubBlockAllocatorBase(std::shared_ptr<Block> block) : block_(std::move(block)) {}
 
-  uint16_t Alloc(uint16_t size);
+  std::optional<uint16_t> Alloc(uint16_t size);
   void Free(uint16_t offset, uint16_t size);
   void Shrink(uint16_t offset, uint16_t old_size, uint16_t new_size);
 
@@ -33,7 +33,6 @@ class SubBlockAllocatorBase {
 
   uint16_t header_offset() const { return sizeof(MetadataBlockHeader); }
 
- private:
   SubBlockAllocatorStruct* mutable_header() {
     return block()->get_mutable_object<SubBlockAllocatorStruct>(header_offset());
   }
@@ -41,9 +40,10 @@ class SubBlockAllocatorBase {
     return block()->get_object<SubBlockAllocatorStruct>(header_offset());
   }
 
+ private:
   std::shared_ptr<Block> block_;
 
-  uint16_t PopFreeEntry(int size_index);
+  std::optional<uint16_t> PopFreeEntry(int size_index);
   void Unlink(const SubBlockAllocatorFreeListEntry* entry, int size_index);
 };
 

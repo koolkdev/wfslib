@@ -87,13 +87,13 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
   while (true) {
     auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
     auto new_offset = leaf_tree.Alloc(size);
-    if (new_offset) {
-      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), new_offset};
-      if (leaf_tree.insert({name | std::ranges::to<std::string>(), new_offset})) {
+    if (new_offset.has_value()) {
+      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), *new_offset};
+      if (leaf_tree.insert({name | std::ranges::to<std::string>(), *new_offset})) {
         std::memcpy(new_attributes.get_mutable(), attributes, size);
         return true;
       }
-      leaf_tree.Free(new_offset, size);
+      leaf_tree.Free(*new_offset, size);
     }
     split_tree(parents, leaf_tree, name);
   }
