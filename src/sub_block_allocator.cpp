@@ -16,7 +16,7 @@ namespace {
 int GetSizeGroup(uint16_t size) {
   assert(size > 0);
   int size_log2 = std::bit_width(static_cast<uint16_t>(size - 1));
-  size_log2 = std::min(size_log2, SubBlockAllocatorBase::BLOCK_SIZE_QUANTA);
+  size_log2 = std::max(size_log2, SubBlockAllocatorBase::BLOCK_SIZE_QUANTA);
   assert(size_log2 <= SubBlockAllocatorBase::MAX_BLOCK_SIZE);
   return size_log2;
 }
@@ -38,23 +38,24 @@ void SubBlockAllocatorBase::Init(uint16_t extra_header_size) {
   header->free_list[MAX_BLOCK_SIZE - BLOCK_SIZE_QUANTA].free_blocks_count = free_entries;
 
   // Reserve header
-  Alloc(total_headers_size);
+  [[maybe_unused]] auto res = Alloc(total_headers_size);
+  assert(res.has_value() && *res == 0);
 }
 
-uint16_t SubBlockAllocatorBase::Alloc(uint16_t size) {
+std::optional<uint16_t> SubBlockAllocatorBase::Alloc(uint16_t size) {
   int size_log2 = GetSizeGroup(size);
-  uint16_t offset = PopFreeEntry(size_log2 - BLOCK_SIZE_QUANTA);
-  if (offset) {
+  auto offset = PopFreeEntry(size_log2 - BLOCK_SIZE_QUANTA);
+  if (offset.has_value()) {
     return offset;
   }
-  int base_size_log2 = size_log2++;
-  for (; !offset; offset = PopFreeEntry(size_log2 - BLOCK_SIZE_QUANTA)) {
-    if (++size_log2 > MAX_BLOCK_SIZE - BLOCK_SIZE_QUANTA)
-      return 0;
+  int base_size_log2 = size_log2;
+  for (; !offset.has_value(); offset = PopFreeEntry(size_log2 - BLOCK_SIZE_QUANTA)) {
+    if (++size_log2 > MAX_BLOCK_SIZE)
+      return std::nullopt;
   }
 
   // Split a bigger block
-  for (uint16_t sub_block_offset = offset + (1 << base_size_log2); base_size_log2 < size_log2;
+  for (uint16_t sub_block_offset = *offset + (1 << base_size_log2); base_size_log2 < size_log2;
        sub_block_offset += (1 << (base_size_log2++))) {
     auto* free_entry = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(sub_block_offset);
     free_entry->free_mark = free_entry->FREE_MARK_CONST;
@@ -89,6 +90,7 @@ void SubBlockAllocatorBase::Free(uint16_t offset, uint16_t size) {
   if (free_blocks_count) {
     // Insert at end of list
     uint16_t head_offset = header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].head.value();
+    mutable_header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].free_blocks_count++;
     auto* next_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(head_offset);
     auto* prev_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(next_free->prev.value());
     free_entry->next = head_offset;
@@ -129,10 +131,10 @@ void SubBlockAllocatorBase::Unlink(const SubBlockAllocatorFreeListEntry* entry, 
       header()->free_list[size_index].free_blocks_count.value() - 1;
 }
 
-uint16_t SubBlockAllocatorBase::PopFreeEntry(int size_index) {
+std::optional<uint16_t> SubBlockAllocatorBase::PopFreeEntry(int size_index) {
   auto free_blocks_count = header()->free_list[size_index].free_blocks_count.value();
   if (free_blocks_count == 0)
-    return 0;
+    return std::nullopt;
   uint16_t entry_offset = header()->free_list[size_index].head.value();
   auto* free_entry = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(entry_offset);
   free_entry->free_mark = 0;
