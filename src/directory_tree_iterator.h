@@ -50,6 +50,7 @@ class DirectoryTreeIterator {
   DirectoryTreeIterator() = default;
   DirectoryTreeIterator(Block* block, std::vector<parent_node_info> parents, std::optional<leaf_node_info> leaf)
       : block_(block), parents_(std::move(parents)), leaf_(std::move(leaf)) {}
+  DirectoryTreeIterator(const DirectoryTreeIterator& other) = default;
 
   DirectoryTreeIterator& operator=(const DirectoryTreeIterator& other) {
     block_ = other.block_;
