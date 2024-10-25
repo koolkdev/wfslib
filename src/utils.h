@@ -38,7 +38,7 @@ class big_endian_type {
     return *this;
   }
   big_endian_type& operator--() {
-    *this += 1;
+    *this -= 1;
     return *this;
   }
 
