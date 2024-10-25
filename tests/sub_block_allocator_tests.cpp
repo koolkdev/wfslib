@@ -129,7 +129,7 @@ TEST_CASE("SubBlockAllocatorTests") {
     auto* allocator_header = allocator.get_allocator_header();
     uint16_t current_offset = sizeof(MetadataBlockHeader) + sizeof(SubBlockAllocatorStruct) + sizeof(DummyExtraHeader);
     size_t total_bytes = (1 << Block::BlockSize::Regular) - current_offset;
-    for (int i = 0; i < (total_bytes >> 3); ++i) {
+    for (size_t i = 0; i < (total_bytes >> 3); ++i) {
       auto offset = allocator.Alloc(8);
       REQUIRE(offset.has_value());
       CHECK(*offset == current_offset);
@@ -144,7 +144,7 @@ TEST_CASE("SubBlockAllocatorTests") {
     CHECK(!offset.has_value());
 
     current_offset = sizeof(MetadataBlockHeader) + sizeof(SubBlockAllocatorStruct) + sizeof(DummyExtraHeader);
-    for (int i = 0; i < (total_bytes >> 3); ++i) {
+    for (size_t i = 0; i < (total_bytes >> 3); ++i) {
       allocator.Free(current_offset, 8);
       current_offset += 8;
     }
