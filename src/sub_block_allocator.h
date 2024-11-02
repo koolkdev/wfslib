@@ -23,6 +23,7 @@ class SubBlockAllocatorBase {
   SubBlockAllocatorBase(std::shared_ptr<Block> block) : block_(std::move(block)) {}
 
   std::optional<uint16_t> Alloc(uint16_t size);
+  bool CanAlloc(uint16_t size) const;
   void Free(uint16_t offset, uint16_t size);
   void Shrink(uint16_t offset, uint16_t old_size, uint16_t new_size);
 
