@@ -33,6 +33,11 @@ class big_endian_type {
     *this = value() - val;
     return *this;
   }
+  big_endian_type& operator|=(T val) {
+    *this = value() | val;
+    return *this;
+  }
+
   big_endian_type& operator++() {
     *this += 1;
     return *this;

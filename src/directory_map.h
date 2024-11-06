@@ -28,6 +28,8 @@ class DirectoryMap {
   bool insert(std::string_view name, const Attributes* attributes);
   bool erase(std::string_view name);
 
+  void Init();
+
  private:
   template <DirectoryTreeImpl TreeType>
   bool split_tree(std::vector<iterator::parent_node_info>& parents, TreeType& tree, std::string_view for_key);

@@ -24,6 +24,7 @@ struct MetadataBlockHeader {
   // 0x40000000 - ?
   // 0x80000000 - Directory?
   enum Flags : uint32_t {
+    FLAGS_MASK = 0xFFF00000,
     AREA = 0x00400000,
     ROOT_AREA = 0x00800000,
     DIRECTORY_LEAF_TREE = 0x20000000,

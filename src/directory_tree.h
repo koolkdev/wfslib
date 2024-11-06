@@ -348,6 +348,20 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
   }
 
+  virtual void Init(bool is_root) {
+    SubBlockAllocator<DirectoryTreeHeader>::Init();
+    auto* header = block()->get_mutable_object<MetadataBlockHeader>(0);
+    header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY;
+    if (is_root) {
+      header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE;
+    }
+  }
+
+  void ReInit() {
+    Init(block()->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+         MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE);
+  }
+
  protected:
   virtual void copy_value(DirectoryTree& new_tree, parent_node& new_node, LeafValueType value) const = 0;
   virtual std::shared_ptr<DirectoryTree<LeafValueType>> create(std::shared_ptr<Block> block) const = 0;
@@ -450,7 +464,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         dir_tree_node_ref<LeafValueType>::load(old_tree->block().get(), extra_header()->root.value())};
     parent_node merge_node{dir_tree_node_ref<LeafValueType>::load(
         old_tree->block().get(), parent ? (*parent->iterator).value() : extra_header()->root.value())};
-    Init();
+    ReInit();
     old_tree->merge_copy(*this, root_node, merge_node);
   }
 

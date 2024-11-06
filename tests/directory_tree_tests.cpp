@@ -64,7 +64,7 @@ TEST_CASE("DirectoryTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto directory_tree_block = TestBlock::LoadMetadataBlock(test_device, 0);
   TestDirectoryTree dir_tree{directory_tree_block};
-  dir_tree.Init();
+  dir_tree.Init(true);
 
   SECTION("Check empty tree size") {
     REQUIRE(dir_tree.size() == 0);
@@ -277,8 +277,8 @@ TEST_CASE("DirectoryTreeTests") {
 
     std::array<TestDirectoryTree, 2> new_trees{TestDirectoryTree{TestBlock::LoadMetadataBlock(test_device, 1)},
                                                TestDirectoryTree{TestBlock::LoadMetadataBlock(test_device, 2)}};
-    new_trees[0].Init();
-    new_trees[1].Init();
+    new_trees[0].Init(false);
+    new_trees[1].Init(false);
 
     dir_tree.split(new_trees[0], new_trees[1], split_point);
     CHECK(new_trees[0].size() == 5);

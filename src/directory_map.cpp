@@ -116,7 +116,7 @@ bool DirectoryMap::erase(std::string_view name) {
   if (parents.empty()) {
     // Root node empty, reinitialize tree
     assert(it.leaf().node.block() == root_block_);
-    it.leaf().node.Init();
+    Init();
     return true;
   }
   while (true) {
@@ -139,7 +139,7 @@ bool DirectoryMap::erase(std::string_view name) {
     if (parents.size() == 1) {
       // Root node empty, reinitialize tree
       assert(parents.back().node.block() == root_block_);
-      parents.back().node.Init();
+      Init();
       return true;
     }
     parents.pop_back();
@@ -167,12 +167,14 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   TreeType new_left_tree{new_left_block}, new_right_tree{new_right_block};
   auto middle = tree.middle();
   auto middle_key = (*middle).key();
+  new_left_tree.Init(/*is_root=*/false);
+  new_right_tree.Init(/*is_root=*/false);
   tree.split(new_left_tree, new_right_tree, middle);
   if (old_block == root_block_) {
     root_block_ = throw_if_error(quota_->LoadMetadataBlock(
         quota_->to_area_block_number(root_block_->device_block_number()), /*new_block=*/true));
     DirectoryParentTree new_root_tree{root_block_};
-    new_root_tree.Init();
+    new_root_tree.Init(/*is_root=*/true);
     new_root_tree.insert({"", new_left_block_number});
     new_root_tree.insert({middle_key, new_right_block_number});
     parents.emplace_back(new_root_tree);
@@ -190,4 +192,9 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
 
   tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
   return true;
+}
+
+void DirectoryMap::Init() {
+  DirectoryLeafTree root_tree{root_block_};
+  root_tree.Init(/*is_root=*/true);
 }
