@@ -350,7 +350,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
 
   virtual void Init(bool is_root) {
     SubBlockAllocator<DirectoryTreeHeader>::Init();
-    auto* header = block()->get_mutable_object<MetadataBlockHeader>(0);
+    auto* header = block()->template get_mutable_object<MetadataBlockHeader>(0);
     header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY;
     if (is_root) {
       header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE;
@@ -358,7 +358,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
   }
 
   void ReInit() {
-    Init(block()->get_object<MetadataBlockHeader>(0)->block_flags.value() &
+    Init(block()->template get_object<MetadataBlockHeader>(0)->block_flags.value() &
          MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE);
   }
 
