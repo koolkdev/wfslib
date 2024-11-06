@@ -31,6 +31,7 @@ add_library(${PROJECT_NAME}
     src/directory_leaf_tree.cpp
     src/directory_map_iterator.cpp
     src/directory_map.cpp
+    src/directory_parent_tree.cpp
     src/directory.cpp
     src/eptree_iterator.cpp
     src/eptree.cpp

@@ -172,8 +172,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
   }
 
-  void erase(iterator& pos) {
-    // Remove currnet parent leaf
+  virtual void erase(iterator& pos) {
+    // Remove current parent leaf
     auto parents = pos.parents();
     std::optional<typename iterator::parent_node_info> last_parent;
     if (!parents.empty())
@@ -223,7 +223,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
   }
 
-  void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const {
+  virtual void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const {
     // Implemented in a totally different way then original because it is way too complex for no reason.
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
     split_copy(right, std::nullopt, root_node, pos.parents(), /*left=*/false);

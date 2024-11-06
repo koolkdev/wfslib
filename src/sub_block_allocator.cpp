@@ -69,6 +69,14 @@ std::optional<uint16_t> SubBlockAllocatorBase::Alloc(uint16_t size) {
   return offset;
 }
 
+bool SubBlockAllocatorBase::CanAlloc(uint16_t size) const {
+  for (int size_log2 = GetSizeGroup(size); size_log2 <= MAX_BLOCK_SIZE; ++size_log2) {
+    if (header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].free_blocks_count.value())
+      return true;
+  }
+  return false;
+}
+
 void SubBlockAllocatorBase::Free(uint16_t offset, uint16_t size) {
   int size_log2 = GetSizeGroup(size);
   assert(!(offset & ((1 << size_log2) - 1)));

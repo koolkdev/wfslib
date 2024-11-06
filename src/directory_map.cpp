@@ -106,14 +106,44 @@ bool DirectoryMap::erase(std::string_view name) {
     return false;
   }
   auto parents = it.parents();
+  // Free the item attributes first
+  it.leaf().node.Free((*it.leaf().iterator).value(),
+                      static_cast<uint16_t>(1 << (*it).attributes->entry_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);
   bool last_empty = it.leaf().node.empty();
-  while (last_empty) {
+  if (!last_empty)
+    return true;
+  if (parents.empty()) {
+    // Root node empty, reinitialize tree
+    assert(it.leaf().node.block() == root_block_);
+    it.leaf().node.Init();
+    return true;
+  }
+  while (true) {
+    // Delete child leaf block
+    [[maybe_unused]] bool res = quota_->DeleteBlocks((*parents.back().iterator).value(), 1);
+    assert(res);
+    // Delete child leaf
+    if (!parents.back().node.can_erase(parents.back().iterator)) {
+      // Erase may fail, split the tree
+      auto [parent, parent_it] = parents.back();
+      parents.pop_back();
+      split_tree(parents, parent, name);
+      parents.emplace_back(parent);
+      parents.back().iterator = parents.back().node.find(name);
+    }
     parents.back().node.erase(parents.back().iterator);
     last_empty = parents.back().node.empty();
+    if (!last_empty)
+      return true;
+    if (parents.size() == 1) {
+      // Root node empty, reinitialize tree
+      assert(parents.back().node.block() == root_block_);
+      parents.back().node.Init();
+      return true;
+    }
     parents.pop_back();
   }
-  return true;
 }
 
 template <DirectoryTreeImpl TreeType>

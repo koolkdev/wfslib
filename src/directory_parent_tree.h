@@ -11,12 +11,20 @@
 
 class DirectoryParentTree : public DirectoryTree<dir_parent_tree_value_type> {
  public:
+  using type = dir_parent_tree_value_type;
+  using base = DirectoryTree<type>;
+
   DirectoryParentTree() = default;
   DirectoryParentTree(std::shared_ptr<Block> block) : DirectoryTree(std::move(block)) {}
 
- private:
-  void copy_value(DirectoryTree&, parent_node&, dir_parent_tree_value_type) const override {}
-  std::shared_ptr<DirectoryTree<dir_parent_tree_value_type>> create(std::shared_ptr<Block> block) const override {
+  void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const override;
+  void erase(iterator& pos) override;
+
+  bool can_erase(iterator& pos) const;
+
+ protected:
+  void copy_value(DirectoryTree&, parent_node&, type) const override {}
+  std::shared_ptr<base> create(std::shared_ptr<Block> block) const override {
     return std::make_shared<DirectoryParentTree>(std::move(block));
   }
 };

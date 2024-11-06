@@ -19,24 +19,21 @@
 #include "utils/test_free_blocks_allocator.h"
 #include "utils/test_utils.h"
 
-template <typename Tuple, std::size_t... I>
-std::string tuple_to_string_impl(const Tuple& tpl, std::index_sequence<I...>) {
-  // Use fold expression to concatenate tuple elements by index
-  return std::string{std::get<I>(tpl)...};
-}
-
-// Wrapper function to create index sequence for any tuple size
-template <typename... T>
-std::string tuple_to_string(const std::tuple<T...>& tpl) {
-  // Create index sequence [0, 1, 2, ..., N-1] where N is the size of the tuple
-  return tuple_to_string_impl(tpl, std::index_sequence_for<T...>{});
-}
 namespace {
 
-class TestDirectoryLeafTree : public DirectoryLeafTree {
+template <typename Tuple, std::size_t... I>
+std::string tuple_to_string_impl(const Tuple& tpl, std::index_sequence<I...>) {
+  return std::string{std::get<I>(tpl)...};
+}
+template <typename... T>
+std::string tuple_to_string(const std::tuple<T...>& tpl) {
+  return tuple_to_string_impl(tpl, std::index_sequence_for<T...>{});
+}
+
+class TestDirectoryTree : public DirectoryTree<uint16_t> {
  public:
-  TestDirectoryLeafTree() = default;
-  TestDirectoryLeafTree(std::shared_ptr<Block> block) : DirectoryLeafTree(std::move(block)) {}
+  TestDirectoryTree() = default;
+  TestDirectoryTree(std::shared_ptr<Block> block) : DirectoryTree<uint16_t>(std::move(block)) {}
 
   int allocated_bytes() {
     int allocated = 1 << Block::BlockSize::Regular;
@@ -54,21 +51,19 @@ class TestDirectoryLeafTree : public DirectoryLeafTree {
     return free_bytes;
   }
 
-  void copy_value(DirectoryTree&, parent_node&, dir_leaf_tree_value_type) const override {
-    // do nothing, don't have actual attributes in this test
-  }
+  void copy_value(DirectoryTree&, parent_node&, dir_leaf_tree_value_type) const override {}
 
-  std::shared_ptr<DirectoryTree<dir_leaf_tree_value_type>> create(std::shared_ptr<Block> block) const override {
-    return std::make_shared<TestDirectoryLeafTree>(std::move(block));
+  std::shared_ptr<DirectoryTree<uint16_t>> create(std::shared_ptr<Block> block) const override {
+    return std::make_shared<TestDirectoryTree>(std::move(block));
   }
 };
 
 }  // namespace
 
-TEST_CASE("DirectoryLeafTreeTests") {
+TEST_CASE("DirectoryTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
-  auto directory_leaf_ftree_block = TestBlock::LoadMetadataBlock(test_device, 0);
-  TestDirectoryLeafTree dir_tree{directory_leaf_ftree_block};
+  auto directory_tree_block = TestBlock::LoadMetadataBlock(test_device, 0);
+  TestDirectoryTree dir_tree{directory_tree_block};
   dir_tree.Init();
 
   SECTION("Check empty tree size") {
@@ -280,8 +275,8 @@ TEST_CASE("DirectoryLeafTreeTests") {
     REQUIRE(split_point != dir_tree.end());
     REQUIRE(dir_tree.size() == 8);
 
-    std::array<TestDirectoryLeafTree, 2> new_trees{TestDirectoryLeafTree{TestBlock::LoadMetadataBlock(test_device, 1)},
-                                                   TestDirectoryLeafTree{TestBlock::LoadMetadataBlock(test_device, 2)}};
+    std::array<TestDirectoryTree, 2> new_trees{TestDirectoryTree{TestBlock::LoadMetadataBlock(test_device, 1)},
+                                               TestDirectoryTree{TestBlock::LoadMetadataBlock(test_device, 2)}};
     new_trees[0].Init();
     new_trees[1].Init();
 
