@@ -9,6 +9,11 @@
 
 #include <cstring>
 
+void DirectoryLeafTree::Init(bool is_root) {
+  base::Init(is_root);
+  block()->get_mutable_object<MetadataBlockHeader>(0)->block_flags |= MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE;
+}
+
 void DirectoryLeafTree::copy_value(DirectoryTree& new_tree,
                                    parent_node& new_node,
                                    dir_leaf_tree_value_type value) const {
