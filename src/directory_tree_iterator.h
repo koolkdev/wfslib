@@ -150,8 +150,9 @@ class DirectoryTreeIterator {
   const leaf_node_info& leaf() const { return *leaf_; }
 
   bool is_begin() const {
-    return parents_.empty() ||
-           (leaf_ && std::ranges::all_of(parents_, [](const auto& parent) { return parent.iterator.is_begin(); }));
+    return parents_.empty() || (leaf_ && std::ranges::all_of(parents_, [](const auto& parent) {
+                                  return !parent.node.has_leaf() && parent.iterator.is_begin();
+                                }));
   }
   bool is_end() const { return !leaf_.has_value(); }
 

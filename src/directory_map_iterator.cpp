@@ -53,10 +53,19 @@ DirectoryMapIterator& DirectoryMapIterator::operator++() {
 DirectoryMapIterator& DirectoryMapIterator::operator--() {
   assert(!is_begin());
   if (leaf_.iterator.is_begin()) {
+    std::vector<parent_node_info> removed_parents;
     while (!parents_.empty() && parents_.back().iterator.is_begin()) {
+      removed_parents.push_back(std::move(parents_.back()));
       parents_.pop_back();
     }
-    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*parents_.back().iterator).value()));
+    if (parents_.empty()) {
+      // begin
+      for (auto& parent : std::views::reverse(removed_parents)) {
+        parents_.push_back(std::move(parent));
+      }
+      return *this;
+    }
+    auto current_block = throw_if_error(quota_->LoadMetadataBlock((*--parents_.back().iterator).value()));
     while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
              MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE)) {
       parents_.push_back({std::move(current_block)});

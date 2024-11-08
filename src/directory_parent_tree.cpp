@@ -15,7 +15,7 @@ void DirectoryParentTree::split(DirectoryTree& left, DirectoryTree& right, const
   // They implemented it differently but this is more simple...
   auto first = right.begin();
   auto first_value = (*first).value();
-  right.erase(first);
+  right.base::erase(first);
   [[maybe_unused]] auto res = right.insert({"", first_value});
   assert(res);
 }
@@ -36,26 +36,23 @@ void DirectoryParentTree::erase(iterator& pos) {
 }
 
 bool DirectoryParentTree::can_erase(iterator& pos) const {
-  if (pos.parents().empty())
+  parent_node current_parent{pos.leaf().get_node()};
+  if (current_parent.size() > 1)
     return true;
-  auto last_parent = pos.parents().end();
-  --last_parent;
-  if (last_parent->node.size() > 1)
-    return true;
-  if (last_parent->node.size() != 1) {
+  if (current_parent.size() != 1) {
     // size == 0, check if need to merge at our parent
-    if (last_parent == pos.parents().begin())
+    if (pos.parents().empty())
       return true;
-    --last_parent;
-    if (last_parent->node.size() != 1)
+    current_parent = pos.parents().back().node;
+    if (!current_parent.has_leaf() && current_parent.size() != 2)
       return true;
   }
   // merge flow, be on the safest size and check if we can alloc the new size node.
   // They do a different calculation with the total free bytes but I am not sure that it is correct and we won't take
   // risk here.
-  auto merged_child_node = dir_tree_node_ref<type>::load(block().get(), (*last_parent->node.begin()).value());
+  auto merged_child_node = dir_tree_node_ref<type>::load(block().get(), (*current_parent.begin()).value());
   auto new_size = static_cast<uint16_t>(DirectoryTreeNode<type>::calc_new_node_size(
-      last_parent->node.prefix().size() + merged_child_node->prefix_length.value() + 1,
+      current_parent.prefix().size() + merged_child_node->prefix_length.value() + 1,
       merged_child_node->keys_count.value() - merged_child_node.has_leaf_value(), merged_child_node.has_leaf_value()));
   return new_size == merged_child_node.node_size || CanAlloc(new_size);
 }

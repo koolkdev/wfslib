@@ -11,8 +11,6 @@
 #include "block.h"
 #include "structs.h"
 
-struct SubBlockAllocatorStruct;
-
 class SubBlockAllocatorBase {
  public:
   static constexpr int BLOCK_SIZE_QUANTA = 3;  // 1 << 3
@@ -26,6 +24,8 @@ class SubBlockAllocatorBase {
   bool CanAlloc(uint16_t size) const;
   void Free(uint16_t offset, uint16_t size);
   void Shrink(uint16_t offset, uint16_t old_size, uint16_t new_size);
+
+  uint16_t GetFreeBytes() const;
 
   const std::shared_ptr<Block>& block() const { return block_; }
 
