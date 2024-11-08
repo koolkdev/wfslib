@@ -48,8 +48,6 @@ DirectoryMap::iterator DirectoryMap::end() const {
 }
 
 DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
-  if (size() == 0)
-    return end();
   auto current_block = root_block_;
   std::vector<iterator::parent_node_info> parents;
   while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
@@ -101,7 +99,7 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
 
 bool DirectoryMap::erase(std::string_view name) {
   auto it = find(name);
-  if (!it.is_end()) {
+  if (it.is_end()) {
     // Not in tree
     return false;
   }
@@ -127,10 +125,17 @@ bool DirectoryMap::erase(std::string_view name) {
     if (!parents.back().node.can_erase(parents.back().iterator)) {
       // Erase may fail, split the tree
       auto [parent, parent_it] = parents.back();
+      auto parent_key = (*parent_it).key();
       parents.pop_back();
-      split_tree(parents, parent, name);
-      parents.emplace_back(parent);
-      parents.back().iterator = parents.back().node.find(name);
+      split_tree(parents, parent, parent_key);
+      auto split_point = (*parents.back().iterator).key();
+      parents.push_back({throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()))});
+      // We won't find the new parent if it is the first key, because the first key is empty
+      if (parent_key == split_point)
+        parents.back().iterator = parents.back().node.begin();
+      else
+        parents.back().iterator = parents.back().node.find(parent_key);
+      assert(!parents.back().iterator.is_end());
     }
     parents.back().node.erase(parents.back().iterator);
     last_empty = parents.back().node.empty();
@@ -189,6 +194,7 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
     // TODO: Maybe insert should return iterator so we won't need to find it again?
   }
   parents.back().iterator = parents.back().node.find(middle_key);
+  assert(!parents.back().iterator.is_end());
 
   tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
   return true;

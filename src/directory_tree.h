@@ -164,7 +164,10 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         new_leaf = key_val.value;
       }
       if (!recreate_node(last_parent, parent, {prefix.begin(), prefix_it}, new_nodes, new_leaf)) {
-        assert(false);  // Should always success because of shrinking
+        if (new_node) {
+          Free(new_node->offset(), new_node->allocated_size());
+        }
+        Free(new_child->offset(), new_child->allocated_size());
         return false;
       }
       mutable_extra_header()->records_count += 1;
@@ -272,13 +275,16 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         // We have a leaf, find cases when we need to return it or the previous node
         bool before_leaf = false;
         bool exact_leaf = false;
-        if (parent.size() == 0) {
+        if (parent.size() == 0 && prefix_it == prefix.end()) {
           // If we have no child and matched the whole prefix, we are at least bigger than leaf key.
           exact_leaf = true;
         } else if (prefix_it != prefix.end()) {
           // We have a mistmach so just compare the prefix
           if (std::lexicographical_compare(key_it, key.end(), prefix_it, prefix.end())) {
             before_leaf = true;
+          } else if (parent.size() == 0) {
+            // If we are after and have no child, so it is the exact leaf
+            exact_leaf = true;
           }
         } else {
           auto iterator = parent.find(*key_it, exact_match);
@@ -355,11 +361,6 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     if (is_root) {
       header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE;
     }
-  }
-
-  void ReInit() {
-    Init(block()->template get_object<MetadataBlockHeader>(0)->block_flags.value() &
-         MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE);
   }
 
  protected:
@@ -464,7 +465,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         dir_tree_node_ref<LeafValueType>::load(old_tree->block().get(), extra_header()->root.value())};
     parent_node merge_node{dir_tree_node_ref<LeafValueType>::load(
         old_tree->block().get(), parent ? (*parent->iterator).value() : extra_header()->root.value())};
-    ReInit();
+    Init(block()->template get_object<MetadataBlockHeader>(0)->block_flags.value() &
+         MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE);
     old_tree->merge_copy(*this, root_node, merge_node);
   }
 

@@ -129,6 +129,13 @@ void SubBlockAllocatorBase::Shrink(uint16_t offset, uint16_t old_size, uint16_t 
   assert(free_offset == offset + (1 << old_size_log2));
 }
 
+uint16_t SubBlockAllocatorBase::GetFreeBytes() const {
+  uint16_t sum = 0;
+  for (int size_log2 = BLOCK_SIZE_QUANTA; size_log2 <= MAX_BLOCK_SIZE; ++size_log2)
+    sum += header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].free_blocks_count.value() << size_log2;
+  return sum;
+}
+
 void SubBlockAllocatorBase::Unlink(const SubBlockAllocatorFreeListEntry* entry, int size_index) {
   auto* prev_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(entry->prev.value());
   auto* next_free = block()->get_mutable_object<SubBlockAllocatorFreeListEntry>(entry->next.value());

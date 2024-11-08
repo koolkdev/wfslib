@@ -13,6 +13,7 @@
 #include <vector>
 
 #include "block.h"
+#include "structs.h"
 
 // Log2 of number of block in for each single quanta in each bucket
 // The first three buckets represent the tree possible blocks allocation sizes (single, large, and large cluster), and
@@ -25,7 +26,6 @@ constexpr auto kSizeBuckets =
 class EPTree;
 class Area;
 class Block;
-struct FreeBlocksAllocatorHeader;
 
 struct FreeBlocksExtentInfo {
   uint32_t block_number;
@@ -53,6 +53,8 @@ class FreeBlocksAllocator {
   virtual ~FreeBlocksAllocator() = default;
 
   void Init(std::vector<FreeBlocksRangeInfo> initial_free_blocks);
+
+  uint32_t free_blocks_count() { return header()->free_blocks_count.value(); }
 
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);
