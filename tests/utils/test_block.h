@@ -11,10 +11,10 @@
 
 class TestBlock : public Block {
  public:
-  TestBlock(std::shared_ptr<BlocksDevice> device, uint32_t device_block_number);
+  TestBlock(std::shared_ptr<BlocksDevice> device, uint32_t physical_block_number);
   ~TestBlock() override;
 
   static std::shared_ptr<TestBlock> LoadMetadataBlock(std::shared_ptr<BlocksDevice> device,
-                                                      uint32_t device_block_number,
+                                                      uint32_t physical_block_number,
                                                       bool new_block = true);
 };

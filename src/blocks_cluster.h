@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2017 koolkdev
+ * Copyright (C) 2024 koolkdev
  *
  * This software may be modified and distributed under the terms
  * of the MIT license.  See the LICENSE file for details.
@@ -7,87 +7,23 @@
 
 #pragma once
 
-#include <cassert>
-#include <memory>
-#include <span>
-#include <string>
-#include <vector>
+#include "block.h"
 
-#include "errors.h"
-
-class BlocksDevice;
-
-class Block;
-
-template <typename T>
-concept BlockRefObj = requires(const T& block_ref) {
-                        { block_ref.operator->() } -> std::same_as<Block*>;
-                      };
-
-template <typename T>
-concept BlockRef = std::same_as<T, Block*> || BlockRefObj<T>;
-
-enum class BlockSize : int {
-  Physical = 12,
-  Logical = 13,
-};
-
-enum class BlockType : int {
-  Single = 0,
-  Cluster = 3,
-  Extent = 6,
-};
-
-constexpr inline auto log2_size(BlockSize size) {
-  return static_cast<int>(size);
-}
-
-constexpr inline auto log2_size(BlockType size) {
-  return static_cast<int>(size);
-}
-
-class Block {
+class BlocksCluster {
  public:
-  template <typename T, BlockRef BlockRefType>
-  struct DataRefBase {
-    BlockRefType block;
-    size_t offset;
-
-    const T* get() const { return block->template get_object<T>(offset); }
-    T* get_mutable() const { return block->template get_mutable_object<T>(offset); }
-
-    auto operator<=>(const DataRefBase& other) const {
-      if (const auto res = block <=> other.block; res != 0)
-        return res;
-      return offset <=> other.offset;
-    }
-    bool operator==(const DataRefBase& other) const { return block == other.block && offset == other.offset; }
-
-    const T* operator->() const { return get(); }
-    T* operator->() { return get_mutable(); }
-  };
-
-  template <typename T>
-  struct DataRef : public DataRefBase<T, std::shared_ptr<Block>> {};
-  template <typename T>
-  struct RawDataRef : public DataRefBase<T, Block*> {};
-
   struct HashRef {
     std::shared_ptr<Block> block;  // null if hash in same block
     size_t offset;
   };
 
   // TODO: Private constructor?
-  Block(std::shared_ptr<BlocksDevice> device,
-        uint32_t physical_block_number,
-        BlockSize block_size,
-        BlockType block_type,
-        uint32_t data_size,
-        uint32_t iv,
-        HashRef hash_ref,
-        bool encrypted);
-  Block(std::vector<std::byte> data);
-  virtual ~Block();
+  BlocksCluster(std::shared_ptr<BlocksDevice> device,
+                uint32_t physical_block_number,
+                uint32_t data_size,
+                uint32_t iv,
+                HashRef hash_ref,
+                bool encrypted);
+  virtual ~BlocksCluster();
 
   bool Fetch(bool check_hash = true);
   void Flush();
@@ -123,7 +59,7 @@ class Block {
   }
 
   uint32_t physical_block_number() const { return physical_block_number_; }
-  int log2_size() const { return ::log2_size(block_size_) + ::log2_size(block_type_); }
+  Block::BlockSize log2_size() const { return size_category_; }
 
   bool encrypted() const { return encrypted_; }
 
@@ -133,8 +69,7 @@ class Block {
 
   static std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(std::shared_ptr<BlocksDevice> device,
                                                                        uint32_t physical_block_number,
-                                                                       BlockSize block_size,
-                                                                       BlockType block_type,
+                                                                       Block::BlockSize size_category,
                                                                        uint32_t data_size,
                                                                        uint32_t iv,
                                                                        HashRef data_hash,
@@ -144,7 +79,7 @@ class Block {
 
   static std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(std::shared_ptr<BlocksDevice> device,
                                                                            uint32_t physical_block_number,
-                                                                           BlockSize block_size,
+                                                                           Block::BlockSize size_category,
                                                                            uint32_t iv,
                                                                            bool load_data = true,
                                                                            bool check_hash = true);
@@ -166,8 +101,7 @@ class Block {
   std::shared_ptr<BlocksDevice> device_;
 
   uint32_t physical_block_number_;
-  BlockSize block_size_;
-  BlockType block_type_;
+  Block::BlockSize size_category_;
   uint32_t data_size_;
   uint32_t iv_;
   bool encrypted_;

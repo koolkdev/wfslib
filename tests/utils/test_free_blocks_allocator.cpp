@@ -23,7 +23,7 @@ bool TestFreeBlocksAllocator::Init(uint32_t free_cache_blocks, uint32_t free_tre
   if (area_) {
     area_->Init(free_cache_blocks + free_tree_blocks + 2);
   }
-  initial_ftrees_block_number_ = root_block()->device_block_number() + 1;
+  initial_ftrees_block_number_ = root_block()->physical_block_number() + 1;
   initial_frees_block_number_ = initial_ftrees_block_number_ + 1;
 
   if (free_cache_blocks) {

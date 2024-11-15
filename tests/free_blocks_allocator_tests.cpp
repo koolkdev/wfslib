@@ -34,9 +34,9 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
 
     // Empty tree, should fail alloc from it
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, false));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, false));
 
-    auto blocks = allocator.AllocBlocks(kCacheBlocksCount, Block::BlockSizeType::Single, true);
+    auto blocks = allocator.AllocBlocks(kCacheBlocksCount, BlockType::Single, true);
     REQUIRE(blocks);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == 0);
 
@@ -45,7 +45,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
                                                          allocator.initial_frees_block_number() + kCacheBlocksCount)));
 
     // no more free blocks
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, true));
   }
 
   SECTION("Alloc single blocks from cache one by one") {
@@ -57,10 +57,10 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
 
     // Empty tree, should fail alloc from it
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, false));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, false));
 
     for (uint32_t i = 0; i < kCacheBlocksCount; ++i) {
-      auto blocks = allocator.AllocBlocks(1, Block::BlockSizeType::Single, true);
+      auto blocks = allocator.AllocBlocks(1, BlockType::Single, true);
       REQUIRE(blocks);
       REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount - i - 1);
       REQUIRE(blocks->size() == 1);
@@ -68,7 +68,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     }
 
     // no more free blocks
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, true));
   }
 
   SECTION("Alloc large block from cache") {
@@ -79,7 +79,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
     // Can't alloc non single block from cache
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Large, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Cluster, true));
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
   }
 
@@ -91,7 +91,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount);
 
-    auto blocks = allocator.AllocBlocks(kTreeBlocksCount, Block::BlockSizeType::Single, true);
+    auto blocks = allocator.AllocBlocks(kTreeBlocksCount, BlockType::Single, true);
     REQUIRE(blocks);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == 0);
 
@@ -100,7 +100,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
                                                          allocator.initial_frees_block_number() + kTreeBlocksCount)));
 
     // no more free blocks
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, true));
   }
 
   SECTION("Alloc single blocks from tree one by one") {
@@ -113,7 +113,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     std::vector<uint32_t> allocated_blocks;
     for (uint32_t i = 0; i < kTreeBlocksCount; ++i) {
-      auto blocks = allocator.AllocBlocks(1, Block::BlockSizeType::Single, true);
+      auto blocks = allocator.AllocBlocks(1, BlockType::Single, true);
       REQUIRE(blocks);
       REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount - i - 1);
       REQUIRE(blocks->size() == 1);
@@ -127,7 +127,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
                                                 allocator.initial_frees_block_number() + kTreeBlocksCount)));
 
     // no more free blocks
-    REQUIRE_FALSE(allocator.AllocBlocks(1, Block::BlockSizeType::Single, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Single, true));
   }
 
   SECTION("Initialize huge area") {
@@ -148,7 +148,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(std::ranges::equal(extent_indexes, std::vector<size_t>({0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 5, 4, 3, 2, 1, 0})));
     // minus 2 because the beginning and the end are not aligned.
     uint32_t blocks_to_alloc = (1 << (28 - 6)) - 2;
-    auto blocks = allocator.AllocBlocks(blocks_to_alloc, Block::BlockSizeType::LargeCluster, false);
+    auto blocks = allocator.AllocBlocks(blocks_to_alloc, BlockType::Extent, false);
     REQUIRE(blocks.has_value());
     REQUIRE(blocks->size() == blocks_to_alloc);
     // should be first aligned block number
@@ -163,7 +163,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     }
 
     // Should have allocated all the larger allocation sizes
-    auto single_block = allocator.AllocBlocks(1, Block::BlockSizeType::Single, false);
+    auto single_block = allocator.AllocBlocks(1, BlockType::Single, false);
     REQUIRE(std::ranges::equal(extent_indexes, std::vector<size_t>({0, 1, 1, 0})));
     REQUIRE(single_block.has_value());
     // should allocate first block now
@@ -238,7 +238,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     // cache size (8)
     allocator.set_blocks_cache_size_log2(3);
 
-    auto blocks = allocator.AllocBlocks(1, Block::BlockSizeType::Single, true);
+    auto blocks = allocator.AllocBlocks(1, BlockType::Single, true);
     REQUIRE(blocks);
     // Should be aligned to data from big enough extent
     REQUIRE(blocks->at(0) == 8);
@@ -257,7 +257,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount);
 
-    auto ranges = allocator.AllocAreaBlocks(kTreeBlocksCount, Block::BlockSizeType::Single);
+    auto ranges = allocator.AllocAreaBlocks(kTreeBlocksCount, BlockType::Single);
     REQUIRE(ranges);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == 0);
 
@@ -274,7 +274,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount);
 
-    auto ranges = allocator.AllocAreaBlocks(kTreeBlocksCount / 2, Block::BlockSizeType::Single);
+    auto ranges = allocator.AllocAreaBlocks(kTreeBlocksCount / 2, BlockType::Single);
     REQUIRE(ranges);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount / 2);
 
@@ -298,7 +298,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(allocator.AddFreeBlocks({kSecondFragmentAddress, kTreeBlocksCount}));
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount * 2);
 
-    auto ranges = allocator.AllocAreaBlocks(kAreaBlocksToAlloc, Block::BlockSizeType::Single);
+    auto ranges = allocator.AllocAreaBlocks(kAreaBlocksToAlloc, BlockType::Single);
     REQUIRE(ranges);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount * 2 - kAreaBlocksToAlloc);
 
@@ -322,7 +322,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(allocator.AddFreeBlocks({kThirdFragmentAddress, kTreeBlocksCount}));
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount * 2.5);
 
-    auto ranges = allocator.AllocAreaBlocks(kAreaBlocksToAlloc, Block::BlockSizeType::Single);
+    auto ranges = allocator.AllocAreaBlocks(kAreaBlocksToAlloc, BlockType::Single);
     REQUIRE(ranges);
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kTreeBlocksCount * 2.5 - kAreaBlocksToAlloc);
 

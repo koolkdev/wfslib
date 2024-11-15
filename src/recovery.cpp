@@ -23,7 +23,7 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
                                       std::shared_ptr<BlocksDevice> blocks_device,
                                       uint32_t block_number,
                                       uint32_t area_start_block_number,
-                                      Block::BlockSize block_size,
+                                      BlockSize block_size,
                                       uint32_t& area_xor_wfs_iv) {
   // The IV of the encryption of block looks like that:
   // DWORD[0]: block offset in disk in bytes
@@ -41,9 +41,9 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
   // The sector size will usually be 512 bytes anyway, so lets start with that.
   device->SetLog2SectorSize(9);
   // Set the sectors count to be enough to read our block
-  device->SetSectorsCount((block_number << (Block::BlockSize::Basic - 9)) + (1 << (block_size - 9)));
+  device->SetSectorsCount((block_number << (log2_size(BlockSize::Physical) - 9)) + (1 << (log2_size(block_size) - 9)));
   // This is the initial iv that the encryption will use
-  std::array<uint32_t, 4> iv = {block_number << Block::BlockSize::Basic, 0, device->SectorsCount(),
+  std::array<uint32_t, 4> iv = {block_number << log2_size(BlockSize::Physical), 0, device->SectorsCount(),
                                 device->SectorSize()};
   auto block = *Block::LoadMetadataBlock(blocks_device, block_number, block_size, /*iv=*/0, /*load_data=*/true,
                                          /*check_hash=*/false);
@@ -80,7 +80,8 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
            .has_value())
     return false;
 
-  area_xor_wfs_iv = iv32 - ((block_number - area_start_block_number) << (Block::BlockSize::Basic - log2_sector_size));
+  area_xor_wfs_iv =
+      iv32 - ((block_number - area_start_block_number) << (log2_size(BlockSize::Physical) - log2_sector_size));
   return true;
 }
 
@@ -88,7 +89,7 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
 
 bool Recovery::CheckWfsKey(std::shared_ptr<FileDevice> device, std::optional<std::vector<std::byte>> key) {
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  auto block = *Block::LoadMetadataBlock(blocks_device, 0, Block::BlockSize::Basic, /*iv=*/0, /*load_data=*/true,
+  auto block = *Block::LoadMetadataBlock(blocks_device, 0, BlockSize::Physical, /*iv=*/0, /*load_data=*/true,
                                          /*check_hash=*/false);
   auto wfs_header = reinterpret_cast<const WfsDeviceHeader*>(&block->data()[sizeof(MetadataBlockHeader)]);
   // Check wfs header
@@ -100,13 +101,13 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
   if (!CheckWfsKey(device, key))
     return WfsError::kInvalidWfsVersion;
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  auto block = *Block::LoadMetadataBlock(blocks_device, /*device_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0,
+  auto block = *Block::LoadMetadataBlock(blocks_device, /*physical_block_number=*/0, BlockSize::Physical, /*iv=*/0,
                                          /*load_data=*/true, /*check_hash=*/false);
   auto wfs_header = block->get_object<WfsDeviceHeader>(sizeof(MetadataBlockHeader));
-  auto block_size = Block::BlockSize::Basic;
+  auto block_size = BlockSize::Physical;
   if (!(wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
       (wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
-    block_size = Block::BlockSize::Regular;
+    block_size = BlockSize::Logical;
   block.reset();
   uint32_t area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(device, blocks_device, 0, 0, block_size, area_xor_wfs_iv)) {
@@ -167,7 +168,7 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
   device->SetLog2SectorSize(9);
   device->SetSectorsCount((kUsrDirectoryBlockNumber + 2) << 3);
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
-  auto block = *Block::LoadMetadataBlock(blocks_device, kUsrDirectoryBlockNumber, Block::BlockSize::Basic, /*iv=*/0,
+  auto block = *Block::LoadMetadataBlock(blocks_device, kUsrDirectoryBlockNumber, BlockSize::Physical, /*iv=*/0,
                                          /*load_data=*/true,
                                          /*check_hash=*/false);
   auto metadata_header = block->get_object<MetadataBlockHeader>(0);
@@ -179,7 +180,7 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
 
   uint32_t root_area_xor_wfs_iv;
   // Assume regular sized area
-  if (!RestoreMetadataBlockIVParameters(device, blocks_device, kUsrDirectoryBlockNumber, 0, Block::BlockSize::Regular,
+  if (!RestoreMetadataBlockIVParameters(device, blocks_device, kUsrDirectoryBlockNumber, 0, BlockSize::Logical,
                                         root_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
@@ -200,8 +201,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
   area_header.iv = root_area_xor_wfs_iv;
   // Set the root directory to be /usr
   area_header.root_directory_block_number =
-      kUsrDirectoryBlockNumber >> (Block::BlockSize::Regular - Block::BlockSize::Basic);
-  area_header.block_size_log2 = Block::BlockSize::Regular;
+      kUsrDirectoryBlockNumber >> (log2_size(BlockSize::Logical) - log2_size(BlockSize::Physical));
+  area_header.block_size_log2 = static_cast<uint8_t>(BlockSize::Logical);
 
   // Now create the block
   std::vector<std::byte> first_wfs_block;
@@ -211,8 +212,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
             std::back_inserter(first_wfs_block));
   std::copy(reinterpret_cast<std::byte*>(&area_header), reinterpret_cast<std::byte*>(&area_header + 1),
             std::back_inserter(first_wfs_block));
-  std::fill_n(std::back_inserter(first_wfs_block), (1 << Block::BlockSize::Regular) - first_wfs_block.size(),
-              std::byte{0});
+  std::fill_n(std::back_inserter(first_wfs_block),
+              (size_t{1} << log2_size(BlockSize::Logical)) - first_wfs_block.size(), std::byte{0});
   auto first_fixed_device = std::make_shared<FakeWfsDeviceHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
 
   // Now go to the the /usr/system/save directory, there must be a sub-area there
@@ -230,8 +231,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
     if (!attributes.get()->is_quota())
       continue;
     // ok this is quota
-    auto new_quota = system_save_dir->quota()->LoadQuotaArea(attributes.get()->directory_block_number.value(),
-                                                             Block::BlockSize::Regular);
+    auto new_quota =
+        system_save_dir->quota()->LoadQuotaArea(attributes.get()->directory_block_number.value(), BlockSize::Logical);
     if (!new_quota.has_value())
       return std::unexpected(new_quota.error());
     sub_area = std::move(*new_quota);
@@ -243,8 +244,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
   uint32_t sub_area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(
           device, blocks_device,
-          sub_area->to_device_block_number(sub_area->header()->root_directory_block_number.value()),
-          sub_area->to_device_block_number(0), Block::BlockSize::Regular, sub_area_xor_wfs_iv)) {
+          sub_area->to_physical_block_number(sub_area->header()->root_directory_block_number.value()),
+          sub_area->to_physical_block_number(0), BlockSize::Logical, sub_area_xor_wfs_iv)) {
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
   uint32_t wfs_iv = sub_area_xor_wfs_iv ^ sub_area->header()->iv.value();
@@ -262,8 +263,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
             std::back_inserter(first_wfs_block));
   std::copy(reinterpret_cast<std::byte*>(&area_header), reinterpret_cast<std::byte*>(&area_header + 1),
             std::back_inserter(first_wfs_block));
-  std::fill_n(std::back_inserter(first_wfs_block), (1 << Block::BlockSize::Regular) - first_wfs_block.size(),
-              std::byte{0});
+  std::fill_n(std::back_inserter(first_wfs_block),
+              (size_t{1} << log2_size(BlockSize::Logical)) - first_wfs_block.size(), std::byte{0});
   auto final_device = std::make_shared<FakeWfsDeviceHeaderBlocksDevice>(device, key, std::move(first_wfs_block));
   return WfsDevice::Open(std::move(final_device));
 }

@@ -137,8 +137,8 @@ struct WfsAreaHeader {
   uint32_be_t shadow_directory_block_number_2;  // is 5
   uint8_be_t depth;                             // how many total parents area this area has
   uint8_be_t block_size_log2;                   // 12/13
-  uint8_be_t large_block_size_log2;             // large block - 8 blocks. so 15/16
-  uint8_be_t large_block_cluster_size_log2;     // large blocks cluster - 8 large blocks. so 18/19
+  uint8_be_t cluster_block_size_log2;           // cluster block - 8 blocks. so 15/16
+  uint8_be_t extent_block_size_log2;            // extent block - 8 cluster  blocks. so 18/19
   uint8_be_t area_type;                         // 0 - transactions area, 1 - quota area
   uint8_be_t maybe_always_zero;                 // init to zero. doesn't seem to be changed by anything
   uint16_be_t remainder_blocks_count;  // in case of quota, how many spare blocks this area allocated beyond the quota.

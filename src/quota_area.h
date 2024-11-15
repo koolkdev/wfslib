@@ -29,10 +29,10 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
   static std::expected<std::shared_ptr<QuotaArea>, WfsError> Create(std::shared_ptr<WfsDevice> wfs_device,
                                                                     std::shared_ptr<Area> parent_area,
                                                                     uint32_t blocks_count,
-                                                                    Block::BlockSize block_size,
+                                                                    BlockSize block_size,
                                                                     const std::vector<QuotaFragment>& fragments);
 
-  std::expected<std::shared_ptr<QuotaArea>, WfsError> LoadQuotaArea(uint32_t area_block_number, Block::BlockSize size);
+  std::expected<std::shared_ptr<QuotaArea>, WfsError> LoadQuotaArea(uint32_t area_block_number, BlockSize block_size);
 
   std::expected<std::shared_ptr<Directory>, WfsError> LoadRootDirectory(std::string name, AttributesRef attributes);
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
@@ -43,8 +43,7 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
                                                                     AttributesRef attributes);
 
   std::expected<std::shared_ptr<Block>, WfsError> AllocMetadataBlock();
-  std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t chunks_count,
-                                                                 Block::BlockSizeType chunk_size);
+  std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t count, BlockType block_type);
   std::expected<std::vector<QuotaFragment>, WfsError> AllocAreaBlocks(uint32_t blocks_count);
   bool DeleteBlocks(uint32_t area_block_number, uint32_t area_blocks_count);
 
@@ -72,6 +71,6 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
 
   void Init(std::shared_ptr<Area> parent_area,
             uint32_t blocks_count,
-            Block::BlockSize block_size,
+            BlockSize block_size,
             const std::vector<QuotaFragment>& fragments);
 };

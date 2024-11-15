@@ -32,8 +32,8 @@ inline uint32_t is_aligned_pow2(uint32_t block_number, size_t pow2) {
   return !(block_number & ((1 << pow2) - 1));
 }
 
-size_t BlockSizeToIndex(Block::BlockSizeType size) {
-  return size / 3;
+size_t BlockTypeToIndex(BlockType block_type) {
+  return log2_size(block_type) / 3;
 }
 
 }  // namespace
@@ -49,9 +49,9 @@ void FreeBlocksAllocator::Init(std::vector<FreeBlocksRangeInfo> initial_free_blo
 
   if (BlocksCacheSizeLog2()) {
     uint32_t cache_end_block_number = initial_free_blocks[0].block_number + (1 << BlocksCacheSizeLog2());
-    cache_end_block_number = area_->to_device_block_number(cache_end_block_number);
+    cache_end_block_number = area_->to_physical_block_number(cache_end_block_number);
     cache_end_block_number = align_ceil_pow2(
-        cache_end_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+        cache_end_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - log2_size(BlockSize::Physical));
     cache_end_block_number = area_->to_area_block_number(cache_end_block_number);
     uint32_t cache_free_blocks_count = cache_end_block_number - initial_free_blocks[0].block_number;
     if (cache_free_blocks_count > initial_free_blocks[0].blocks_count) {
@@ -70,7 +70,7 @@ void FreeBlocksAllocator::Init(std::vector<FreeBlocksRangeInfo> initial_free_blo
 
   // TODO: support sparse areas
   EPTree eptree{this};
-  eptree.Init(area_->to_area_block_number(block_->device_block_number()));
+  eptree.Init(area_->to_area_block_number(block_->physical_block_number()));
   // TODO: 2 -> k
   auto ftree_block = LoadAllocatorBlock(2, true);
   FTrees ftrees{std::move(ftree_block)};
@@ -317,13 +317,11 @@ bool FreeBlocksAllocator::IsRangeIsFree(FreeBlocksRangeInfo range) {
   return (*pos).block_number() >= range.block_number && (*pos).block_number() < range.end_block_number();
 }
 
-std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t chunks_count,
-                                                                      Block::BlockSizeType size,
-                                                                      bool use_cache) {
+std::optional<std::vector<uint32_t>> FreeBlocksAllocator::AllocBlocks(uint32_t count, BlockType type, bool use_cache) {
   std::vector<uint32_t> result;
-  result.reserve(chunks_count);
-  size_t size_index = BlockSizeToIndex(size);
-  uint32_t need_more_blocks_count = chunks_count << size;
+  result.reserve(count);
+  size_t size_index = BlockTypeToIndex(type);
+  uint32_t need_more_blocks_count = count << log2_size(type);
   if (!need_more_blocks_count)
     return result;
   if (use_cache && size_index == 0 && BlocksCacheSizeLog2()) {
@@ -375,9 +373,9 @@ bool FreeBlocksAllocator::ReplanishBlocksCache() {
   if (!selected_extent)
     return false;
   // Round the block number to be aligned to blocks cache in the whole disk
-  auto abs_block_number = area_->to_device_block_number(selected_extent->block_number);
-  auto aligned_block_number =
-      align_ceil_pow2(abs_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - Block::BlockSize::Basic);
+  auto abs_block_number = area_->to_physical_block_number(selected_extent->block_number);
+  auto aligned_block_number = align_ceil_pow2(
+      abs_block_number, BlocksCacheSizeLog2() + area_->block_size_log2() - log2_size(BlockSize::Physical));
   selected_extent->block_number = area_->to_area_block_number(aligned_block_number);
   selected_extent->blocks_count = blocks_to_alloc;
   auto* header = mutable_header();
@@ -419,14 +417,13 @@ bool FreeBlocksAllocator::AllocBlocksOfSpecificSize(uint32_t blocks_count,
   return true;
 }
 
-std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBlocks(uint32_t chunks_count,
-                                                                                     Block::BlockSizeType size) {
+std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBlocks(uint32_t count, BlockType type) {
   struct range_info {
     FreeBlocksRangeInfo range;
     std::vector<FreeBlocksExtentInfo> extents;
   };
-  size_t size_index = BlockSizeToIndex(size);
-  uint32_t wanted_blocks_count = chunks_count << size;
+  size_t size_index = BlockTypeToIndex(type);
+  uint32_t wanted_blocks_count = count << log2_size(type);
   FreeBlocksTree tree{this};
   std::vector<range_info> ranges;
   std::optional<range_info> selected_range;
@@ -500,7 +497,7 @@ FreeBlocksAllocatorHeader* FreeBlocksAllocator::mutable_header() {
 }
 
 size_t FreeBlocksAllocator::BlocksCacheSizeLog2() const {
-  if (area_->blocks_count() >> (24 - Block::BlockSize::Basic)) {
+  if (area_->blocks_count() >> (24 - log2_size(BlockSize::Physical))) {
     if (area_->blocks_count() >> (30 - area_->block_size_log2())) {
       return 23 - area_->block_size_log2();
     } else {

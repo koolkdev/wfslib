@@ -15,9 +15,9 @@ class TransactionsArea : public Area {
 
   static std::expected<std::shared_ptr<TransactionsArea>, WfsError> Create(std::shared_ptr<WfsDevice> wfs_device,
                                                                            std::shared_ptr<Area> parent_area,
-                                                                           uint32_t device_block_number,
-                                                                           uint32_t device_blocks_count);
+                                                                           uint32_t physical_block_number,
+                                                                           uint32_t physical_blocks_count);
 
  private:
-  void Init(std::shared_ptr<Area> parent_area, uint32_t device_blocks_count);
+  void Init(std::shared_ptr<Area> parent_area, uint32_t physical_blocks_count);
 };

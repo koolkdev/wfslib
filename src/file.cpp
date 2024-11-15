@@ -147,17 +147,18 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   }
 
  protected:
-  virtual size_t GetBlocksLog2CountInDataBlock() const = 0;
-  virtual Block::BlockSize GetDataBlockSize() const {
-    return static_cast<Block::BlockSize>(file_->quota()->block_size_log2() + GetBlocksLog2CountInDataBlock());
+  virtual BlockType GetBlocksLog2CountInDataBlock() const = 0;
+  virtual size_t GetDataBlockSize() const {
+    return file_->quota()->block_size_log2() + log2_size(GetBlocksLog2CountInDataBlock());
   }
   std::shared_ptr<Block> current_data_block;
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
     if (current_data_block &&
-        file_->quota()->to_area_block_number(current_data_block->device_block_number()) == block_number)
+        file_->quota()->to_area_block_number(current_data_block->physical_block_number()) == block_number)
       return;
-    auto block = file_->quota()->LoadDataBlock(block_number, GetDataBlockSize(), data_size, std::move(data_hash),
+    auto block = file_->quota()->LoadDataBlock(block_number, static_cast<BlockSize>(file_->quota()->block_size_log2()),
+                                               GetBlocksLog2CountInDataBlock(), data_size, std::move(data_hash),
                                                !(file_->attributes()->flags.value() & Attributes::UNENCRYPTED_FILE));
     if (!block.has_value())
       throw WfsException(WfsError::kFileDataCorrupted);
@@ -172,7 +173,7 @@ class File::DataCategory1Reader : public File::RegularDataCategoryReader {
   DataCategory1Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
 
  protected:
-  virtual size_t GetBlocksLog2CountInDataBlock() const { return 0; }
+  virtual BlockType GetBlocksLog2CountInDataBlock() const { return BlockType::Single; }
 };
 
 // Category 2 - File data in large block (8 regular blocks), in the attribute metadata there is a reversed list of block
@@ -182,7 +183,7 @@ class File::DataCategory2Reader : public File::RegularDataCategoryReader {
   DataCategory2Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
 
  protected:
-  virtual size_t GetBlocksLog2CountInDataBlock() const { return 3; }
+  virtual BlockType GetBlocksLog2CountInDataBlock() const { return BlockType::Cluster; }
 };
 
 // Category 3 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is a
@@ -221,7 +222,8 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
       cluster = &clusters_list[-cluster_index - 1];
     else
       cluster = &clusters_list[cluster_index];
-    LoadDataBlock(cluster->block_number.value() + static_cast<uint32_t>(block_index << GetBlocksLog2CountInDataBlock()),
+    LoadDataBlock(cluster->block_number.value() +
+                      static_cast<uint32_t>(block_index << log2_size(GetBlocksLog2CountInDataBlock())),
                   static_cast<uint32_t>(
                       std::min(1U << GetDataBlockSize(), file_->attributes()->file_size.value() - block_offset)),
                   {metadata_block, metadata_block->to_offset(&cluster->hash[block_index])});
@@ -260,7 +262,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 
   void LoadMetadataBlock(uint32_t block_number) {
     if (current_metadata_block &&
-        file_->quota()->to_area_block_number(current_metadata_block->device_block_number()) == block_number)
+        file_->quota()->to_area_block_number(current_metadata_block->physical_block_number()) == block_number)
       return;
     auto metadata_block = file_->quota()->LoadMetadataBlock(block_number);
     if (!metadata_block.has_value())
@@ -373,6 +375,5 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
 std::streamsize File::file_device::optimal_buffer_size() const {
   // Max block size. TODO: By category
   // TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
-  return 1 << (static_cast<size_t>(Block::BlockSize::Regular) +
-               static_cast<size_t>(Block::BlockSizeType::LargeCluster));
+  return size_t{1} << (log2_size(BlockSize::Logical) + log2_size(BlockType::Extent));
 }

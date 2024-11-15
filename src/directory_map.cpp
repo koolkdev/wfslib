@@ -162,12 +162,12 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   if (old_block == root_block_) {
     new_left_block = throw_if_error(quota_->AllocMetadataBlock());
   } else {
-    new_left_block = throw_if_error(
-        quota_->LoadMetadataBlock(quota_->to_area_block_number(old_block->device_block_number()), /*new_block=*/true));
+    new_left_block = throw_if_error(quota_->LoadMetadataBlock(
+        quota_->to_area_block_number(old_block->physical_block_number()), /*new_block=*/true));
   }
   auto new_right_block = throw_if_error(quota_->AllocMetadataBlock());
-  auto new_left_block_number = quota_->to_area_block_number(new_left_block->device_block_number());
-  auto new_right_block_number = quota_->to_area_block_number(new_right_block->device_block_number());
+  auto new_left_block_number = quota_->to_area_block_number(new_left_block->physical_block_number());
+  auto new_right_block_number = quota_->to_area_block_number(new_right_block->physical_block_number());
 
   TreeType new_left_tree{new_left_block}, new_right_tree{new_right_block};
   auto middle = tree.middle();
@@ -177,7 +177,7 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   tree.split(new_left_tree, new_right_tree, middle);
   if (old_block == root_block_) {
     root_block_ = throw_if_error(quota_->LoadMetadataBlock(
-        quota_->to_area_block_number(root_block_->device_block_number()), /*new_block=*/true));
+        quota_->to_area_block_number(root_block_->physical_block_number()), /*new_block=*/true));
     DirectoryParentTree new_root_tree{root_block_};
     new_root_tree.Init(/*is_root=*/true);
     new_root_tree.insert({"", new_left_block_number});
