@@ -13,15 +13,17 @@
 #include "utils.h"
 
 Block::Block(std::shared_ptr<BlocksDevice> device,
-             uint32_t device_block_number,
-             Block::BlockSize size_category,
+             uint32_t physical_block_number,
+             BlockSize block_size,
+             BlockType block_type,
              uint32_t data_size,
              uint32_t iv,
              HashRef hash_ref,
              bool encrypted)
     : device_(std::move(device)),
-      device_block_number_(device_block_number),
-      size_category_(size_category),
+      physical_block_number_(physical_block_number),
+      block_size_(block_size),
+      block_type_(block_type),
       data_size_(data_size),
       iv_(iv),
       encrypted_(encrypted),
@@ -29,8 +31,9 @@ Block::Block(std::shared_ptr<BlocksDevice> device,
       data_{GetAlignedSize(data_size_), std::byte{0}} {}
 
 Block::Block(std::vector<std::byte> data)
-    : device_block_number_(0),
-      size_category_(Block::BlockSize::Basic),
+    : physical_block_number_(0),
+      block_size_(BlockSize::Physical),
+      block_type_(BlockType::Single),
       data_size_(static_cast<uint32_t>(data.size())),
       iv_(0),
       encrypted_(false),
@@ -59,20 +62,20 @@ void Block::Resize(uint32_t data_size) {
 void Block::Detach() {
   if (detached_)
     return;
-  device_->RemoveFromCache(device_block_number_);
+  device_->RemoveFromCache(physical_block_number_);
   detached_ = true;
 }
 
 bool Block::Fetch(bool check_hash) {
   assert(!detached_);
-  return device_->ReadBlock(device_block_number_, 1 << (size_category_ - BlockSize::Basic), data_,
+  return device_->ReadBlock(physical_block_number_, 1 << (log2_size() - ::log2_size(BlockSize::Physical)), data_,
                             {hash(), DeviceEncryption::DIGEST_SIZE}, iv_, encrypted_, check_hash);
 }
 
 void Block::Flush() {
   if (detached_ || !dirty_)
     return;
-  device_->WriteBlock(device_block_number_, 1 << (size_category_ - BlockSize::Basic), data_,
+  device_->WriteBlock(physical_block_number_, 1 << (log2_size() - ::log2_size(BlockSize::Physical)), data_,
                       {mutable_hash(), DeviceEncryption::DIGEST_SIZE}, iv_, encrypted_,
                       /*recalculate_hash=*/true);
   dirty_ = false;
@@ -90,27 +93,28 @@ std::span<std::byte> Block::GetDataForWriting() {
 }
 
 std::expected<std::shared_ptr<Block>, WfsError> Block::LoadDataBlock(std::shared_ptr<BlocksDevice> device,
-                                                                     uint32_t device_block_number,
-                                                                     Block::BlockSize size_category,
+                                                                     uint32_t physical_block_number,
+                                                                     BlockSize block_size,
+                                                                     BlockType block_type,
                                                                      uint32_t data_size,
                                                                      uint32_t iv,
                                                                      HashRef data_hash,
                                                                      bool encrypted,
                                                                      bool load_data,
                                                                      bool check_hash) {
-  auto cached_block = device->GetFromCache(device_block_number);
+  auto cached_block = device->GetFromCache(physical_block_number);
   if (cached_block) {
-    assert(cached_block->device_block_number() == device_block_number);
-    assert(cached_block->log2_size() == size_category);
+    assert(cached_block->physical_block_number() == physical_block_number);
+    assert(cached_block->block_size() == block_size);
+    assert(cached_block->block_type() == block_type);
     assert(cached_block->size() == data_size);
     assert(cached_block->encrypted() == encrypted);
     return cached_block;
   }
-  auto block = std::make_shared<Block>(device, device_block_number, size_category, data_size, iv, std::move(data_hash),
-                                       encrypted);
-  device->AddToCache(device_block_number, block);
-  if (load_data && data_size) {
-    // Fetch block only if have data
+  auto block = std::make_shared<Block>(device, physical_block_number, block_size, block_type, data_size, iv,
+                                       std::move(data_hash), encrypted);
+  device->AddToCache(physical_block_number, block);
+  if (load_data) {
     if (!block->Fetch(check_hash))
       return std::unexpected(WfsError::kBlockBadHash);
   }
@@ -119,11 +123,11 @@ std::expected<std::shared_ptr<Block>, WfsError> Block::LoadDataBlock(std::shared
 
 std::expected<std::shared_ptr<Block>, WfsError> Block::LoadMetadataBlock(std::shared_ptr<BlocksDevice> device,
                                                                          uint32_t block_number,
-                                                                         Block::BlockSize size_category,
+                                                                         BlockSize block_size,
                                                                          uint32_t iv,
                                                                          bool load_data,
                                                                          bool check_hash) {
-  return LoadDataBlock(std::move(device), block_number, size_category, 1 << size_category, iv,
+  return LoadDataBlock(std::move(device), block_number, block_size, BlockType::Single, 1 << ::log2_size(block_size), iv,
                        {nullptr, offsetof(MetadataBlockHeader, hash)}, /*encrypted=*/true, load_data, check_hash);
 }
 

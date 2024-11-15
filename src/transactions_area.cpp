@@ -16,19 +16,19 @@ TransactionsArea::TransactionsArea(std::shared_ptr<WfsDevice> wfs_device, std::s
 std::expected<std::shared_ptr<TransactionsArea>, WfsError> TransactionsArea::Create(
     std::shared_ptr<WfsDevice> wfs_device,
     std::shared_ptr<Area> parent_area,
-    uint32_t device_block_number,
-    uint32_t device_blocks_count) {
-  auto block = wfs_device->LoadMetadataBlock(parent_area.get(), device_block_number, Block::BlockSize::Basic,
+    uint32_t physical_block_number,
+    uint32_t physical_blocks_count) {
+  auto block = wfs_device->LoadMetadataBlock(parent_area.get(), physical_block_number, BlockSize::Physical,
                                              /*new_block=*/true);
   if (!block.has_value())
     return std::unexpected(block.error());
   auto transactions = std::make_shared<TransactionsArea>(std::move(wfs_device), std::move(*block));
-  transactions->Init(parent_area, device_blocks_count);
+  transactions->Init(parent_area, physical_blocks_count);
   return transactions;
 }
 
 void TransactionsArea::Init(std::shared_ptr<Area> parent_area, uint32_t blocks_count) {
-  Area::Init(parent_area, blocks_count, Block::BlockSize::Basic);
+  Area::Init(parent_area, blocks_count, BlockSize::Physical);
 
   mutable_header()->area_type = static_cast<uint8_t>(WfsAreaHeader::AreaType::TransactionsArea);
 

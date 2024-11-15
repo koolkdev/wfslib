@@ -46,7 +46,7 @@ TEST_CASE("TreeNodesAllocatorTests") {
   DummyAllocatorBlock allocator{block};
   allocator.Init();
 
-  constexpr size_t total_bytes = (1 << Block::BlockSize::Regular) - sizeof(MetadataBlockHeader) -
+  constexpr size_t total_bytes = (size_t{1} << log2_size(BlockSize::Logical)) - sizeof(MetadataBlockHeader) -
                                  sizeof(DummyExtraHeader) - sizeof(DummyTreeHeader) - sizeof(HeapHeader);
   constexpr size_t max_entries_count = total_bytes / 0x10;
   constexpr size_t offset = sizeof(MetadataBlockHeader) + sizeof(DummyExtraHeader);

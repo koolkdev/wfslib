@@ -28,10 +28,10 @@ std::expected<std::shared_ptr<WfsItem>, WfsError> WfsItem::Load(std::shared_ptr<
   } else if (attributes->is_directory()) {
     if (attributes->flags.value() & attributes->Flags::QUOTA) {
       // The directory is quota, aka new area
-      auto block_size = Block::BlockSize::Basic;
+      auto block_size = BlockSize::Physical;
       if (!(attributes->flags.value() & attributes->Flags::AREA_SIZE_BASIC) &&
           (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
-        block_size = Block::BlockSize::Regular;
+        block_size = BlockSize::Logical;
       auto new_quota = quota->LoadQuotaArea(attributes->directory_block_number.value(), block_size);
       if (!new_quota.has_value())
         return std::unexpected(new_quota.error());

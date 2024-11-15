@@ -128,7 +128,7 @@ TEST_CASE("SubBlockAllocatorTests") {
   SECTION("Fill heap") {
     auto* allocator_header = allocator.get_allocator_header();
     uint16_t current_offset = sizeof(MetadataBlockHeader) + sizeof(SubBlockAllocatorStruct) + sizeof(DummyExtraHeader);
-    size_t total_bytes = (1 << Block::BlockSize::Regular) - current_offset;
+    size_t total_bytes = (1 << log2_size(BlockSize::Logical)) - current_offset;
     for (size_t i = 0; i < (total_bytes >> 3); ++i) {
       auto offset = allocator.Alloc(8);
       REQUIRE(offset.has_value());

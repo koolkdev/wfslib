@@ -36,7 +36,7 @@ class TestDirectoryTree : public DirectoryTree<uint16_t> {
   TestDirectoryTree(std::shared_ptr<Block> block) : DirectoryTree<uint16_t>(std::move(block)) {}
 
   int allocated_bytes() {
-    int allocated = 1 << Block::BlockSize::Regular;
+    int allocated = 1 << log2_size(BlockSize::Logical);
     for (int i = 3; i <= 10; ++i) {
       allocated -= header()->free_list[i - 3].free_blocks_count.value() << i;
     }
