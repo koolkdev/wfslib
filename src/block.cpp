@@ -105,7 +105,8 @@ std::expected<std::shared_ptr<Block>, WfsError> Block::LoadDataBlock(std::shared
   auto cached_block = device->GetFromCache(physical_block_number);
   if (cached_block) {
     assert(cached_block->physical_block_number() == physical_block_number);
-    assert(cached_block->log2_size() == size_category);
+    assert(cached_block->block_size() == block_size);
+    assert(cached_block->block_type() == block_type);
     assert(cached_block->size() == data_size);
     assert(cached_block->encrypted() == encrypted);
     return cached_block;

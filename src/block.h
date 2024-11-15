@@ -123,6 +123,8 @@ class Block {
   }
 
   uint32_t physical_block_number() const { return physical_block_number_; }
+  BlockSize block_size() const { return block_size_; }
+  BlockType block_type() const { return block_type_; }
   int log2_size() const { return ::log2_size(block_size_) + ::log2_size(block_type_); }
 
   bool encrypted() const { return encrypted_; }
