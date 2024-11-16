@@ -34,8 +34,8 @@ enum class BlockSize : int {
 
 enum class BlockType : int {
   Single = 0,
-  Cluster = 3,
-  Extent = 6,
+  Large = 3,
+  Cluster = 6,
 };
 
 constexpr inline auto log2_size(BlockSize size) {

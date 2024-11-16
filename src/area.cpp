@@ -27,9 +27,9 @@ void Area::Init(std::shared_ptr<Area> parent_area, uint32_t blocks_count, BlockS
   header->blocks_count = blocks_count;
   header->depth = parent_area ? parent_area->header()->depth.value() + 1 : 0;
   header->block_size_log2 = static_cast<uint8_t>(block_size);
+  header->large_block_size_log2 = static_cast<uint8_t>(header->block_size_log2.value() + log2_size(BlockType::Large));
   header->cluster_block_size_log2 =
       static_cast<uint8_t>(header->block_size_log2.value() + log2_size(BlockType::Cluster));
-  header->extent_block_size_log2 = static_cast<uint8_t>(header->block_size_log2.value() + log2_size(BlockType::Extent));
   header->maybe_always_zero = 0;
   header->remainder_blocks_count = 0;
 }

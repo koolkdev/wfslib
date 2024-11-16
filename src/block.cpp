@@ -68,6 +68,8 @@ void Block::Detach() {
 
 bool Block::Fetch(bool check_hash) {
   assert(!detached_);
+  if (data_.size() == 0)
+    return true;
   return device_->ReadBlock(physical_block_number_, 1 << (log2_size() - ::log2_size(BlockSize::Physical)), data_,
                             {hash(), DeviceEncryption::DIGEST_SIZE}, iv_, encrypted_, check_hash);
 }
@@ -75,9 +77,11 @@ bool Block::Fetch(bool check_hash) {
 void Block::Flush() {
   if (detached_ || !dirty_)
     return;
-  device_->WriteBlock(physical_block_number_, 1 << (log2_size() - ::log2_size(BlockSize::Physical)), data_,
-                      {mutable_hash(), DeviceEncryption::DIGEST_SIZE}, iv_, encrypted_,
-                      /*recalculate_hash=*/true);
+  if (data_.size() > 0) {
+    device_->WriteBlock(physical_block_number_, 1 << (log2_size() - ::log2_size(BlockSize::Physical)), data_,
+                        {mutable_hash(), DeviceEncryption::DIGEST_SIZE}, iv_, encrypted_,
+                        /*recalculate_hash=*/true);
+  }
   dirty_ = false;
 }
 
