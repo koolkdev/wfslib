@@ -183,7 +183,7 @@ class File::DataCategory2Reader : public File::RegularDataCategoryReader {
   DataCategory2Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
 
  protected:
-  virtual BlockType GetBlocksLog2CountInDataBlock() const { return BlockType::Cluster; }
+  virtual BlockType GetBlocksLog2CountInDataBlock() const { return BlockType::Large; }
 };
 
 // Category 3 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is a
@@ -375,5 +375,5 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
 std::streamsize File::file_device::optimal_buffer_size() const {
   // Max block size. TODO: By category
   // TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
-  return size_t{1} << (log2_size(BlockSize::Logical) + log2_size(BlockType::Extent));
+  return size_t{1} << (log2_size(BlockSize::Logical) + log2_size(BlockType::Cluster));
 }

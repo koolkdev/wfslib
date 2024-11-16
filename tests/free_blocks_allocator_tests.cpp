@@ -79,7 +79,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
 
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
     // Can't alloc non single block from cache
-    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Cluster, true));
+    REQUIRE_FALSE(allocator.AllocBlocks(1, BlockType::Large, true));
     REQUIRE(allocator.GetHeader()->free_blocks_count.value() == kCacheBlocksCount);
   }
 
@@ -148,7 +148,7 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     REQUIRE(std::ranges::equal(extent_indexes, std::vector<size_t>({0, 1, 2, 3, 4, 5, 6, 6, 6, 6, 5, 4, 3, 2, 1, 0})));
     // minus 2 because the beginning and the end are not aligned.
     uint32_t blocks_to_alloc = (1 << (28 - 6)) - 2;
-    auto blocks = allocator.AllocBlocks(blocks_to_alloc, BlockType::Extent, false);
+    auto blocks = allocator.AllocBlocks(blocks_to_alloc, BlockType::Cluster, false);
     REQUIRE(blocks.has_value());
     REQUIRE(blocks->size() == blocks_to_alloc);
     // should be first aligned block number

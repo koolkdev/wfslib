@@ -97,11 +97,11 @@ std::expected<std::vector<uint32_t>, WfsError> QuotaArea::AllocDataBlocks(uint32
 }
 
 std::expected<std::vector<QuotaArea::QuotaFragment>, WfsError> QuotaArea::AllocAreaBlocks(uint32_t blocks_count) {
-  uint32_t extents_count = (blocks_count + (1 << log2_size(BlockType::Extent)) - 1) >> log2_size(BlockType::Extent);
+  uint32_t extents_count = (blocks_count + (1 << log2_size(BlockType::Cluster)) - 1) >> log2_size(BlockType::Cluster);
   auto allocator = GetFreeBlocksAllocator();
   if (!allocator)
     return std::unexpected(allocator.error());
-  auto res = (*allocator)->AllocAreaBlocks(extents_count, BlockType::Extent);
+  auto res = (*allocator)->AllocAreaBlocks(extents_count, BlockType::Cluster);
   if (!res)
     return std::unexpected(kNoSpace);
   return *res | std::views::transform([](const auto& frag) {

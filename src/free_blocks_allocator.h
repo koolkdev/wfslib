@@ -19,9 +19,9 @@
 // The first three buckets represent the tree possible blocks allocation sizes (single, cluster and extent), and
 // the rest are increasing by 16 every time. So the actual sizes are {0, 3, 6, 10, 14, 18, 22}
 constexpr auto kSizeBuckets =
-    std::to_array<int>({log2_size(BlockType::Single), log2_size(BlockType::Cluster), log2_size(BlockType::Extent),
-                        log2_size(BlockType::Extent) + 1 * 4, log2_size(BlockType::Extent) + 2 * 4,
-                        log2_size(BlockType::Extent) + 3 * 4, log2_size(BlockType::Extent) + 4 * 4});
+    std::to_array<int>({log2_size(BlockType::Single), log2_size(BlockType::Large), log2_size(BlockType::Cluster),
+                        log2_size(BlockType::Cluster) + 1 * 4, log2_size(BlockType::Cluster) + 2 * 4,
+                        log2_size(BlockType::Cluster) + 3 * 4, log2_size(BlockType::Cluster) + 4 * 4});
 
 class EPTree;
 class Area;
