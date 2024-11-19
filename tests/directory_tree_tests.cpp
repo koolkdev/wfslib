@@ -70,31 +70,31 @@ TEST_CASE("DirectoryTreeTests") {
     REQUIRE(dir_tree.size() == 0);
   }
 
-  SECTION("insert linear items sorted") {
-    const int kItems = 10;
-    for (uint16_t i = 0; i < kItems; ++i) {
+  SECTION("insert linear entries sorted") {
+    const int kEntries = 10;
+    for (uint16_t i = 0; i < kEntries; ++i) {
       REQUIRE(dir_tree.insert({std::string(i + 1, 'a'), i}));
     }
-    REQUIRE(dir_tree.size() == kItems);
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.key() == std::string(i + 1, 'a'));
-      CHECK(item.value() == static_cast<uint16_t>(i));
+    REQUIRE(dir_tree.size() == kEntries);
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.key() == std::string(i + 1, 'a'));
+      CHECK(entry.value() == static_cast<uint16_t>(i));
     }
   }
 
-  SECTION("insert linear items reverse") {
-    const int kItems = 10;
-    for (int i = 0; i < kItems; ++i) {
-      REQUIRE(dir_tree.insert({std::string(kItems - i, 'a'), static_cast<uint16_t>(kItems - 1 - i)}));
+  SECTION("insert linear entries reverse") {
+    const int kEntries = 10;
+    for (int i = 0; i < kEntries; ++i) {
+      REQUIRE(dir_tree.insert({std::string(kEntries - i, 'a'), static_cast<uint16_t>(kEntries - 1 - i)}));
     }
-    REQUIRE(dir_tree.size() == kItems);
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.key() == std::string(i + 1, 'a'));
-      CHECK(item.value() == static_cast<uint16_t>(i));
+    REQUIRE(dir_tree.size() == kEntries);
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.key() == std::string(i + 1, 'a'));
+      CHECK(entry.value() == static_cast<uint16_t>(i));
     }
   }
 
-  SECTION("insert and erase items randomlly") {
+  SECTION("insert and erase entries randomlly") {
     constexpr std::array<char, 3> chars = {'a', 'b', 'c'};
     auto one_char = std::views::cartesian_product(chars) |
                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
@@ -118,9 +118,9 @@ TEST_CASE("DirectoryTreeTests") {
     }
     REQUIRE(dir_tree.size() == keys.size());
     REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == static_cast<int>(keys.size()));
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.key() == keys[i]);
-      CHECK(item.value() == static_cast<uint16_t>(i));
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.key() == keys[i]);
+      CHECK(entry.value() == static_cast<uint16_t>(i));
     }
     for (uint16_t i = 0; i < keys.size(); ++i) {
       auto it = dir_tree.find(keys[unsorted_keys_indxes[i]]);
@@ -139,9 +139,9 @@ TEST_CASE("DirectoryTreeTests") {
     }
     REQUIRE(dir_tree.size() == 26);
     char i = 'a';
-    for (const auto& item : dir_tree) {
-      CHECK(item.key() == std::string{i});
-      CHECK(item.value() == static_cast<uint16_t>(i++));
+    for (const auto& entry : dir_tree) {
+      CHECK(entry.key() == std::string{i});
+      CHECK(entry.value() == static_cast<uint16_t>(i++));
     }
   }
 

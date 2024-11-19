@@ -33,6 +33,7 @@ add_library(${PROJECT_NAME}
     src/directory_map.cpp
     src/directory_parent_tree.cpp
     src/directory.cpp
+    src/entry.cpp
     src/eptree_iterator.cpp
     src/eptree.cpp
     src/errors.cpp
@@ -55,7 +56,6 @@ add_library(${PROJECT_NAME}
     src/sub_block_allocator.cpp
     src/transactions_area.cpp
     src/wfs_device.cpp
-    src/wfs_item.cpp
 )
 
 if(BUILD_STATIC AND MSVC)

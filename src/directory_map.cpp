@@ -104,7 +104,7 @@ bool DirectoryMap::erase(std::string_view name) {
     return false;
   }
   auto parents = it.parents();
-  // Free the item attributes first
+  // Free the entry attributes first
   it.leaf().node.Free((*it.leaf().iterator).value(),
                       static_cast<uint16_t>(1 << (*it).attributes->entry_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);

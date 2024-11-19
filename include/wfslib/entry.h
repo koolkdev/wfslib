@@ -7,6 +7,7 @@
 
 #pragma once
 
+#include <expected>
 #include <memory>
 #include <string>
 
@@ -17,10 +18,10 @@ class QuotaArea;
 
 using AttributesRef = Block::DataRef<Attributes>;
 
-class WfsItem {
+class Entry {
  public:
-  WfsItem(std::string name, AttributesRef block);
-  virtual ~WfsItem();
+  Entry(std::string name, AttributesRef block);
+  virtual ~Entry();
 
   const std::string& name() const { return name_; }
   bool is_directory() const { return !attributes()->is_link() && attributes()->is_directory(); }
@@ -28,9 +29,9 @@ class WfsItem {
   bool is_link() const { return attributes()->is_link(); }
   bool is_quota() const { return attributes()->is_directory() && attributes()->is_quota(); }
 
-  static std::expected<std::shared_ptr<WfsItem>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
-                                                                std::string name,
-                                                                AttributesRef attributes_ref);
+  static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
+                                                              std::string name,
+                                                              AttributesRef attributes_ref);
 
  protected:
   // TODO: Attributes copy as it can change?

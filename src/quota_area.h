@@ -10,8 +10,8 @@
 #include <expected>
 
 #include "area.h"
+#include "entry.h"
 #include "errors.h"
-#include "wfs_item.h"
 
 class Directory;
 class FreeBlocksAllocator;

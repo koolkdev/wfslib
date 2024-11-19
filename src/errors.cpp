@@ -9,8 +9,8 @@
 
 char const* WfsException::what() const noexcept {
   switch (error_) {
-    case WfsError::kItemNotFound:
-      return "Item not found";
+    case WfsError::kEntryNotFound:
+      return "Entry not found";
     case WfsError::kNotDirectory:
       return "Not a directory";
     case WfsError::kNotFile:

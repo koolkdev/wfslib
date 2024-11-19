@@ -22,7 +22,7 @@ class BlocksDevice;
 class Area;
 class QuotaArea;
 class TransactionsArea;
-class WfsItem;
+class Entry;
 class Device;
 class File;
 class Directory;
@@ -35,7 +35,7 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
 
   BlocksDevice* device() { return device_.get(); }
 
-  std::shared_ptr<WfsItem> GetObject(const std::string& filename);
+  std::shared_ptr<Entry> GetEntry(const std::string& filename);
   std::shared_ptr<File> GetFile(const std::string& filename);
   std::shared_ptr<Directory> GetDirectory(const std::string& filename);
 
