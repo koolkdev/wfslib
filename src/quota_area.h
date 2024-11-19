@@ -34,13 +34,13 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
 
   std::expected<std::shared_ptr<QuotaArea>, WfsError> LoadQuotaArea(uint32_t area_block_number, BlockSize block_size);
 
-  std::expected<std::shared_ptr<Directory>, WfsError> LoadRootDirectory(std::string name, AttributesRef attributes);
+  std::expected<std::shared_ptr<Directory>, WfsError> LoadRootDirectory(std::string name, Entry::MetadataRef metadata);
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory1();
   std::expected<std::shared_ptr<Directory>, WfsError> GetShadowDirectory2();
 
   std::expected<std::shared_ptr<Directory>, WfsError> LoadDirectory(uint32_t area_block_number,
                                                                     std::string name,
-                                                                    AttributesRef attributes);
+                                                                    Entry::MetadataRef metadata);
 
   std::expected<std::shared_ptr<Block>, WfsError> AllocMetadataBlock();
   std::expected<std::vector<uint32_t>, WfsError> AllocDataBlocks(uint32_t count, BlockType block_type);

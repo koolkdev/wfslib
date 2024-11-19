@@ -12,11 +12,11 @@
 #include "directory_parent_tree.h"
 
 class QuotaArea;
-struct Attributes;
+struct EntryMetadata;
 
 struct DiretoryMapEntry {
   std::string name;
-  Block::DataRef<Attributes> attributes;
+  Block::DataRef<EntryMetadata> metadata;
 };
 
 class DirectoryMapIterator {

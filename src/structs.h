@@ -60,7 +60,7 @@ struct Permissions {
 static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 
 // sizeof 0x2c
-struct Attributes {
+struct EntryMetadata {
   enum Flags : uint32_t {
     UNENCRYPTED_FILE = 0x2000000,
     LINK = 0x4000000,
@@ -80,8 +80,8 @@ struct Attributes {
   };
   uint32_be_t directory_block_number;  // in case of directory
   Permissions permissions;
-  uint8_be_t entry_log2_size;  // log2 size of the whole entry, including this attributes
-  uint8_be_t size_category;    // 0-4, see File.c
+  uint8_be_t metadata_log2_size;  // log2 size of the whole metadata
+  uint8_be_t size_category;       // 0-4, see File.c
   uint8_be_t filename_length;
   uint8_be_t case_bitmap;  // This byte in the struct also behave as padding, it isn't really a
                            // byte, it is a bitmap of filename_length
@@ -91,11 +91,11 @@ struct Attributes {
   bool is_link() const { return !!(flags.value() & Flags::LINK); }
   bool is_quota() const { return !!(flags.value() & Flags::QUOTA); }
 
-  size_t size() const { return offsetof(Attributes, case_bitmap) + div_ceil(filename_length.value(), 8); }
+  size_t size() const { return offsetof(EntryMetadata, case_bitmap) + div_ceil(filename_length.value(), 8); }
 
   std::string GetCaseSensitiveName(const std::string& name) const;
 };
-static_assert(sizeof(Attributes) == 0x2C, "Incorrect sizeof Attributes");
+static_assert(sizeof(EntryMetadata) == 0x2C, "Incorrect sizeof EntryMetadata");
 
 enum class DeviceType : uint16_t {
   MLC = 0x136a,
@@ -108,7 +108,7 @@ struct WfsDeviceHeader {
   uint32_be_t version;      // should be 0x01010800
   uint16_be_t device_type;  // usb - 0x16a2. mlc - 0x136a?
   uint16_be_t _pad;
-  Attributes root_quota_attributes;
+  EntryMetadata root_quota_metadata;
   uint32_be_t transactions_area_block_number;  // must be 6 or 12 (6*2, when regular block size used)
   uint32_be_t transactions_area_blocks_count;
   uint32_be_t unknown[2];  // not used??

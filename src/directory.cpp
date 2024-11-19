@@ -15,10 +15,10 @@
 #include "structs.h"
 
 Directory::Directory(std::string name,
-                     AttributesRef attributes,
+                     MetadataRef metadata,
                      std::shared_ptr<QuotaArea> quota,
                      std::shared_ptr<Block> block)
-    : Entry(std::move(name), std::move(attributes)),
+    : Entry(std::move(name), std::move(metadata)),
       quota_(std::move(quota)),
       block_(std::move(block)),
       map_{quota_, block_} {}

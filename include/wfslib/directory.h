@@ -25,7 +25,7 @@ class Directory : public Entry, public std::enable_shared_from_this<Directory> {
   using iterator = DirectoryIterator;
 
   // TODO: Replace name with tree iterator?
-  Directory(std::string name, AttributesRef attributes, std::shared_ptr<QuotaArea> quota, std::shared_ptr<Block> block);
+  Directory(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota, std::shared_ptr<Block> block);
 
   std::expected<std::shared_ptr<Entry>, WfsError> GetEntry(const std::string& name) const;
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(const std::string& name) const;
