@@ -105,8 +105,8 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
                                          /*load_data=*/true, /*check_hash=*/false);
   auto wfs_header = block->get_object<WfsDeviceHeader>(sizeof(MetadataBlockHeader));
   auto block_size = BlockSize::Physical;
-  if (!(wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_BASIC) &&
-      (wfs_header->root_quota_attributes.flags.value() & Attributes::Flags::AREA_SIZE_REGULAR))
+  if (!(wfs_header->root_quota_metadata.flags.value() & EntryMetadata::Flags::AREA_SIZE_BASIC) &&
+      (wfs_header->root_quota_metadata.flags.value() & EntryMetadata::Flags::AREA_SIZE_REGULAR))
     block_size = BlockSize::Logical;
   block.reset();
   uint32_t area_xor_wfs_iv;
@@ -193,8 +193,8 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
   std::memset(&wfs_header, 0, sizeof(wfs_header));
   wfs_header.iv = 0;
   wfs_header.version = 0x01010800;
-  wfs_header.root_quota_attributes.flags = static_cast<uint32_t>(
-      Attributes::Flags::AREA_SIZE_REGULAR | Attributes::Flags::QUOTA | Attributes::Flags::DIRECTORY);
+  wfs_header.root_quota_metadata.flags = static_cast<uint32_t>(
+      EntryMetadata::Flags::AREA_SIZE_REGULAR | EntryMetadata::Flags::QUOTA | EntryMetadata::Flags::DIRECTORY);
   WfsAreaHeader area_header;
   std::memset(&area_header, 0, sizeof(area_header));
   // This is the initial iv until we correct it
@@ -226,13 +226,13 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWi
     throw std::logic_error("Failed to find /usr/save/system");
   }
   std::shared_ptr<const Area> sub_area;
-  for (const auto& [name, attributes] : system_save_dir->map_) {
+  for (const auto& [name, metadata] : system_save_dir->map_) {
     // this is probably a corrupted quota, let's check
-    if (!attributes.get()->is_quota())
+    if (!metadata.get()->is_quota())
       continue;
     // ok this is quota
     auto new_quota =
-        system_save_dir->quota()->LoadQuotaArea(attributes.get()->directory_block_number.value(), BlockSize::Logical);
+        system_save_dir->quota()->LoadQuotaArea(metadata.get()->directory_block_number.value(), BlockSize::Logical);
     if (!new_quota.has_value())
       return std::unexpected(new_quota.error());
     sub_area = std::move(*new_quota);

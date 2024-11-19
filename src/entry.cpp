@@ -12,35 +12,34 @@
 #include "link.h"
 #include "quota_area.h"
 
-Entry::Entry(std::string name, AttributesRef attributes) : name_(std::move(name)), attributes_(std::move(attributes)) {}
+Entry::Entry(std::string name, MetadataRef metadata) : name_(std::move(name)), metadata_(std::move(metadata)) {}
 
 Entry::~Entry() = default;
 
 // static
 std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<QuotaArea> quota,
                                                             std::string name,
-                                                            AttributesRef attributes_ref) {
-  auto* attributes = attributes_ref.get();
-  if (attributes->is_link()) {
-    // TODO, I think that the link info is in the attributes metadata
-    return std::make_shared<Link>(std::move(name), std::move(attributes_ref), std::move(quota));
-  } else if (attributes->is_directory()) {
-    if (attributes->flags.value() & attributes->Flags::QUOTA) {
+                                                            MetadataRef metadata_ref) {
+  auto* metadata = metadata_ref.get();
+  if (metadata->is_link()) {
+    // TODO, I think that the link info is in the metadata metadata
+    return std::make_shared<Link>(std::move(name), std::move(metadata_ref), std::move(quota));
+  } else if (metadata->is_directory()) {
+    if (metadata->flags.value() & metadata->Flags::QUOTA) {
       // The directory is quota, aka new area
       auto block_size = BlockSize::Physical;
-      if (!(attributes->flags.value() & attributes->Flags::AREA_SIZE_BASIC) &&
-          (attributes->flags.value() & attributes->Flags::AREA_SIZE_REGULAR))
+      if (!(metadata->flags.value() & metadata->Flags::AREA_SIZE_BASIC) &&
+          (metadata->flags.value() & metadata->Flags::AREA_SIZE_REGULAR))
         block_size = BlockSize::Logical;
-      auto new_quota = quota->LoadQuotaArea(attributes->directory_block_number.value(), block_size);
+      auto new_quota = quota->LoadQuotaArea(metadata->directory_block_number.value(), block_size);
       if (!new_quota.has_value())
         return std::unexpected(new_quota.error());
-      return (*new_quota)->LoadRootDirectory(std::move(name), std::move(attributes_ref));
+      return (*new_quota)->LoadRootDirectory(std::move(name), std::move(metadata_ref));
     } else {
-      return quota->LoadDirectory(attributes->directory_block_number.value(), std::move(name),
-                                  std::move(attributes_ref));
+      return quota->LoadDirectory(metadata->directory_block_number.value(), std::move(name), std::move(metadata_ref));
     }
   } else {
     // IsFile()
-    return std::make_shared<File>(std::move(name), std::move(attributes_ref), std::move(quota));
+    return std::make_shared<File>(std::move(name), std::move(metadata_ref), std::move(quota));
   }
 }

@@ -10,7 +10,7 @@
 
 #include "structs.h"
 
-std::string Attributes::GetCaseSensitiveName(const std::string& name) const {
+std::string EntryMetadata::GetCaseSensitiveName(const std::string& name) const {
   std::string real_filename = "";
   if (filename_length.value() != name.size()) {
     // TODO: return WfsError

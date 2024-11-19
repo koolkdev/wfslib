@@ -74,7 +74,7 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
   }
 };
 
-bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
+bool DirectoryMap::insert(std::string_view name, const EntryMetadata* metadata) {
   auto it = find(name);
   if (!it.is_end()) {
     // Already in tree
@@ -83,12 +83,12 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
   auto parents = it.parents();
   auto leaf_tree = it.leaf().node;
   while (true) {
-    auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
+    auto size = static_cast<uint16_t>(1 << metadata->metadata_log2_size.value());
     auto new_offset = leaf_tree.Alloc(size);
     if (new_offset.has_value()) {
-      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), *new_offset};
+      Block::RawDataRef<EntryMetadata> new_metadata{leaf_tree.block().get(), *new_offset};
       if (leaf_tree.insert({name | std::ranges::to<std::string>(), *new_offset})) {
-        std::memcpy(new_attributes.get_mutable(), attributes, size);
+        std::memcpy(new_metadata.get_mutable(), metadata, size);
         return true;
       }
       leaf_tree.Free(*new_offset, size);
@@ -104,9 +104,9 @@ bool DirectoryMap::erase(std::string_view name) {
     return false;
   }
   auto parents = it.parents();
-  // Free the entry attributes first
+  // Free the entry metadata first
   it.leaf().node.Free((*it.leaf().iterator).value(),
-                      static_cast<uint16_t>(1 << (*it).attributes->entry_log2_size.value()));
+                      static_cast<uint16_t>(1 << (*it).metadata->metadata_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);
   bool last_empty = it.leaf().node.empty();
   if (!last_empty)

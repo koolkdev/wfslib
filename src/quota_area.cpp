@@ -41,16 +41,16 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::share
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadDirectory(uint32_t area_block_number,
                                                                              std::string name,
-                                                                             AttributesRef attributes) {
+                                                                             Entry::MetadataRef metadata) {
   auto block = LoadMetadataBlock(area_block_number);
   if (!block.has_value())
     return std::unexpected(WfsError::kDirectoryCorrupted);
-  return std::make_shared<Directory>(std::move(name), std::move(attributes), shared_from_this(), std::move(*block));
+  return std::make_shared<Directory>(std::move(name), std::move(metadata), shared_from_this(), std::move(*block));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(std::string name,
-                                                                                 AttributesRef attributes) {
-  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(attributes));
+                                                                                 Entry::MetadataRef metadata) {
+  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(metadata));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory1() {

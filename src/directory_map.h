@@ -25,7 +25,7 @@ class DirectoryMap {
 
   iterator find(std::string_view key) const;
 
-  bool insert(std::string_view name, const Attributes* attributes);
+  bool insert(std::string_view name, const EntryMetadata* metadata);
   bool erase(std::string_view name);
 
   void Init();

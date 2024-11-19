@@ -16,29 +16,29 @@
 
 class QuotaArea;
 
-using AttributesRef = Block::DataRef<Attributes>;
-
 class Entry {
  public:
-  Entry(std::string name, AttributesRef block);
+  using MetadataRef = Block::DataRef<EntryMetadata>;
+
+  Entry(std::string name, MetadataRef block);
   virtual ~Entry();
 
   const std::string& name() const { return name_; }
-  bool is_directory() const { return !attributes()->is_link() && attributes()->is_directory(); }
-  bool is_file() const { return !attributes()->is_link() && !attributes()->is_directory(); }
-  bool is_link() const { return attributes()->is_link(); }
-  bool is_quota() const { return attributes()->is_directory() && attributes()->is_quota(); }
+  bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
+  bool is_file() const { return !metadata()->is_link() && !metadata()->is_directory(); }
+  bool is_link() const { return metadata()->is_link(); }
+  bool is_quota() const { return metadata()->is_directory() && metadata()->is_quota(); }
 
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                               std::string name,
-                                                              AttributesRef attributes_ref);
+                                                              MetadataRef metadata_ref);
 
  protected:
-  // TODO: Attributes copy as it can change?
-  Attributes* mutable_attributes() { return attributes_.get_mutable(); }
-  const Attributes* attributes() const { return attributes_.get(); }
-  const std::shared_ptr<Block>& attributes_block() const { return attributes_.block; }
+  // TODO: Metadata copy as it can change?
+  EntryMetadata* mutable_metadata() { return metadata_.get_mutable(); }
+  const EntryMetadata* metadata() const { return metadata_.get(); }
+  const std::shared_ptr<Block>& metadata_block() const { return metadata_.block; }
 
   std::string name_;
-  AttributesRef attributes_;
+  MetadataRef metadata_;
 };

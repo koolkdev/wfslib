@@ -93,7 +93,7 @@ std::shared_ptr<QuotaArea> WfsDevice::GetRootArea() {
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory() {
-  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_attributes)});
+  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_metadata)});
 }
 
 // static
@@ -187,8 +187,9 @@ void WfsDevice::Init() {
   header->iv = random_iv_generator(rand_engine);
   header->device_type = static_cast<uint16_t>(DeviceType::USB);  // TODO
   header->version = WFS_VERSION;
-  header->root_quota_attributes.flags = Attributes::DIRECTORY | Attributes::AREA_SIZE_REGULAR | Attributes::QUOTA;
-  header->root_quota_attributes.quota_blocks_count = blocks_count;
+  header->root_quota_metadata.flags =
+      EntryMetadata::DIRECTORY | EntryMetadata::AREA_SIZE_REGULAR | EntryMetadata::QUOTA;
+  header->root_quota_metadata.quota_blocks_count = blocks_count;
   header->transactions_area_block_number = QuotaArea::kReservedAreaBlocks
                                            << (log2_size(BlockSize::Logical) - log2_size(BlockSize::Physical));
   header->transactions_area_blocks_count = kTransactionsAreaEnd - header->transactions_area_block_number.value();
