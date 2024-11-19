@@ -41,7 +41,7 @@ class TestAttributes {
 TEST_CASE("DirectoryMapTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
   auto wfs_device = *WfsDevice::Create(test_device);
-  auto root_block = *wfs_device->GetRootArea()->LoadMetadataBlock(10);
+  auto root_block = *wfs_device->GetRootArea()->AllocMetadataBlock();
   DirectoryMap dir_tree{wfs_device->GetRootArea(), root_block};
   dir_tree.Init();
 
