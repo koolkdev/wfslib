@@ -49,33 +49,33 @@ TEST_CASE("DirectoryMapTests") {
     REQUIRE(dir_tree.size() == 0);
   }
 
-  SECTION("insert items sorted") {
-    const int kItemsCount = 100000;
+  SECTION("insert entries sorted") {
+    const int kEntriesCount = 100000;
     TestAttributes attributes(6);
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
       attributes.data()->flags = i;
       REQUIRE(dir_tree.insert(std::format("{:05}", i), attributes.data()));
     }
-    REQUIRE(dir_tree.size() == kItemsCount);
-    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kItemsCount);
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.name == std::format("{:05}", i));
-      CHECK(item.attributes.get()->flags.value() == i);
-      CHECK(item.attributes.get()->entry_log2_size.value() == 6);
+    REQUIRE(dir_tree.size() == kEntriesCount);
+    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kEntriesCount);
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.name == std::format("{:05}", i));
+      CHECK(entry.attributes.get()->flags.value() == i);
+      CHECK(entry.attributes.get()->entry_log2_size.value() == 6);
     }
     REQUIRE(std::ranges::equal(
         std::views::transform(std::views::reverse(dir_tree),
-                              [](const auto& item) -> int { return item.attributes.get()->flags.value(); }),
-        std::views::reverse(std::views::iota(0, kItemsCount))));
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      auto item = dir_tree.find(std::format("{:05}", i));
-      REQUIRE(!item.is_end());
-      CHECK((*item).attributes.get()->flags.value() == i);
-      CHECK((*item).name == std::format("{:05}", i));
+                              [](const auto& entry) -> int { return entry.attributes.get()->flags.value(); }),
+        std::views::reverse(std::views::iota(0, kEntriesCount))));
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
+      auto entry = dir_tree.find(std::format("{:05}", i));
+      REQUIRE(!entry.is_end());
+      CHECK((*entry).attributes.get()->flags.value() == i);
+      CHECK((*entry).name == std::format("{:05}", i));
     }
   }
 
-  SECTION("insert and remove one two items") {
+  SECTION("insert and remove one two entries") {
     SubBlockAllocator<DirectoryTreeHeader> allocator{root_block};
     auto free_bytes_1 = allocator.GetFreeBytes();
     TestAttributes attributes(6);
@@ -90,68 +90,68 @@ TEST_CASE("DirectoryMapTests") {
     CHECK(free_bytes_1 == allocator.GetFreeBytes());
   }
 
-  SECTION("insert items unsorted") {
-    constexpr int kItemsCount = 100000;
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
+  SECTION("insert entries unsorted") {
+    constexpr int kEntriesCount = 100000;
+    auto unsorted_keys = createShuffledKeysArray<kEntriesCount>();
     TestAttributes attributes(6);
     for (auto i : unsorted_keys) {
       attributes.data()->flags = i;
       REQUIRE(dir_tree.insert(std::format("{:05}", i), attributes.data()));
     }
-    REQUIRE(dir_tree.size() == kItemsCount);
-    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kItemsCount);
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.name == std::format("{:05}", i));
-      CHECK(item.attributes.get()->flags.value() == i);
-      CHECK(item.attributes.get()->entry_log2_size.value() == 6);
+    REQUIRE(dir_tree.size() == kEntriesCount);
+    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kEntriesCount);
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.name == std::format("{:05}", i));
+      CHECK(entry.attributes.get()->flags.value() == i);
+      CHECK(entry.attributes.get()->entry_log2_size.value() == 6);
     }
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      auto item = dir_tree.find(std::format("{:05}", i));
-      REQUIRE(!item.is_end());
-      CHECK((*item).attributes.get()->flags.value() == i);
-      CHECK((*item).name == std::format("{:05}", i));
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
+      auto entry = dir_tree.find(std::format("{:05}", i));
+      REQUIRE(!entry.is_end());
+      CHECK((*entry).attributes.get()->flags.value() == i);
+      CHECK((*entry).name == std::format("{:05}", i));
     }
   }
 
-  SECTION("insert items unsorted different attributes size") {
-    constexpr int kItemsCount = 10000;
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
+  SECTION("insert entries unsorted different attributes size") {
+    constexpr int kEntriesCount = 10000;
+    auto unsorted_keys = createShuffledKeysArray<kEntriesCount>();
     for (auto i : unsorted_keys) {
       TestAttributes attributes((i % 5) + 6);
       attributes.data()->flags = i;
       REQUIRE(dir_tree.insert(std::format("{:04}", i), attributes.data()));
     }
-    REQUIRE(dir_tree.size() == kItemsCount);
-    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kItemsCount);
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.name == std::format("{:04}", i));
-      CHECK(item.attributes.get()->flags.value() == i);
-      CHECK(item.attributes.get()->entry_log2_size.value() == (i % 5) + 6);
+    REQUIRE(dir_tree.size() == kEntriesCount);
+    REQUIRE(std::ranges::distance(dir_tree.begin(), dir_tree.end()) == kEntriesCount);
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.name == std::format("{:04}", i));
+      CHECK(entry.attributes.get()->flags.value() == i);
+      CHECK(entry.attributes.get()->entry_log2_size.value() == (i % 5) + 6);
     }
   }
 
-  SECTION("remove items randomly") {
-    constexpr int kItemsCount = 100000;
+  SECTION("remove entries randomly") {
+    constexpr int kEntriesCount = 100000;
     auto free_blocks = (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count();
     TestAttributes attributes(6);
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
       attributes.data()->flags = i;
       REQUIRE(dir_tree.insert(std::format("{:05}", i), attributes.data()));
     }
     CHECK(free_blocks != (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count());
 
-    auto unsorted_indexes = createShuffledKeysArray<kItemsCount>();
-    auto middle = unsorted_indexes.begin() + kItemsCount / 2;
-    // Remove half the items first
+    auto unsorted_indexes = createShuffledKeysArray<kEntriesCount>();
+    auto middle = unsorted_indexes.begin() + kEntriesCount / 2;
+    // Remove half the entries first
     for (auto i : std::ranges::subrange(unsorted_indexes.begin(), middle)) {
       REQUIRE(dir_tree.erase(std::format("{:05}", i)));
     }
 
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_indexes.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
+    // Ensure that the right entries were deleted
     REQUIRE(std::ranges::equal(
-        std::views::transform(dir_tree, [](const auto& item) -> int { return item.attributes.get()->flags.value(); }),
+        std::views::transform(dir_tree, [](const auto& entry) -> int { return entry.attributes.get()->flags.value(); }),
         sorted_upper_half));
 
     // Remove the second half
@@ -166,28 +166,28 @@ TEST_CASE("DirectoryMapTests") {
     CHECK(free_blocks == (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count());
   }
 
-  SECTION("remove items randomly") {
-    constexpr int kItemsCount = 100000;
+  SECTION("remove entries randomly") {
+    constexpr int kEntriesCount = 100000;
     auto free_blocks = (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count();
     TestAttributes attributes(6);
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
       attributes.data()->flags = i;
       REQUIRE(dir_tree.insert(std::format("{:05}", i), attributes.data()));
     }
     CHECK(free_blocks != (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count());
 
-    auto unsorted_indexes = createShuffledKeysArray<kItemsCount>();
-    auto middle = unsorted_indexes.begin() + kItemsCount / 2;
-    // Remove half the items first
+    auto unsorted_indexes = createShuffledKeysArray<kEntriesCount>();
+    auto middle = unsorted_indexes.begin() + kEntriesCount / 2;
+    // Remove half the entries first
     for (auto i : std::ranges::subrange(unsorted_indexes.begin(), middle)) {
       REQUIRE(dir_tree.erase(std::format("{:05}", i)));
     }
 
     auto sorted_upper_half = std::ranges::subrange(middle, unsorted_indexes.end()) | std::ranges::to<std::vector>();
     std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
+    // Ensure that the right entries were deleted
     REQUIRE(std::ranges::equal(
-        std::views::transform(dir_tree, [](const auto& item) -> int { return item.attributes.get()->flags.value(); }),
+        std::views::transform(dir_tree, [](const auto& entry) -> int { return entry.attributes.get()->flags.value(); }),
         sorted_upper_half));
 
     // Remove the second half
@@ -203,9 +203,9 @@ TEST_CASE("DirectoryMapTests") {
   }
 
   SECTION("check backward/forward iterator") {
-    constexpr int kItemsCount = 100000;
+    constexpr int kEntriesCount = 100000;
     TestAttributes attributes(6);
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
+    for (uint32_t i = 0; i < kEntriesCount; ++i) {
       REQUIRE(dir_tree.insert(std::format("{:05}", i), attributes.data()));
     }
 
@@ -216,7 +216,7 @@ TEST_CASE("DirectoryMapTests") {
       ++it;
       ++steps;
     }
-    REQUIRE(steps == kItemsCount);
+    REQUIRE(steps == kEntriesCount);
     REQUIRE(it.is_end());
     while (it != dir_tree.begin()) {
       --it;
@@ -254,13 +254,13 @@ TEST_CASE("DirectoryMapTests") {
     for (uint32_t i = 0; i < 200; ++i) {
       REQUIRE(dir_tree.erase(std::format("{:05}", 11000 + i)));
     }
-    for (auto [i, item] : std::views::enumerate(dir_tree)) {
-      CHECK(item.name == std::format("{:05}", 10000 + i));
+    for (auto [i, entry] : std::views::enumerate(dir_tree)) {
+      CHECK(entry.name == std::format("{:05}", 10000 + i));
     }
     for (uint32_t i = 0; i < 80; ++i) {
-      auto item = dir_tree.find(std::format("{:05}", 10000 + i));
-      REQUIRE(!item.is_end());
-      CHECK((*item).name == std::format("{:05}", 10000 + i));
+      auto entry = dir_tree.find(std::format("{:05}", 10000 + i));
+      REQUIRE(!entry.is_end());
+      CHECK((*entry).name == std::format("{:05}", 10000 + i));
     }
   }
 }

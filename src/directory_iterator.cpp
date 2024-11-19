@@ -7,15 +7,15 @@
 
 #include "directory_iterator.h"
 
+#include "entry.h"
 #include "quota_area.h"
-#include "wfs_item.h"
 
 DirectoryIterator::DirectoryIterator(DirectoryMapIterator base) : base_(base) {}
 
 DirectoryIterator::reference DirectoryIterator::operator*() const {
   auto val = *base_;
   auto name = val.attributes.get()->GetCaseSensitiveName(val.name);
-  return {name, WfsItem::Load(base_.quota(), name, val.attributes)};
+  return {name, Entry::Load(base_.quota(), name, val.attributes)};
 }
 
 DirectoryIterator& DirectoryIterator::operator++() {

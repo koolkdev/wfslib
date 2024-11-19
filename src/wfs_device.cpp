@@ -27,21 +27,21 @@ WfsDevice::~WfsDevice() {
   Flush();
 }
 
-std::shared_ptr<WfsItem> WfsDevice::GetObject(const std::string& filename) {
+std::shared_ptr<Entry> WfsDevice::GetEntry(const std::string& filename) {
   if (filename == "/")
     return GetDirectory("/");
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
-  auto obj = dir->GetObject(path.filename().string());
-  if (!obj.has_value()) {
-    if (obj.error() == WfsError::kItemNotFound)
+  auto entry = dir->GetEntry(path.filename().string());
+  if (!entry.has_value()) {
+    if (entry.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
-      throw WfsException(obj.error());
+      throw WfsException(entry.error());
   }
-  return *obj;
+  return *entry;
 }
 
 std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
@@ -51,7 +51,7 @@ std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
     return nullptr;
   auto file = dir->GetFile(path.filename().string());
   if (!file.has_value()) {
-    if (file.error() == WfsError::kItemNotFound)
+    if (file.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
       throw WfsException(file.error());
@@ -63,7 +63,7 @@ std::shared_ptr<Directory> WfsDevice::GetDirectory(const std::string& filename) 
   std::filesystem::path path(filename);
   auto current_directory = GetRootDirectory();
   if (!current_directory.has_value()) {
-    if (current_directory.error() == WfsError::kItemNotFound)
+    if (current_directory.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
       throw WfsException(current_directory.error());
@@ -75,7 +75,7 @@ std::shared_ptr<Directory> WfsDevice::GetDirectory(const std::string& filename) 
       continue;
     current_directory = (*current_directory)->GetDirectory(part.string());
     if (!current_directory.has_value()) {
-      if (current_directory.error() == WfsError::kItemNotFound)
+      if (current_directory.error() == WfsError::kEntryNotFound)
         return nullptr;
       else
         throw WfsException(current_directory.error());

@@ -5,22 +5,21 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include "wfs_item.h"
+#include "entry.h"
 
 #include "directory.h"
 #include "file.h"
 #include "link.h"
 #include "quota_area.h"
 
-WfsItem::WfsItem(std::string name, AttributesRef attributes)
-    : name_(std::move(name)), attributes_(std::move(attributes)) {}
+Entry::Entry(std::string name, AttributesRef attributes) : name_(std::move(name)), attributes_(std::move(attributes)) {}
 
-WfsItem::~WfsItem() = default;
+Entry::~Entry() = default;
 
 // static
-std::expected<std::shared_ptr<WfsItem>, WfsError> WfsItem::Load(std::shared_ptr<QuotaArea> quota,
-                                                                std::string name,
-                                                                AttributesRef attributes_ref) {
+std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<QuotaArea> quota,
+                                                            std::string name,
+                                                            AttributesRef attributes_ref) {
   auto* attributes = attributes_ref.get();
   if (attributes->is_link()) {
     // TODO, I think that the link info is in the attributes metadata
