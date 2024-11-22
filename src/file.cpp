@@ -123,8 +123,8 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
                                const std::shared_ptr<Block>& hash_block,
                                const uint8_be_t* hash) {
     LoadDataBlock(block_number,
-                  static_cast<uint32_t>(
-                      std::min(1ULL << GetDataBlockSize(), file_->metadata()->file_size.value() - block_offset)),
+                  std::min(uint32_t{1} << GetDataBlockSize(),
+                           static_cast<uint32_t>(file_->metadata()->file_size.value() - block_offset)),
                   {hash_block, hash_block->to_offset(hash)});
     size = std::min(size, current_data_block->size() - offset_in_block);
     return {current_data_block, offset_in_block, size};
@@ -149,7 +149,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
           // Minus 1 because if it is right at the end of the block, we will get the next block
           auto chunk_info = GetFileDataRef(new_size - 1, 1);
           current_block = chunk_info.data_block;
-          new_block_size = std::min(chunk_info.offset_in_block + 1, 1ULL << GetDataBlockSize());
+          new_block_size = std::min(chunk_info.offset_in_block + 1, size_t{1} << GetDataBlockSize());
         }
         old_size = new_size;
       } else {
@@ -158,14 +158,15 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
           // Minus 1 because if it is right at the end of the block, we will get the next block
           auto chunk_info = GetFileDataRef(old_size - 1, 1);
           current_block = chunk_info.data_block;
-          new_block_size = std::min(chunk_info.offset_in_block + 1 + (new_size - old_size), 1ULL << GetDataBlockSize());
+          new_block_size =
+              std::min(chunk_info.offset_in_block + 1 + (new_size - old_size), size_t{1} << GetDataBlockSize());
           old_size += new_block_size - (chunk_info.offset_in_block + 1);
         } else {
           // Open new block, the size of the loaded block will be 0
           auto chunk_info = GetFileDataRef(old_size, 0);
           current_block = chunk_info.data_block;
           assert(chunk_info.offset_in_block == 0);
-          new_block_size = std::min(new_size - old_size, 1ULL << GetDataBlockSize());
+          new_block_size = std::min(new_size - old_size, size_t{1} << GetDataBlockSize());
           old_size += new_block_size;
         }
       }
@@ -395,5 +396,5 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
 std::streamsize File::file_device::optimal_buffer_size() const {
   // Max block size. TODO: By category
   // TODO: The pback_buffer_size, which is actually used, is 0x10004, fix it
-  return 1ULL << (log2_size(BlockSize::Logical) + log2_size(BlockType::Cluster));
+  return std::streamsize{1} << (log2_size(BlockSize::Logical) + log2_size(BlockType::Cluster));
 }
