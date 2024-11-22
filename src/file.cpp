@@ -294,7 +294,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   size_t ClustersInBlock() const {
     size_t clusters_in_block =
         (file_->quota()->block_size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
-    clusters_in_block = std::min(clusters_in_block, 48ULL);
+    clusters_in_block = std::min(clusters_in_block, size_t{48});
     return clusters_in_block;
   }
 };
