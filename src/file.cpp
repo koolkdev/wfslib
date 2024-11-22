@@ -138,7 +138,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
                             file_->metadata_block(), blocks_list[block_index].hash);
   }
 
-  virtual void Resize(size_t new_size) {
+  void Resize(size_t new_size) override {
     size_t old_size = file_->metadata()->file_size.value();
     while (old_size != new_size) {
       std::shared_ptr<Block> current_block;
