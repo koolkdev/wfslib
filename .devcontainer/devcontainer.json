@@ -13,7 +13,7 @@
 	// "forwardPorts": [],
 
 	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "git submodule init && git submodule update && cmake --preset default",
+	"postCreateCommand": "git submodule init && git submodule update && cmake --preset default"
 
 	// Configure tool-specific properties.
 	// "customizations": {},
