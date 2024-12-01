@@ -19,6 +19,6 @@ COPY ./reinstall-cmake.sh /tmp/
 #     && apt-get -y install --no-install-recommends <your-package-list-here>
 
 # Install gcc 14
-RUN apt-get update && apt-get install software-properties-common \
+RUN apt-get update && apt-get -y install software-properties-common \
     && add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe" \
     && apt-get update && apt-get -y install gcc-14 g++-14
