@@ -19,5 +19,6 @@ COPY ./reinstall-cmake.sh /tmp/
 #     && apt-get -y install --no-install-recommends <your-package-list-here>
 
 # Install gcc 14
-RUN add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe" && \
-    apt-get update && apt-get -y install gcc-14 g++-14
+RUN apt-get update && apt-get install add-apt-repository \
+    && add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe" \
+    && apt-get update && apt-get -y install gcc-14 g++-14
