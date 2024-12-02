@@ -327,6 +327,7 @@ TEST_CASE("DirectoryTreeTests") {
     for (const auto& [key, result] : kExpectedResults) {
       auto it = dir_tree.find(key, /*exact_match=*/false);
       REQUIRE(it != dir_tree.end());
+      CAPTURE(key);
       CHECK((*it).key() == result);
     }
   }
