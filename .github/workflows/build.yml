@@ -42,7 +42,9 @@ jobs:
       - name: Set gcc
         run: |
           # Temporary until gcc-14 is officialy released and available on the runner
-          
+          sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe"
+          sudo apt update
+          sudo apt install gcc-14 g++-14
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
