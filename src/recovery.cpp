@@ -9,6 +9,7 @@
 
 #include <array>
 
+#include "area.h"
 #include "blocks_device.h"
 #include "device_encryption.h"
 #include "directory.h"

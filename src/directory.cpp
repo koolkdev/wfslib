@@ -7,12 +7,10 @@
 
 #include "directory.h"
 
-#include <numeric>
 #include <utility>
 
 #include "file.h"
 #include "quota_area.h"
-#include "structs.h"
 
 Directory::Directory(std::string name,
                      MetadataRef metadata,

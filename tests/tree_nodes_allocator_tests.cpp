@@ -7,7 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "../src/tree_nodes_allocator.h"
+#include "tree_nodes_allocator.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"

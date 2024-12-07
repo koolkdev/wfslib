@@ -8,11 +8,10 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <random>
 #include <ranges>
 
-#include "../src/free_blocks_tree.h"
-#include "../src/free_blocks_tree_bucket.h"
+#include "free_blocks_tree.h"
+#include "free_blocks_tree_bucket.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"

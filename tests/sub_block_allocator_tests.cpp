@@ -7,7 +7,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include "../src/sub_block_allocator.h"
+#include "sub_block_allocator.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"

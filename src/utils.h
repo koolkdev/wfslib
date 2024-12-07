@@ -9,6 +9,9 @@
 
 #include <bit>
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 template <typename T>
 class big_endian_type {

@@ -8,10 +8,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <random>
 #include <ranges>
 
-#include "../src/eptree.h"
+#include "eptree.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"
@@ -35,13 +34,10 @@ TEST_CASE("EPTreeTests") {
     REQUIRE(eptree.tree_header()->depth.value() == 3);
 
     REQUIRE(std::ranges::equal(
-        std::views::transform(eptree,
-                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key(), extent.value()};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
-          return {i, i + 1};
-        })));
+        std::views::transform(
+            eptree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(0, kItemsCount),
+                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
   }
 
   SECTION("insert items unsorted") {
@@ -59,13 +55,10 @@ TEST_CASE("EPTreeTests") {
 
     // Check the values
     REQUIRE(std::ranges::equal(
-        std::views::transform(eptree,
-                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key(), extent.value()};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, uint32_t> {
-          return {i, i + 1};
-        })));
+        std::views::transform(
+            eptree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(0, kItemsCount),
+                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
 
     for (uint32_t i = 0; i < kItemsCount; ++i) {
       REQUIRE((*eptree.find(i, true)).key() == i);

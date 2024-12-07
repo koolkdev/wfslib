@@ -7,7 +7,6 @@
 
 #include "quota_area.h"
 
-#include <algorithm>
 #include <numeric>
 #include <ranges>
 

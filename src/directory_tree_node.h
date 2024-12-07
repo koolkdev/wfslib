@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <ranges>
 
 #include "directory_tree_node_iterator.h"
 

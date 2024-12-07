@@ -10,8 +10,7 @@
 #include <random>
 #include <ranges>
 
-#include "../src/free_blocks_allocator.h"
-#include "../src/free_blocks_tree.h"
+#include "free_blocks_tree.h"
 
 #include "utils/test_area.h"
 #include "utils/test_block.h"

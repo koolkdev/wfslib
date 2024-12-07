@@ -9,7 +9,6 @@
 
 #include <cstdint>
 #include <span>
-#include <vector>
 
 class Device {
  public:

@@ -7,7 +7,6 @@
 
 #pragma once
 
-#include <memory>
 #include <type_traits>
 
 #include "block.h"
@@ -161,11 +160,10 @@ struct node_keys_size_calc<T, low, high> {
 };
 
 template <typename T>
-concept is_parent_node_details = is_node_details<T> && node_keys_capacity<T>::value + 1 ==
-node_values_capacity<T>::value;
+concept is_parent_node_details =
+    is_node_details<T> && node_keys_capacity<T>::value + 1 == node_values_capacity<T>::value;
 template <typename T>
-concept is_leaf_node_details = is_node_details<T> && node_keys_capacity<T>::value ==
-node_values_capacity<T>::value;
+concept is_leaf_node_details = is_node_details<T> && node_keys_capacity<T>::value == node_values_capacity<T>::value;
 
 template <has_keys T>
 size_t node_keys_size(const T& node);

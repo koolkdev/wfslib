@@ -7,7 +7,6 @@
 
 #include "area.h"
 
-#include <numeric>
 #include <random>
 
 #include "wfs_device.h"

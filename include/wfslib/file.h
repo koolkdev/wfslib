@@ -11,7 +11,6 @@
 #include <boost/iostreams/positioning.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <memory>
-#include <vector>
 #include "entry.h"
 
 class QuotaArea;

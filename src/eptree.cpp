@@ -5,8 +5,6 @@
  * of the MIT license.  See the LICENSE file for details.
  */
 
-#include <algorithm>
-
 #include "eptree.h"
 
 void EPTree::Init(uint32_t block_number) {

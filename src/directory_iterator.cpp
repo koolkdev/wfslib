@@ -8,7 +8,6 @@
 #include "directory_iterator.h"
 
 #include "entry.h"
-#include "quota_area.h"
 
 DirectoryIterator::DirectoryIterator(DirectoryMapIterator base) : base_(base) {}
 

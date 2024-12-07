@@ -7,9 +7,9 @@
 
 #include "test_free_blocks_allocator.h"
 
-#include "../../src/eptree.h"
-#include "../../src/ftrees.h"
-#include "../../src/structs.h"
+#include "eptree.h"
+#include "ftree.h"
+#include "structs.h"
 #include "test_area.h"
 #include "test_block.h"
 #include "test_blocks_device.h"

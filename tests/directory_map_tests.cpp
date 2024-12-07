@@ -8,15 +8,13 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <array>
-#include <random>
 #include <ranges>
 
 #include <wfslib/wfs_device.h>
 
-#include "../src/directory_map.h"
-#include "../src/free_blocks_allocator.h"
-#include "../src/quota_area.h"
+#include "directory_map.h"
+#include "free_blocks_allocator.h"
+#include "quota_area.h"
 
 #include "utils/test_blocks_device.h"
 #include "utils/test_utils.h"

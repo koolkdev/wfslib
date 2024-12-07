@@ -10,7 +10,6 @@
 #include <cassert>
 #include <memory>
 #include <span>
-#include <string>
 #include <vector>
 
 #include "errors.h"
@@ -21,8 +20,8 @@ class Block;
 
 template <typename T>
 concept BlockRefObj = requires(const T& block_ref) {
-                        { block_ref.operator->() } -> std::same_as<Block*>;
-                      };
+  { block_ref.operator->() } -> std::same_as<Block*>;
+};
 
 template <typename T>
 concept BlockRef = std::same_as<T, Block*> || BlockRefObj<T>;

@@ -7,7 +7,7 @@
 
 #pragma once
 
-#include "../../src/free_blocks_allocator.h"
+#include "free_blocks_allocator.h"
 
 class TestBlocksDevice;
 class TestArea;
