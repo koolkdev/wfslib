@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-13]
+        platform: [ubuntu-24.04	, windows-latest, macos-13]
         compiler: [msvc, gcc, llvm]
         config: [debug, release]
         exclude:
@@ -18,11 +18,8 @@ jobs:
             compiler: gcc
           - platform: windows-latest
             compiler: llvm
-          - platform: ubuntu-latest
+          - platform: ubuntu-24.04
             compiler: msvc
-          # Re-enable after llvm-19
-          - platform: ubuntu-latest
-            compiler: llvm
           - platform: macos-13
             compiler: msvc
           - platform: macos-13
@@ -41,25 +38,24 @@ jobs:
 
       - name: Set gcc
         run: |
-          # Temporary until gcc-14 is officialy released and available on the runner
           sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe"
           sudo apt update
           sudo apt install gcc-14 g++-14
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
+        if: matrix.platform == 'ubuntu-24.04' && matrix.compiler == 'gcc'
 
       - name: Set llvm (Ubuntu)
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          sudo apt install libc++-18-dev
-          echo "CC=clang-18" >> $GITHUB_ENV
-          echo "CXX=clang++-18" >> $GITHUB_ENV
+          sudo ./llvm.sh 19
+          sudo apt install libc++-19-dev
+          echo "CC=clang-19" >> $GITHUB_ENV
+          echo "CXX=clang++-19" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
+        if: matrix.platform == 'ubuntu-24.04' && matrix.compiler == 'llvm'
 
       - name: Set llvm (MacOS)
         run: |
