@@ -23,7 +23,7 @@ class Entry {
   Entry(std::string name, MetadataRef block);
   virtual ~Entry();
 
-  const std::string& name() const { return name_; }
+  std::string_view name() const { return name_; }
   bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
   bool is_file() const { return !metadata()->is_link() && !metadata()->is_directory(); }
   bool is_link() const { return metadata()->is_link(); }

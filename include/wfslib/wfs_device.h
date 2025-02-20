@@ -10,7 +10,7 @@
 #include <expected>
 #include <memory>
 #include <optional>
-#include <string>
+#include <string_view>
 #include <vector>
 
 #include "block.h"
@@ -34,9 +34,9 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
 
   BlocksDevice* device() { return device_.get(); }
 
-  std::shared_ptr<Entry> GetEntry(const std::string& filename);
-  std::shared_ptr<File> GetFile(const std::string& filename);
-  std::shared_ptr<Directory> GetDirectory(const std::string& filename);
+  std::shared_ptr<Entry> GetEntry(std::string_view filename);
+  std::shared_ptr<File> GetFile(std::string_view filename);
+  std::shared_ptr<Directory> GetDirectory(std::string_view filename);
 
   std::shared_ptr<QuotaArea> GetRootArea();
   std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();

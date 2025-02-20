@@ -25,7 +25,7 @@ WfsDevice::~WfsDevice() {
   Flush();
 }
 
-std::shared_ptr<Entry> WfsDevice::GetEntry(const std::string& filename) {
+std::shared_ptr<Entry> WfsDevice::GetEntry(std::string_view filename) {
   if (filename == "/")
     return GetDirectory("/");
   std::filesystem::path path(filename);
@@ -42,7 +42,7 @@ std::shared_ptr<Entry> WfsDevice::GetEntry(const std::string& filename) {
   return *entry;
 }
 
-std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
+std::shared_ptr<File> WfsDevice::GetFile(std::string_view filename) {
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
@@ -57,7 +57,7 @@ std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
   return *file;
 }
 
-std::shared_ptr<Directory> WfsDevice::GetDirectory(const std::string& filename) {
+std::shared_ptr<Directory> WfsDevice::GetDirectory(std::string_view filename) {
   std::filesystem::path path(filename);
   auto current_directory = GetRootDirectory();
   if (!current_directory.has_value()) {

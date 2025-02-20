@@ -20,7 +20,7 @@ class KeyFile {
 
  protected:
   template <class T>
-  static T* LoadFromFile(const std::string& path, size_t size)
+  static T* LoadFromFile(std::string_view path, size_t size)
     requires std::is_base_of<KeyFile, T>::value;
 
   std::vector<std::byte> data_;
@@ -34,7 +34,7 @@ class OTP : KeyFile {
 
   OTP(const std::vector<std::byte>& data) : KeyFile(data, OTP_SIZE) {}
 
-  static OTP* LoadFromFile(const std::string& path);
+  static OTP* LoadFromFile(std::string_view path);
 
   std::vector<std::byte> GetMLCKey() const;
   std::vector<std::byte> GetUSBSeedEncryptionKey() const;
@@ -46,7 +46,7 @@ class SEEPROM : KeyFile {
 
   SEEPROM(const std::vector<std::byte>& data) : KeyFile(data, SEEPROM_SIZE) {}
 
-  static SEEPROM* LoadFromFile(const std::string& path);
+  static SEEPROM* LoadFromFile(std::string_view path);
 
   std::vector<std::byte> GetUSBKeySeed() const;
   std::vector<std::byte> GetUSBKey(const OTP& otp) const;

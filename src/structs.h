@@ -91,7 +91,7 @@ struct EntryMetadata {
 
   size_t size() const { return offsetof(EntryMetadata, case_bitmap) + div_ceil(filename_length.value(), 8); }
 
-  std::string GetCaseSensitiveName(const std::string& name) const;
+  std::string GetCaseSensitiveName(std::string_view name) const;
 };
 static_assert(sizeof(EntryMetadata) == 0x2C, "Incorrect sizeof EntryMetadata");
 
