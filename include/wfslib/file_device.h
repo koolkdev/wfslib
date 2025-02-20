@@ -14,7 +14,7 @@
 
 class FileDevice : public Device {
  public:
-  FileDevice(const std::string& path,
+  FileDevice(std::string_view path,
              uint32_t log2_sector_size = 9 /* 512 */,
              uint32_t sectors_count = 0,
              bool read_only = true,

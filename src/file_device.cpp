@@ -10,7 +10,7 @@
 #include <cassert>
 #include <fstream>
 
-FileDevice::FileDevice(const std::string& path,
+FileDevice::FileDevice(std::string_view path,
                        uint32_t log2_sector_size,
                        uint32_t sectors_count,
                        bool read_only,

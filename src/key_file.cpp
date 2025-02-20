@@ -23,10 +23,10 @@ class KeyFileException : public std::exception {
 };
 
 template <class T>
-T* KeyFile::LoadFromFile(const std::string& path, size_t size)
+T* KeyFile::LoadFromFile(std::string_view path, size_t size)
   requires std::is_base_of<KeyFile, T>::value
 {
-  std::fstream file(path, std::ios::binary | std::ios::in);
+  std::fstream file(path.data(), std::ios::binary | std::ios::in);
   if (file.fail()) {
     throw KeyFileException<T>(std::format("Failed to key file {}", path));
   }
@@ -38,11 +38,11 @@ T* KeyFile::LoadFromFile(const std::string& path, size_t size)
   return new T(data);
 }
 
-OTP* OTP::LoadFromFile(const std::string& path) {
+OTP* OTP::LoadFromFile(std::string_view path) {
   return KeyFile::LoadFromFile<OTP>(path, OTP_SIZE);
 }
 
-SEEPROM* SEEPROM::LoadFromFile(const std::string& path) {
+SEEPROM* SEEPROM::LoadFromFile(std::string_view path) {
   return KeyFile::LoadFromFile<SEEPROM>(path, SEEPROM_SIZE);
 }
 

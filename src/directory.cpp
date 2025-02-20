@@ -21,7 +21,7 @@ Directory::Directory(std::string name,
       block_(std::move(block)),
       map_{quota_, block_} {}
 
-std::expected<std::shared_ptr<Entry>, WfsError> Directory::GetEntry(const std::string& name) const {
+std::expected<std::shared_ptr<Entry>, WfsError> Directory::GetEntry(std::string_view name) const {
   try {
     auto it = find(name);
     if (it.is_end()) {
@@ -33,7 +33,7 @@ std::expected<std::shared_ptr<Entry>, WfsError> Directory::GetEntry(const std::s
   }
 }
 
-std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(const std::string& name) const {
+std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(std::string_view name) const {
   auto entry = GetEntry(name);
   if (!entry.has_value())
     return std::unexpected(entry.error());
@@ -44,7 +44,7 @@ std::expected<std::shared_ptr<Directory>, WfsError> Directory::GetDirectory(cons
   return std::dynamic_pointer_cast<Directory>(*entry);
 }
 
-std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::string& name) const {
+std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(std::string_view name) const {
   auto entry = GetEntry(name);
   if (!entry.has_value())
     return std::unexpected(entry.error());
@@ -55,8 +55,9 @@ std::expected<std::shared_ptr<File>, WfsError> Directory::GetFile(const std::str
   return std::dynamic_pointer_cast<File>(*entry);
 }
 
-Directory::iterator Directory::find(std::string key) const {
+Directory::iterator Directory::find(std::string_view key) const {
+  std::string lowercase_key{key};
   // to lowercase
-  std::ranges::transform(key, key.begin(), [](char c) { return std::tolower(c); });
-  return {map_.find(key)};
+  std::ranges::transform(lowercase_key, lowercase_key.begin(), [](char c) { return std::tolower(c); });
+  return {map_.find(lowercase_key)};
 }
