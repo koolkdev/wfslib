@@ -64,8 +64,8 @@ jobs:
       - name: Set llvm (MacOS)
         run: |
           brew update
-          # Temporary fix, see https://github.com/actions/setup-python/issues/577
-          brew install --overwrite python@3,12
+          # Temporary fix, see https://github.com/actions/runner-images/issues/9966
+          brew install --overwrite python@3.12
           brew install llvm@$LLVM_VERSION
           echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
           echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
