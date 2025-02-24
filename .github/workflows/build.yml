@@ -6,6 +6,10 @@ on:
       - master
   pull_request:
 
+env:
+  LLVM_VERSION: 19
+  GCC_VERSION: 14
+
 jobs:
   build:
     strategy:
@@ -20,9 +24,6 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
-          # Re-enable after llvm-19
-          - platform: ubuntu-latest
-            compiler: llvm
           - platform: macos-13
             compiler: msvc
           - platform: macos-13
@@ -41,12 +42,11 @@ jobs:
 
       - name: Set gcc
         run: |
-          # Temporary until gcc-14 is officialy released and available on the runner
           sudo add-apt-repository "deb http://archive.ubuntu.com/ubuntu/ noble main universe"
           sudo apt update
-          sudo apt install gcc-14 g++-14
-          echo "CC=gcc-14" >> $GITHUB_ENV
-          echo "CXX=g++-14" >> $GITHUB_ENV
+          sudo apt install gcc-$GCC_VERSION g++-$GCC_VERSION
+          echo "CC=gcc-$GCC_VERSION" >> $GITHUB_ENV
+          echo "CXX=g++-$GCC_VERSION" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
 
@@ -54,23 +54,20 @@ jobs:
         run: |
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 18
-          sudo apt install libc++-18-dev
-          echo "CC=clang-18" >> $GITHUB_ENV
-          echo "CXX=clang++-18" >> $GITHUB_ENV
+          sudo ./llvm.sh $LLVM_VERSION
+          sudo apt install libc++-$LLVM_VERSION-dev
+          echo "CC=clang-$LLVM_VERSION" >> $GITHUB_ENV
+          echo "CXX=clang++-$LLVM_VERSION" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
       - name: Set llvm (MacOS)
         run: |
           brew update
-          # Temporary fix, see https://github.com/actions/setup-python/issues/577
-          rm /usr/local/bin/2to3 || true
-          rm /usr/local/bin/idle3 || true
-          rm /usr/local/bin/pydoc3 || true
-          rm /usr/local/bin/python3 || true
-          rm /usr/local/bin/python3-config || true
-          brew install llvm
+          # Temporary fix, see https://github.com/actions/runner-images/issues/9966
+          brew install --overwrite python@3.12
+          brew install --overwrite python@3.13
+          brew install llvm@$LLVM_VERSION
           echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
           echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
         shell: bash
