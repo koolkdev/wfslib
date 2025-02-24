@@ -11,7 +11,7 @@
 #include <expected>
 
 enum WfsError {
-  kItemNotFound,
+  kEntryNotFound,
   kNotDirectory,
   kNotFile,
   kBlockBadHash,

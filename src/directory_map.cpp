@@ -48,8 +48,6 @@ DirectoryMap::iterator DirectoryMap::end() const {
 }
 
 DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
-  if (size() == 0)
-    return end();
   auto current_block = root_block_;
   std::vector<iterator::parent_node_info> parents;
   while (!(current_block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
@@ -76,7 +74,7 @@ size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) cons
   }
 };
 
-bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
+bool DirectoryMap::insert(std::string_view name, const EntryMetadata* metadata) {
   auto it = find(name);
   if (!it.is_end()) {
     // Already in tree
@@ -85,12 +83,12 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
   auto parents = it.parents();
   auto leaf_tree = it.leaf().node;
   while (true) {
-    auto size = static_cast<uint16_t>(1 << attributes->entry_log2_size.value());
+    auto size = static_cast<uint16_t>(1 << metadata->metadata_log2_size.value());
     auto new_offset = leaf_tree.Alloc(size);
     if (new_offset.has_value()) {
-      Block::RawDataRef<Attributes> new_attributes{leaf_tree.block().get(), *new_offset};
+      Block::RawDataRef<EntryMetadata> new_metadata{leaf_tree.block().get(), *new_offset};
       if (leaf_tree.insert({name | std::ranges::to<std::string>(), *new_offset})) {
-        std::memcpy(new_attributes.get_mutable(), attributes, size);
+        std::memcpy(new_metadata.get_mutable(), metadata, size);
         return true;
       }
       leaf_tree.Free(*new_offset, size);
@@ -101,19 +99,56 @@ bool DirectoryMap::insert(std::string_view name, const Attributes* attributes) {
 
 bool DirectoryMap::erase(std::string_view name) {
   auto it = find(name);
-  if (!it.is_end()) {
+  if (it.is_end()) {
     // Not in tree
     return false;
   }
   auto parents = it.parents();
+  // Free the entry metadata first
+  it.leaf().node.Free((*it.leaf().iterator).value(),
+                      static_cast<uint16_t>(1 << (*it).metadata->metadata_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);
   bool last_empty = it.leaf().node.empty();
-  while (last_empty) {
+  if (!last_empty)
+    return true;
+  if (parents.empty()) {
+    // Root node empty, reinitialize tree
+    assert(it.leaf().node.block() == root_block_);
+    Init();
+    return true;
+  }
+  while (true) {
+    // Delete child leaf block
+    [[maybe_unused]] bool res = quota_->DeleteBlocks((*parents.back().iterator).value(), 1);
+    assert(res);
+    // Delete child leaf
+    if (!parents.back().node.can_erase(parents.back().iterator)) {
+      // Erase may fail, split the tree
+      auto [parent, parent_it] = parents.back();
+      auto parent_key = (*parent_it).key();
+      parents.pop_back();
+      split_tree(parents, parent, parent_key);
+      auto split_point = (*parents.back().iterator).key();
+      parents.push_back({throw_if_error(quota_->LoadMetadataBlock((*parents.back().iterator).value()))});
+      // We won't find the new parent if it is the first key, because the first key is empty
+      if (parent_key == split_point)
+        parents.back().iterator = parents.back().node.begin();
+      else
+        parents.back().iterator = parents.back().node.find(parent_key);
+      assert(!parents.back().iterator.is_end());
+    }
     parents.back().node.erase(parents.back().iterator);
     last_empty = parents.back().node.empty();
+    if (!last_empty)
+      return true;
+    if (parents.size() == 1) {
+      // Root node empty, reinitialize tree
+      assert(parents.back().node.block() == root_block_);
+      Init();
+      return true;
+    }
     parents.pop_back();
   }
-  return true;
 }
 
 template <DirectoryTreeImpl TreeType>
@@ -127,22 +162,24 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   if (old_block == root_block_) {
     new_left_block = throw_if_error(quota_->AllocMetadataBlock());
   } else {
-    new_left_block = throw_if_error(
-        quota_->LoadMetadataBlock(quota_->to_area_block_number(old_block->device_block_number()), /*new_block=*/true));
+    new_left_block = throw_if_error(quota_->LoadMetadataBlock(
+        quota_->to_area_block_number(old_block->physical_block_number()), /*new_block=*/true));
   }
   auto new_right_block = throw_if_error(quota_->AllocMetadataBlock());
-  auto new_left_block_number = quota_->to_area_block_number(new_left_block->device_block_number());
-  auto new_right_block_number = quota_->to_area_block_number(new_right_block->device_block_number());
+  auto new_left_block_number = quota_->to_area_block_number(new_left_block->physical_block_number());
+  auto new_right_block_number = quota_->to_area_block_number(new_right_block->physical_block_number());
 
   TreeType new_left_tree{new_left_block}, new_right_tree{new_right_block};
   auto middle = tree.middle();
   auto middle_key = (*middle).key();
+  new_left_tree.Init(/*is_root=*/false);
+  new_right_tree.Init(/*is_root=*/false);
   tree.split(new_left_tree, new_right_tree, middle);
   if (old_block == root_block_) {
     root_block_ = throw_if_error(quota_->LoadMetadataBlock(
-        quota_->to_area_block_number(root_block_->device_block_number()), /*new_block=*/true));
+        quota_->to_area_block_number(root_block_->physical_block_number()), /*new_block=*/true));
     DirectoryParentTree new_root_tree{root_block_};
-    new_root_tree.Init();
+    new_root_tree.Init(/*is_root=*/true);
     new_root_tree.insert({"", new_left_block_number});
     new_root_tree.insert({middle_key, new_right_block_number});
     parents.emplace_back(new_root_tree);
@@ -157,7 +194,13 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
     // TODO: Maybe insert should return iterator so we won't need to find it again?
   }
   parents.back().iterator = parents.back().node.find(middle_key);
+  assert(!parents.back().iterator.is_end());
 
   tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
   return true;
+}
+
+void DirectoryMap::Init() {
+  DirectoryLeafTree root_tree{root_block_};
+  root_tree.Init(/*is_root=*/true);
 }

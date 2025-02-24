@@ -10,12 +10,11 @@
 #include <algorithm>
 #include <ranges>
 
-#include "../src/ftree.h"
+#include "ftree.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"
 #include "utils/test_free_blocks_allocator.h"
-#include "utils/test_utils.h"
 
 TEST_CASE("FTreeTests") {
   auto test_device = std::make_shared<TestBlocksDevice>();
@@ -23,9 +22,7 @@ TEST_CASE("FTreeTests") {
   FTreesBlock{ftrees_block}.Init();
 
   auto ftrees = std::ranges::iota_view(size_t{0}, kSizeBuckets.size()) |
-                std::views::transform([&ftrees_block](size_t i) -> FTree {
-                  return FTree{ftrees_block, i};
-                }) |
+                std::views::transform([&ftrees_block](size_t i) -> FTree { return FTree{ftrees_block, i}; }) |
                 std::ranges::to<std::vector>();
 
   SECTION("Check empty ftree size") {
@@ -54,21 +51,17 @@ TEST_CASE("FTreeTests") {
     REQUIRE(ftrees[2].size() == 0);
 
     REQUIRE(std::ranges::equal(
-        std::views::transform(ftrees[0],
-                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
-                                return {extent.key(), extent.value()};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::pair<uint32_t, nibble> {
-          return {i, static_cast<nibble>(i % 16)};
-        })));
+        std::views::transform(
+            ftrees[0],
+            [](const auto& extent) -> std::pair<uint32_t, nibble> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(0, kItemsCount),
+                              [](int i) -> std::pair<uint32_t, nibble> { return {i, static_cast<nibble>(i % 16)}; })));
     REQUIRE(std::ranges::equal(
-        std::views::transform(ftrees[1],
-                              [](const auto& extent) -> std::pair<uint32_t, nibble> {
-                                return {extent.key(), extent.value()};
-                              }),
-        std::views::transform(std::views::iota(uint32_t{0}, inserted), [](int i) -> std::pair<uint32_t, nibble> {
-          return {i, static_cast<nibble>(i % 16)};
-        })));
+        std::views::transform(
+            ftrees[1],
+            [](const auto& extent) -> std::pair<uint32_t, nibble> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(uint32_t{0}, inserted),
+                              [](int i) -> std::pair<uint32_t, nibble> { return {i, static_cast<nibble>(i % 16)}; })));
 
     ftrees[0].erase(ftrees[0].begin(), ftrees[0].end());
     REQUIRE(ftrees[0].size() == 0);

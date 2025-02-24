@@ -13,19 +13,19 @@
 #include <vector>
 
 #include "block.h"
+#include "structs.h"
 
 // Log2 of number of block in for each single quanta in each bucket
-// The first three buckets represent the tree possible blocks allocation sizes (single, large, and large cluster), and
+// The first three buckets represent the tree possible blocks allocation sizes (single, cluster and extent), and
 // the rest are increasing by 16 every time. So the actual sizes are {0, 3, 6, 10, 14, 18, 22}
 constexpr auto kSizeBuckets =
-    std::to_array<int>({Block::BlockSizeType::Single, Block::BlockSizeType::Large, Block::BlockSizeType::LargeCluster,
-                        Block::BlockSizeType::LargeCluster + 1 * 4, Block::BlockSizeType::LargeCluster + 2 * 4,
-                        Block::BlockSizeType::LargeCluster + 3 * 4, Block::BlockSizeType::LargeCluster + 4 * 4});
+    std::to_array<int>({log2_size(BlockType::Single), log2_size(BlockType::Large), log2_size(BlockType::Cluster),
+                        log2_size(BlockType::Cluster) + 1 * 4, log2_size(BlockType::Cluster) + 2 * 4,
+                        log2_size(BlockType::Cluster) + 3 * 4, log2_size(BlockType::Cluster) + 4 * 4});
 
 class EPTree;
 class Area;
 class Block;
-struct FreeBlocksAllocatorHeader;
 
 struct FreeBlocksExtentInfo {
   uint32_t block_number;
@@ -54,11 +54,13 @@ class FreeBlocksAllocator {
 
   void Init(std::vector<FreeBlocksRangeInfo> initial_free_blocks);
 
+  uint32_t free_blocks_count() { return header()->free_blocks_count.value(); }
+
   uint32_t AllocFreeBlockFromCache();
   uint32_t FindSmallestFreeBlockExtent(uint32_t near, std::vector<FreeBlocksExtentInfo>& allocated);
 
-  std::optional<std::vector<uint32_t>> AllocBlocks(uint32_t chunks_count, Block::BlockSizeType size, bool use_cache);
-  std::optional<std::vector<FreeBlocksRangeInfo>> AllocAreaBlocks(uint32_t chunks_count, Block::BlockSizeType size);
+  std::optional<std::vector<uint32_t>> AllocBlocks(uint32_t count, BlockType type, bool use_cache);
+  std::optional<std::vector<FreeBlocksRangeInfo>> AllocAreaBlocks(uint32_t count, BlockType type);
 
   // Mark the blocks as frees by adding them to the tree
   bool AddFreeBlocks(FreeBlocksRangeInfo range);

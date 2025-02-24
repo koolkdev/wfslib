@@ -12,11 +12,11 @@
 #include "directory_parent_tree.h"
 
 class QuotaArea;
-struct Attributes;
+struct EntryMetadata;
 
-struct DiretoryMapItem {
+struct DiretoryMapEntry {
   std::string name;
-  Block::DataRef<Attributes> attributes;
+  Block::DataRef<EntryMetadata> metadata;
 };
 
 class DirectoryMapIterator {
@@ -24,8 +24,8 @@ class DirectoryMapIterator {
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = ptrdiff_t;
 
-  using value_type = DiretoryMapItem;
-  using ref_type = DiretoryMapItem;
+  using value_type = DiretoryMapEntry;
+  using ref_type = DiretoryMapEntry;
 
   using reference = ref_type;
 

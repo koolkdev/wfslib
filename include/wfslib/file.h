@@ -11,12 +11,11 @@
 #include <boost/iostreams/positioning.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <memory>
-#include <vector>
-#include "wfs_item.h"
+#include "entry.h"
 
 class QuotaArea;
 
-class File : public WfsItem, public std::enable_shared_from_this<File> {
+class File : public Entry, public std::enable_shared_from_this<File> {
  public:
   class DataCategoryReader;
   class DataCategory0Reader;
@@ -26,8 +25,8 @@ class File : public WfsItem, public std::enable_shared_from_this<File> {
   class DataCategory3Reader;
   class DataCategory4Reader;
 
-  File(std::string name, AttributesRef attributes, std::shared_ptr<QuotaArea> quota)
-      : WfsItem(std::move(name), std::move(attributes)), quota_(std::move(quota)) {}
+  File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota)
+      : Entry(std::move(name), std::move(metadata)), quota_(std::move(quota)) {}
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;

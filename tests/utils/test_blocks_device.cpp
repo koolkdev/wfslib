@@ -7,12 +7,12 @@
 
 #include <cassert>
 
-#include "../../src/block.h"
+#include "block.h"
 #include "test_blocks_device.h"
 #include "test_device.h"
 
 TestBlocksDevice::TestBlocksDevice(uint32_t blocks_count)
-    : BlocksDevice(std::make_shared<TestDevice>(blocks_count << (Block::BlockSize::Regular - 9))) {}
+    : BlocksDevice(std::make_shared<TestDevice>(blocks_count << (log2_size(BlockSize::Logical) - 9))) {}
 TestBlocksDevice::~TestBlocksDevice() = default;
 
 void TestBlocksDevice::WriteBlock(uint32_t block_number,

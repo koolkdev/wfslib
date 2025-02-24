@@ -14,9 +14,7 @@
 #include <array>
 #include <cassert>
 
-#include "block.h"
 #include "device.h"
-#include "structs.h"
 #include "utils.h"
 
 struct WfsBlockIV {

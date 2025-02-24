@@ -57,7 +57,7 @@ bool BlocksDevice::ReadBlock(uint32_t block_number,
 }
 
 uint32_t BlocksDevice::ToDeviceSector(uint32_t block_number) const {
-  return block_number << (Block::BlockSize::Basic - device()->Log2SectorSize());
+  return block_number << (log2_size(BlockSize::Physical) - device()->Log2SectorSize());
 }
 
 std::shared_ptr<Block> BlocksDevice::GetFromCache(uint32_t block_number) {

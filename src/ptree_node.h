@@ -8,7 +8,6 @@
 #pragma once
 
 #include <algorithm>
-#include <memory>
 #include <ranges>
 
 #include "ptree_node_iterator.h"

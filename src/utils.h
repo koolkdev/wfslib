@@ -9,6 +9,9 @@
 
 #include <bit>
 #include <cassert>
+#include <cstddef>
+#include <cstdint>
+#include <utility>
 
 template <typename T>
 class big_endian_type {
@@ -33,12 +36,17 @@ class big_endian_type {
     *this = value() - val;
     return *this;
   }
+  big_endian_type& operator|=(T val) {
+    *this = value() | val;
+    return *this;
+  }
+
   big_endian_type& operator++() {
     *this += 1;
     return *this;
   }
   big_endian_type& operator--() {
-    *this += 1;
+    *this -= 1;
     return *this;
   }
 
@@ -85,4 +93,16 @@ inline size_t align_to_power_of_2(size_t size) {
 
 inline size_t div_ceil(size_t n, size_t div) {
   return (n + div - 1) / div;
+}
+
+inline size_t div_ceil_pow2(size_t n, size_t pow) {
+  return (n + ((1ULL << pow) - 1)) >> pow;
+}
+
+inline std::pair<size_t, size_t> div_pow2(size_t n, size_t pow) {
+  return {n >> pow, n & ((1 << pow) - 1)};
+}
+
+inline size_t floor_pow2(size_t n, size_t pow) {
+  return (n >> pow) << pow;
 }

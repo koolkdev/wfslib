@@ -164,7 +164,10 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         new_leaf = key_val.value;
       }
       if (!recreate_node(last_parent, parent, {prefix.begin(), prefix_it}, new_nodes, new_leaf)) {
-        assert(false);  // Should always success because of shrinking
+        if (new_node) {
+          Free(new_node->offset(), new_node->allocated_size());
+        }
+        Free(new_child->offset(), new_child->allocated_size());
         return false;
       }
       mutable_extra_header()->records_count += 1;
@@ -172,8 +175,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
   }
 
-  void erase(iterator& pos) {
-    // Remove currnet parent leaf
+  virtual void erase(iterator& pos) {
+    // Remove current parent leaf
     auto parents = pos.parents();
     std::optional<typename iterator::parent_node_info> last_parent;
     if (!parents.empty())
@@ -223,7 +226,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     }
   }
 
-  void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const {
+  virtual void split(DirectoryTree& left, DirectoryTree& right, const iterator& pos) const {
     // Implemented in a totally different way then original because it is way too complex for no reason.
     parent_node root_node{dir_tree_node_ref<LeafValueType>::load(block().get(), extra_header()->root.value())};
     split_copy(right, std::nullopt, root_node, pos.parents(), /*left=*/false);
@@ -244,107 +247,67 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       parent_node parent{dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset)};
       auto prefix = parent.prefix();
       auto [key_it, prefix_it] = std::ranges::mismatch(std::ranges::subrange(current_key, key.end()), prefix);
+      std::strong_ordering status = std::strong_ordering::less;
       if (key_it == key.end()) {
         // Got to end of our key
-        if (prefix_it == prefix.end()) {
-          // Full match, check if there is a node
-          if (parent.has_leaf()) {
-            // Found exact match!
-            return {block().get(), std::move(parents), parent.leaf_ref()};
-          }
+        if (prefix_it == prefix.end() && parent.has_leaf()) {
+          // Found exact match!
+          return {block().get(), std::move(parents), parent.leaf_ref()};
         }
       } else if (prefix_it == prefix.end()) {
         // We matched the prefix
         auto iterator = parent.find(*key_it, exact_match);
-        if (iterator != parent.end() && (*iterator).key() == *key_it) {
+        if (iterator != parent.end() && *key_it >= (*iterator).key()) {
           current_key = key_it + 1;
           node_offset = (*iterator).value();
           parents.emplace_back(parent, iterator);
-          continue;
+          if ((*iterator).key() != *key_it) {
+            status = std::strong_ordering::greater;
+            parent = {dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset)};
+          } else {
+            continue;
+          }
+        } else if (parent.has_leaf()) {
+          status = std::strong_ordering::equal;
         }
+      } else if (*key_it >= *prefix_it) {
+        status = std::strong_ordering::greater;
       }
-      if (exact_match)
-        return end();
 
-      // Hit mistmach with non exact match, find which child to return.
-      if (parent.has_leaf()) {
+      if (exact_match) {
+        return end();
+      }
+
+      if (status != std::strong_ordering::greater) {
+        // Go to the next leaf and back
+        while (!parent.has_leaf()) {
+          parents.emplace_back(parent, parent.begin());
+          node_offset = (*parents.back().iterator).value();
+          parent = dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset);
+        }
+        iterator res{block().get(), std::move(parents), parent.leaf_ref()};
+        if (status == std::strong_ordering::less && res != begin())
+          --res;
+        return res;
+      } else {
+        // Go to last leaf from here.
+        while (parent.size()) {
+          parents.emplace_back(parent, --parent.end());
+          node_offset = (*parents.back().iterator).value();
+          parent = dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset);
+        }
         assert(parent.has_leaf());
-        // We have a leaf, find cases when we need to return it or the previous node
-        bool before_leaf = false;
-        bool exact_leaf = false;
-        if (parent.size() == 0) {
-          // If we have no child and matched the whole prefix, we are at least bigger than leaf key.
-          exact_leaf = true;
-        } else if (prefix_it != prefix.end()) {
-          // We have a mistmach so just compare the prefix
-          if (std::lexicographical_compare(key_it, key.end(), prefix_it, prefix.end())) {
-            before_leaf = true;
-          }
-        } else {
-          auto iterator = parent.find(*key_it, exact_match);
-          assert(iterator != parent.end());
-          if ((*iterator).key() > *key_it) {
-            // We are smaller than smallest key, so we should return the leaf
-            exact_leaf = true;
-          }
-        }
-        if (before_leaf || exact_leaf) {
-          // If we are smaller we overshoot, or we have no child so we may return the leaf node
-          iterator res{block().get(), std::move(parents), parent.leaf_ref()};
-          if (before_leaf) {
-            // We overshoot, go to prev
-            if (res != begin())
-              --res;
-          }  // Otherwise parent.size() == 0 so we are bigger than res
-          return res;
-        }
-      } else {
-        // For non leaf node, handle the case where we overshoot and need to go to prev node
-        bool smaller = false;
-        if (prefix_it != prefix.end() && std::lexicographical_compare(key_it, key.end(), prefix_it, prefix.end())) {
-          smaller = true;
-        } else if (prefix_it == prefix.end()) {
-          auto iterator = parent.find(*key_it, exact_match);
-          assert(iterator != parent.end());
-          if ((*iterator).key() > *key_it) {
-            smaller = true;
-          }
-        }
-        if (smaller) {
-          // Go to the next leaf and back
-          do {
-            parents.emplace_back(parent, parent.begin());
-            node_offset = (*parents.back().iterator).value();
-            parent = dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset);
-          } while (!parent.has_leaf());
-          iterator res{block().get(), std::move(parents), parent.leaf_ref()};
-          if (res != begin())
-            --res;
-          return res;
-        }
+        return {block().get(), std::move(parents), parent.leaf_ref()};
       }
-      assert(parent.size() > 0);
-      // Ok, now we just need to select the appropiate child that we are bigger than, and go the the last leaf of it.
-      typename parent_node::iterator iterator;
-      if (prefix_it != prefix.end()) {
-        // Prefix mismatch (and not smaller than because we already handle it), got to last.
-        iterator = --parent.end();
-      } else {
-        // Prefix match and find will return the last child that we are bigger from (as we handled the smaller than
-        // cases)
-        iterator = parent.find(*key_it, exact_match);
-      }
-      node_offset = (*iterator).value();
-      parents.emplace_back(parent, iterator);
-      parent = dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset);
-      // Go to last leaf from here.
-      while (parent.size()) {
-        parents.emplace_back(parent, --parent.end());
-        node_offset = (*parents.back().iterator).value();
-        parent = dir_tree_node_ref<LeafValueType>::load(block().get(), node_offset);
-      }
-      assert(parent.has_leaf());
-      return {block().get(), std::move(parents), parent.leaf_ref()};
+    }
+  }
+
+  virtual void Init(bool is_root) {
+    SubBlockAllocator<DirectoryTreeHeader>::Init();
+    auto* header = block()->template get_mutable_object<MetadataBlockHeader>(0);
+    header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY;
+    if (is_root) {
+      header->block_flags |= MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE;
     }
   }
 
@@ -450,7 +413,8 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
         dir_tree_node_ref<LeafValueType>::load(old_tree->block().get(), extra_header()->root.value())};
     parent_node merge_node{dir_tree_node_ref<LeafValueType>::load(
         old_tree->block().get(), parent ? (*parent->iterator).value() : extra_header()->root.value())};
-    Init();
+    Init(block()->template get_object<MetadataBlockHeader>(0)->block_flags.value() &
+         MetadataBlockHeader::Flags::DIRECTORY_ROOT_TREE);
     old_tree->merge_copy(*this, root_node, merge_node);
   }
 

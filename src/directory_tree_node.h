@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <ranges>
 
 #include "directory_tree_node_iterator.h"
 
@@ -79,14 +80,15 @@ class DirectoryTreeNode {
   }
 
   bool insert(const iterator& pos, const typename iterator::value_type& key_val, bool check_size = true) {
-    if (check_size && allocated_size() != calc_new_node_size(prefix().size(), size() + has_leaf(), has_leaf())) {
+    if (check_size && allocated_size() != calc_new_node_size(prefix().size(), size() + has_leaf() + 1, has_leaf())) {
       return false;
     }
     assert(begin() <= pos && pos <= end());
     iterator res = begin() + (pos - begin());
-    std::copy_backward(res, end(), end() + 1);
-    *res = key_val;
+    auto old_end = end();
     ++node_->keys_count;
+    std::copy_backward(res, old_end, old_end + 1);
+    *res = key_val;
     assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
@@ -104,9 +106,10 @@ class DirectoryTreeNode {
     }
     assert(begin() <= pos && pos <= end());
     iterator res = begin() + (pos - begin());
-    std::copy_backward(res, end(), end() + items);
-    std::copy(start_it, end_it, res);
+    auto old_end = end();
     node_->keys_count += static_cast<uint8_t>(items);
+    std::copy_backward(res, old_end, old_end + items);
+    std::copy(start_it, end_it, res);
     assert(!check_size || allocated_size() == node_.get_node_size(node_.get()));
     return true;
   }
@@ -152,10 +155,10 @@ class DirectoryTreeNode {
     if (check_size && allocated_size() != calc_new_node_size(prefix.size(), size(), has_leaf())) {
       return false;
     }
-    node_.get_mutable()->prefix_length = static_cast<uint8_t>(prefix.size());
-    std::ranges::copy(prefix, node_.mutable_prefix().begin());
     auto old_leaf_value = leaf();
     auto old_keys_values = std::ranges::to<std::vector<typename iterator::value_type>>(*this);
+    node_.get_mutable()->prefix_length = static_cast<uint8_t>(prefix.size());
+    std::ranges::copy(prefix, node_.mutable_prefix().begin());
     clear();
     if (old_leaf_value) {
       set_leaf(*old_leaf_value, /*check_size=*/false);

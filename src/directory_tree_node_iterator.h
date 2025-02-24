@@ -82,7 +82,8 @@ struct dir_tree_node_ref : public Block::RawDataRef<DirectoryTreeNodeHeader> {
   }
 
   static bool has_leaf_value(const DirectoryTreeNodeHeader* node) {
-    return *get_key_ref(const_cast<DirectoryTreeNodeHeader*>(node), 0) == '\0';
+    // keys_count would be 0 only when building node.
+    return node->keys_count.value() > 0 && *get_key_ref(const_cast<DirectoryTreeNodeHeader*>(node), 0) == '\0';
   }
 };
 

@@ -7,8 +7,6 @@
 
 #include "wfs_device.h"
 
-#include <array>
-#include <bit>
 #include <filesystem>
 #include <random>
 
@@ -27,31 +25,31 @@ WfsDevice::~WfsDevice() {
   Flush();
 }
 
-std::shared_ptr<WfsItem> WfsDevice::GetObject(const std::string& filename) {
+std::shared_ptr<Entry> WfsDevice::GetEntry(std::string_view filename) {
   if (filename == "/")
     return GetDirectory("/");
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
-  auto obj = dir->GetObject(path.filename().string());
-  if (!obj.has_value()) {
-    if (obj.error() == WfsError::kItemNotFound)
+  auto entry = dir->GetEntry(path.filename().string());
+  if (!entry.has_value()) {
+    if (entry.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
-      throw WfsException(obj.error());
+      throw WfsException(entry.error());
   }
-  return *obj;
+  return *entry;
 }
 
-std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
+std::shared_ptr<File> WfsDevice::GetFile(std::string_view filename) {
   std::filesystem::path path(filename);
   auto dir = GetDirectory(path.parent_path().string());
   if (!dir)
     return nullptr;
   auto file = dir->GetFile(path.filename().string());
   if (!file.has_value()) {
-    if (file.error() == WfsError::kItemNotFound)
+    if (file.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
       throw WfsException(file.error());
@@ -59,11 +57,11 @@ std::shared_ptr<File> WfsDevice::GetFile(const std::string& filename) {
   return *file;
 }
 
-std::shared_ptr<Directory> WfsDevice::GetDirectory(const std::string& filename) {
+std::shared_ptr<Directory> WfsDevice::GetDirectory(std::string_view filename) {
   std::filesystem::path path(filename);
   auto current_directory = GetRootDirectory();
   if (!current_directory.has_value()) {
-    if (current_directory.error() == WfsError::kItemNotFound)
+    if (current_directory.error() == WfsError::kEntryNotFound)
       return nullptr;
     else
       throw WfsException(current_directory.error());
@@ -75,7 +73,7 @@ std::shared_ptr<Directory> WfsDevice::GetDirectory(const std::string& filename) 
       continue;
     current_directory = (*current_directory)->GetDirectory(part.string());
     if (!current_directory.has_value()) {
-      if (current_directory.error() == WfsError::kItemNotFound)
+      if (current_directory.error() == WfsError::kEntryNotFound)
         return nullptr;
       else
         throw WfsException(current_directory.error());
@@ -93,7 +91,7 @@ std::shared_ptr<QuotaArea> WfsDevice::GetRootArea() {
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory() {
-  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_attributes)});
+  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_metadata)});
 }
 
 // static
@@ -104,9 +102,9 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_
 
 // static
 std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Open(std::shared_ptr<BlocksDevice> device) {
-  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Basic, /*iv=*/0);
+  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, BlockSize::Physical, /*iv=*/0);
   if (!block.has_value()) {
-    block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Regular, /*iv=*/0);
+    block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, BlockSize::Logical, /*iv=*/0);
     if (!block.has_value())
       return std::unexpected(WfsError::kAreaHeaderCorrupted);
   }
@@ -124,7 +122,7 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Create(std::share
 
 // static
 std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Create(std::shared_ptr<BlocksDevice> device) {
-  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, Block::BlockSize::Regular, /*iv=*/0,
+  auto block = Block::LoadMetadataBlock(device, /*dvice_block_number=*/0, BlockSize::Logical, /*iv=*/0,
                                         /*load_data=*/false);
   if (!block.has_value()) {
     return std::unexpected(block.error());
@@ -136,34 +134,35 @@ std::expected<std::shared_ptr<WfsDevice>, WfsError> WfsDevice::Create(std::share
 }
 
 std::expected<std::shared_ptr<Block>, WfsError> WfsDevice::LoadMetadataBlock(const Area* area,
-                                                                             uint32_t device_block_number,
-                                                                             Block::BlockSize size,
+                                                                             uint32_t physical_block_number,
+                                                                             BlockSize block_size,
                                                                              bool new_block) const {
-  return Block::LoadMetadataBlock(device_, device_block_number, size, CalcIV(area, device_block_number), !new_block);
+  return Block::LoadMetadataBlock(device_, physical_block_number, block_size, CalcIV(area, physical_block_number),
+                                  !new_block);
 }
 
 std::expected<std::shared_ptr<Block>, WfsError> WfsDevice::LoadDataBlock(const Area* area,
-                                                                         uint32_t device_block_number,
-                                                                         Block::BlockSize size,
+                                                                         uint32_t physical_block_number,
+                                                                         BlockSize block_size,
+                                                                         BlockType block_type,
                                                                          uint32_t data_size,
                                                                          Block::HashRef data_hash,
                                                                          bool encrypted,
                                                                          bool new_block) const {
-  return Block::LoadDataBlock(device_, device_block_number, size, data_size, CalcIV(area, device_block_number),
-                              std::move(data_hash), encrypted, !new_block);
+  return Block::LoadDataBlock(device_, physical_block_number, block_size, block_type, data_size,
+                              CalcIV(area, physical_block_number), std::move(data_hash), encrypted, !new_block);
 }
 
-uint32_t WfsDevice::CalcIV(const Area* area, uint32_t device_block_number) const {
+uint32_t WfsDevice::CalcIV(const Area* area, uint32_t physical_block_number) const {
   return (area->header()->iv.value() ^ header()->iv.value()) +
-         ((device_block_number - area->device_block_number())
-          << (Block::BlockSize::Basic - device_->device()->Log2SectorSize()));
+         ((physical_block_number - area->physical_block_number())
+          << (log2_size(BlockSize::Physical) - device_->device()->Log2SectorSize()));
 }
 
 std::expected<std::shared_ptr<TransactionsArea>, WfsError> WfsDevice::GetTransactionsArea(bool backup_area) {
   auto root_area = GetRootArea();
-  auto block =
-      LoadMetadataBlock(root_area.get(), header()->transactions_area_block_number.value() + (backup_area ? 1 : 0),
-                        Block::BlockSize::Basic);
+  auto block = LoadMetadataBlock(
+      root_area.get(), header()->transactions_area_block_number.value() + (backup_area ? 1 : 0), BlockSize::Physical);
   if (!block.has_value())
     return std::unexpected(WfsError::kTransactionsAreaCorrupted);
   return std::make_shared<TransactionsArea>(shared_from_this(), std::move(*block));
@@ -173,7 +172,7 @@ void WfsDevice::Init() {
   constexpr uint32_t kTransactionsAreaEnd = 0x1000;
 
   uint32_t blocks_count =
-      device_->device()->SectorsCount() >> (Block::BlockSize::Regular - device_->device()->Log2SectorSize());
+      device_->device()->SectorsCount() >> (log2_size(BlockSize::Logical) - device_->device()->Log2SectorSize());
 
   std::random_device rand_device;
   std::default_random_engine rand_engine{rand_device()};
@@ -186,17 +185,18 @@ void WfsDevice::Init() {
   header->iv = random_iv_generator(rand_engine);
   header->device_type = static_cast<uint16_t>(DeviceType::USB);  // TODO
   header->version = WFS_VERSION;
-  header->root_quota_attributes.flags = Attributes::DIRECTORY | Attributes::AREA_SIZE_REGULAR | Attributes::QUOTA;
-  header->root_quota_attributes.quota_blocks_count = blocks_count;
+  header->root_quota_metadata.flags =
+      EntryMetadata::DIRECTORY | EntryMetadata::AREA_SIZE_REGULAR | EntryMetadata::QUOTA;
+  header->root_quota_metadata.quota_blocks_count = blocks_count;
   header->transactions_area_block_number = QuotaArea::kReservedAreaBlocks
-                                           << (Block::BlockSize::Regular - Block::BlockSize::Basic);
+                                           << (log2_size(BlockSize::Logical) - log2_size(BlockSize::Physical));
   header->transactions_area_blocks_count = kTransactionsAreaEnd - header->transactions_area_block_number.value();
 
   // Initialize root area
   auto root_area =
       throw_if_error(QuotaArea::Create(shared_from_this(), /*parent_area=*/nullptr,
-                                       blocks_count >> (Block::BlockSize::Regular - Block::BlockSize::Basic),
-                                       Block::BlockSize::Regular, {{0, blocks_count}}));
+                                       blocks_count >> (log2_size(BlockSize::Logical) - log2_size(BlockSize::Physical)),
+                                       BlockSize::Logical, {{0, blocks_count}}));
 
   auto transactions_area = throw_if_error(TransactionsArea::Create(shared_from_this(), root_area,
                                                                    header->transactions_area_block_number.value(),

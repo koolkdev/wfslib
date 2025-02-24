@@ -8,9 +8,10 @@
 #include "file_device.h"
 
 #include <cassert>
+#include <filesystem>
 #include <fstream>
 
-FileDevice::FileDevice(const std::string& path,
+FileDevice::FileDevice(const std::filesystem::path& path,
                        uint32_t log2_sector_size,
                        uint32_t sectors_count,
                        bool read_only,

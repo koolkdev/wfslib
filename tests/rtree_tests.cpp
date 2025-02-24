@@ -8,10 +8,9 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <algorithm>
-#include <random>
 #include <ranges>
 
-#include "../src/rtree.h"
+#include "rtree.h"
 
 #include "utils/test_block.h"
 #include "utils/test_blocks_device.h"
@@ -142,13 +141,10 @@ TEST_CASE("RTreeTests") {
     REQUIRE(!rtree.begin().parents()[0].node.full());
 
     REQUIRE(std::ranges::equal(
-        std::views::transform(rtree,
-                              [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                return {extent.key(), extent.value()};
-                              }),
-        std::views::transform(std::views::iota(0, static_cast<int>(index)), [](int i) -> std::pair<uint32_t, uint32_t> {
-          return {i, i + 1};
-        })));
+        std::views::transform(
+            rtree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(0, static_cast<int>(index)),
+                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
 
     for (uint32_t i = 0; i < index; ++i) {
       REQUIRE((*rtree.find(i, true)).key() == i);
@@ -168,14 +164,11 @@ TEST_CASE("RTreeTests") {
     std::ranges::sort(sorted_keys);
     REQUIRE(std::ranges::equal(keys, sorted_keys));
 
-    REQUIRE(std::ranges::equal(std::views::transform(rtree,
-                                                     [](const auto& extent) -> std::pair<uint32_t, uint32_t> {
-                                                       return {extent.key(), extent.value()};
-                                                     }),
-                               std::views::transform(std::views::iota(0, static_cast<int>(kItemsCount)),
-                                                     [](int i) -> std::pair<uint32_t, uint32_t> {
-                                                       return {i, i + 1};
-                                                     })));
+    REQUIRE(std::ranges::equal(
+        std::views::transform(
+            rtree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
+        std::views::transform(std::views::iota(0, static_cast<int>(kItemsCount)),
+                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
   }
 
   SECTION("erase items after inserting") {

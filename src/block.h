@@ -10,7 +10,6 @@
 #include <cassert>
 #include <memory>
 #include <span>
-#include <string>
 #include <vector>
 
 #include "errors.h"
@@ -21,11 +20,30 @@ class Block;
 
 template <typename T>
 concept BlockRefObj = requires(const T& block_ref) {
-                        { block_ref.operator->() } -> std::same_as<Block*>;
-                      };
+  { block_ref.operator->() } -> std::same_as<Block*>;
+};
 
 template <typename T>
 concept BlockRef = std::same_as<T, Block*> || BlockRefObj<T>;
+
+enum class BlockSize : int {
+  Physical = 12,
+  Logical = 13,
+};
+
+enum class BlockType : int {
+  Single = 0,
+  Large = 3,
+  Cluster = 6,
+};
+
+constexpr inline auto log2_size(BlockSize size) {
+  return static_cast<int>(size);
+}
+
+constexpr inline auto log2_size(BlockType size) {
+  return static_cast<int>(size);
+}
 
 class Block {
  public:
@@ -53,17 +71,6 @@ class Block {
   template <typename T>
   struct RawDataRef : public DataRefBase<T, Block*> {};
 
-  enum BlockSize {
-    Basic = 12,
-    Regular = 13,
-  };
-
-  enum BlockSizeType {
-    Single = 0,
-    Large = 3,
-    LargeCluster = 6,
-  };
-
   struct HashRef {
     std::shared_ptr<Block> block;  // null if hash in same block
     size_t offset;
@@ -71,8 +78,9 @@ class Block {
 
   // TODO: Private constructor?
   Block(std::shared_ptr<BlocksDevice> device,
-        uint32_t device_block_number,
-        Block::BlockSize size_category,
+        uint32_t physical_block_number,
+        BlockSize block_size,
+        BlockType block_type,
         uint32_t data_size,
         uint32_t iv,
         HashRef hash_ref,
@@ -113,8 +121,10 @@ class Block {
     return static_cast<size_t>(res);
   }
 
-  uint32_t device_block_number() const { return device_block_number_; }
-  Block::BlockSize log2_size() const { return size_category_; }
+  uint32_t physical_block_number() const { return physical_block_number_; }
+  BlockSize block_size() const { return block_size_; }
+  BlockType block_type() const { return block_type_; }
+  int log2_size() const { return ::log2_size(block_size_) + ::log2_size(block_type_); }
 
   bool encrypted() const { return encrypted_; }
 
@@ -123,8 +133,9 @@ class Block {
   void Detach();
 
   static std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(std::shared_ptr<BlocksDevice> device,
-                                                                       uint32_t device_block_number,
-                                                                       Block::BlockSize size_category,
+                                                                       uint32_t physical_block_number,
+                                                                       BlockSize block_size,
+                                                                       BlockType block_type,
                                                                        uint32_t data_size,
                                                                        uint32_t iv,
                                                                        HashRef data_hash,
@@ -133,8 +144,8 @@ class Block {
                                                                        bool check_hash = true);
 
   static std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(std::shared_ptr<BlocksDevice> device,
-                                                                           uint32_t device_block_number,
-                                                                           Block::BlockSize size_category,
+                                                                           uint32_t physical_block_number,
+                                                                           BlockSize block_size,
                                                                            uint32_t iv,
                                                                            bool load_data = true,
                                                                            bool check_hash = true);
@@ -155,8 +166,9 @@ class Block {
 
   std::shared_ptr<BlocksDevice> device_;
 
-  uint32_t device_block_number_;
-  Block::BlockSize size_category_;
+  uint32_t physical_block_number_;
+  BlockSize block_size_;
+  BlockType block_type_;
   uint32_t data_size_;
   uint32_t iv_;
   bool encrypted_;

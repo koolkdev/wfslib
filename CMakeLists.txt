@@ -4,16 +4,16 @@ project(wfslib)
 
 # Check compiler verions
 if(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 11.0)
-        message(FATAL_ERROR "GCC version must be at least 11.0!")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 14.0)
+        message(FATAL_ERROR "GCC version must be at least 14.0!")
     endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 16.0)
-        message(FATAL_ERROR "Clang version must be at least 16.0!")
+    if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 18.0)
+        message(FATAL_ERROR "Clang version must be at least 18.0!")
     endif()
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.34)
-        message(FATAL_ERROR "Visual Studio must be at least VS2022 17.4!")
+    if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS 19.37)
+        message(FATAL_ERROR "Visual Studio must be at least VS2022 17.7!")
     endif()
 else()
     message(WARNING "You are using an unsupported compiler! Please use MSVC/GCC/Clang")
@@ -31,7 +31,9 @@ add_library(${PROJECT_NAME}
     src/directory_leaf_tree.cpp
     src/directory_map_iterator.cpp
     src/directory_map.cpp
+    src/directory_parent_tree.cpp
     src/directory.cpp
+    src/entry.cpp
     src/eptree_iterator.cpp
     src/eptree.cpp
     src/errors.cpp
@@ -54,7 +56,6 @@ add_library(${PROJECT_NAME}
     src/sub_block_allocator.cpp
     src/transactions_area.cpp
     src/wfs_device.cpp
-    src/wfs_item.cpp
 )
 
 if(BUILD_STATIC AND MSVC)

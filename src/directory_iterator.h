@@ -11,11 +11,11 @@
 #include "errors.h"
 
 class QuotaArea;
-class WfsItem;
+class Entry;
 
-struct DiretoryItem {
+struct DiretoryEntry {
   std::string name;
-  std::expected<std::shared_ptr<WfsItem>, WfsError> item;
+  std::expected<std::shared_ptr<Entry>, WfsError> entry;
 };
 
 class DirectoryIterator {
@@ -23,8 +23,8 @@ class DirectoryIterator {
   using iterator_category = std::bidirectional_iterator_tag;
   using difference_type = ptrdiff_t;
 
-  using value_type = DiretoryItem;
-  using ref_type = DiretoryItem;
+  using value_type = DiretoryEntry;
+  using ref_type = DiretoryEntry;
 
   using reference = ref_type;
 

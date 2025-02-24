@@ -15,5 +15,5 @@ void TestArea::Init(uint32_t blocks_count) {
   auto* header = mutable_header();
   std::fill(reinterpret_cast<std::byte*>(header), reinterpret_cast<std::byte*>(header + 1), std::byte{0});
   header->blocks_count = blocks_count;
-  header->block_size_log2 = static_cast<uint8_t>(Block::BlockSize::Regular);
+  header->block_size_log2 = static_cast<uint8_t>(BlockSize::Logical);
 }

@@ -12,8 +12,9 @@
 TestBlock::TestBlock(std::shared_ptr<BlocksDevice> device, uint32_t block_number)
     : Block(std::move(device),
             block_number,
-            Block::BlockSize::Regular,
-            1 << Block::BlockSize::Regular,
+            BlockSize::Logical,
+            BlockType::Single,
+            1 << ::log2_size(BlockSize::Logical),
             /*iv=*/0,
             /*hash_ref=*/{},
             /*encrypted=*/false) {}

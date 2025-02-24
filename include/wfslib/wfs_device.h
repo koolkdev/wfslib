@@ -10,8 +10,7 @@
 #include <expected>
 #include <memory>
 #include <optional>
-#include <span>
-#include <string>
+#include <string_view>
 #include <vector>
 
 #include "block.h"
@@ -22,7 +21,7 @@ class BlocksDevice;
 class Area;
 class QuotaArea;
 class TransactionsArea;
-class WfsItem;
+class Entry;
 class Device;
 class File;
 class Directory;
@@ -35,9 +34,9 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
 
   BlocksDevice* device() { return device_.get(); }
 
-  std::shared_ptr<WfsItem> GetObject(const std::string& filename);
-  std::shared_ptr<File> GetFile(const std::string& filename);
-  std::shared_ptr<Directory> GetDirectory(const std::string& filename);
+  std::shared_ptr<Entry> GetEntry(std::string_view filename);
+  std::shared_ptr<File> GetFile(std::string_view filename);
+  std::shared_ptr<Directory> GetDirectory(std::string_view filename);
 
   std::shared_ptr<QuotaArea> GetRootArea();
   std::expected<std::shared_ptr<Directory>, WfsError> GetRootDirectory();
@@ -47,12 +46,13 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
   std::expected<std::shared_ptr<TransactionsArea>, WfsError> GetTransactionsArea(bool backup_area = false);
 
   std::expected<std::shared_ptr<Block>, WfsError> LoadMetadataBlock(const Area* area,
-                                                                    uint32_t device_block_number,
-                                                                    Block::BlockSize size,
+                                                                    uint32_t physical_block_number,
+                                                                    BlockSize block_size,
                                                                     bool new_block = false) const;
   std::expected<std::shared_ptr<Block>, WfsError> LoadDataBlock(const Area* area,
-                                                                uint32_t device_block_number,
-                                                                Block::BlockSize size,
+                                                                uint32_t physical_block_number,
+                                                                BlockSize block_size,
+                                                                BlockType block_type,
                                                                 uint32_t data_size,
                                                                 Block::HashRef data_hash,
                                                                 bool encrypted,
@@ -73,7 +73,7 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
 
   void Init();
 
-  uint32_t CalcIV(const Area* area, uint32_t device_block_number) const;
+  uint32_t CalcIV(const Area* area, uint32_t physical_block_number) const;
 
   static constexpr uint16_t header_offset() { return sizeof(MetadataBlockHeader); }
 

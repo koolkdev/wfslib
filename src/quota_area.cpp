@@ -7,7 +7,6 @@
 
 #include "quota_area.h"
 
-#include <algorithm>
 #include <numeric>
 #include <ranges>
 
@@ -23,7 +22,7 @@ QuotaArea::QuotaArea(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Bloc
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::shared_ptr<WfsDevice> wfs_device,
                                                                       std::shared_ptr<Area> parent_area,
                                                                       uint32_t blocks_count,
-                                                                      Block::BlockSize block_size,
+                                                                      BlockSize block_size,
                                                                       const std::vector<QuotaFragment>& fragments) {
   // TODO: size
   std::shared_ptr<Block> block;
@@ -41,16 +40,16 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::share
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadDirectory(uint32_t area_block_number,
                                                                              std::string name,
-                                                                             AttributesRef attributes) {
+                                                                             Entry::MetadataRef metadata) {
   auto block = LoadMetadataBlock(area_block_number);
   if (!block.has_value())
     return std::unexpected(WfsError::kDirectoryCorrupted);
-  return std::make_shared<Directory>(std::move(name), std::move(attributes), shared_from_this(), std::move(*block));
+  return std::make_shared<Directory>(std::move(name), std::move(metadata), shared_from_this(), std::move(*block));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(std::string name,
-                                                                                 AttributesRef attributes) {
-  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(attributes));
+                                                                                 Entry::MetadataRef metadata) {
+  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(metadata));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory1() {
@@ -62,8 +61,8 @@ std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirector
 }
 
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::LoadQuotaArea(uint32_t area_block_number,
-                                                                             Block::BlockSize size) {
-  auto area_metadata_block = LoadMetadataBlock(area_block_number, size);
+                                                                             BlockSize block_size) {
+  auto area_metadata_block = LoadMetadataBlock(area_block_number, block_size);
   if (!area_metadata_block.has_value())
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
   return std::make_shared<QuotaArea>(wfs_device(), std::move(*area_metadata_block));
@@ -80,30 +79,28 @@ std::expected<std::shared_ptr<Block>, WfsError> QuotaArea::AllocMetadataBlock() 
   auto allocator = GetFreeBlocksAllocator();
   if (!allocator)
     return std::unexpected(allocator.error());
-  auto res = (*allocator)->AllocBlocks(1, Block::BlockSizeType::Single, true);
+  auto res = (*allocator)->AllocBlocks(1, BlockType::Single, /*use_cache=*/true);
   if (!res)
     return std::unexpected(kNoSpace);
   return LoadMetadataBlock((*res)[0], /*new_block=*/true);
 }
 
-std::expected<std::vector<uint32_t>, WfsError> QuotaArea::AllocDataBlocks(uint32_t chunks_count,
-                                                                          Block::BlockSizeType chunk_size) {
+std::expected<std::vector<uint32_t>, WfsError> QuotaArea::AllocDataBlocks(uint32_t count, BlockType type) {
   auto allocator = GetFreeBlocksAllocator();
   if (!allocator)
     return std::unexpected(allocator.error());
-  auto res = (*allocator)->AllocBlocks(chunks_count, chunk_size, false);
+  auto res = (*allocator)->AllocBlocks(count, type, false);
   if (!res)
     return std::unexpected(kNoSpace);
   return *res;
 }
 
 std::expected<std::vector<QuotaArea::QuotaFragment>, WfsError> QuotaArea::AllocAreaBlocks(uint32_t blocks_count) {
-  uint32_t chunks_count =
-      (blocks_count + (1 << Block::BlockSizeType::LargeCluster) - 1) >> Block::BlockSizeType::LargeCluster;
+  uint32_t extents_count = (blocks_count + (1 << log2_size(BlockType::Cluster)) - 1) >> log2_size(BlockType::Cluster);
   auto allocator = GetFreeBlocksAllocator();
   if (!allocator)
     return std::unexpected(allocator.error());
-  auto res = (*allocator)->AllocAreaBlocks(chunks_count, Block::BlockSizeType::LargeCluster);
+  auto res = (*allocator)->AllocAreaBlocks(extents_count, BlockType::Cluster);
   if (!res)
     return std::unexpected(kNoSpace);
   return *res | std::views::transform([](const auto& frag) {
@@ -120,7 +117,7 @@ bool QuotaArea::DeleteBlocks(uint32_t block_number, uint32_t blocks_count) {
 
 void QuotaArea::Init(std::shared_ptr<Area> parent_area,
                      uint32_t blocks_count,
-                     Block::BlockSize block_size,
+                     BlockSize block_size,
                      const std::vector<QuotaFragment>& fragments) {
   Area::Init(parent_area, blocks_count, block_size);
 
@@ -136,8 +133,8 @@ void QuotaArea::Init(std::shared_ptr<Area> parent_area,
   }
 
   header->fragments_log2_block_size =
-      static_cast<uint32_t>(parent_area ? parent_area->block_size_log2() : size_t{Block::BlockSize::Basic});
-  uint32_t blocks_count_in_parent_size = to_device_blocks_count(blocks_count);
+      static_cast<uint32_t>(parent_area ? parent_area->block_size_log2() : log2_size(BlockSize::Physical));
+  uint32_t blocks_count_in_parent_size = to_physical_blocks_count(blocks_count);
   if (parent_area)
     blocks_count_in_parent_size = parent_area->to_area_blocks_count(blocks_count_in_parent_size);
   uint32_t total_blocks_count_in_parent_size =
@@ -163,9 +160,9 @@ void QuotaArea::Init(std::shared_ptr<Area> parent_area,
   auto quota_free_blocks =
       fragments | std::views::transform([&](const auto& frag) {
         return FreeBlocksRangeInfo{
-            to_area_block_number(parent_area ? parent_area->to_device_block_number(frag.block_number)
+            to_area_block_number(parent_area ? parent_area->to_physical_block_number(frag.block_number)
                                              : frag.block_number),
-            to_area_blocks_count(parent_area ? parent_area->to_device_blocks_count(frag.blocks_count)
+            to_area_blocks_count(parent_area ? parent_area->to_physical_blocks_count(frag.blocks_count)
                                              : frag.blocks_count)};
       }) |
       std::ranges::to<std::vector>();
@@ -181,7 +178,7 @@ void QuotaArea::Init(std::shared_ptr<Area> parent_area,
 
   // Decrease spare blocks from last block
   quota_free_blocks.back().blocks_count -=
-      to_area_blocks_count(parent_area ? parent_area->to_device_blocks_count(header->remainder_blocks_count.value())
+      to_area_blocks_count(parent_area ? parent_area->to_physical_blocks_count(header->remainder_blocks_count.value())
                                        : header->remainder_blocks_count.value());
   free_blocks_allocator->Init(std::move(quota_free_blocks));
 

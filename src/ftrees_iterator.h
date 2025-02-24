@@ -11,10 +11,7 @@
 #include <array>
 #include <bitset>
 #include <iterator>
-#include <memory>
-#include <numeric>
 #include <ranges>
-#include <type_traits>
 
 #include "free_blocks_allocator.h"
 #include "ftree.h"

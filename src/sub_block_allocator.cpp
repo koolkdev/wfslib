@@ -69,6 +69,14 @@ std::optional<uint16_t> SubBlockAllocatorBase::Alloc(uint16_t size) {
   return offset;
 }
 
+bool SubBlockAllocatorBase::CanAlloc(uint16_t size) const {
+  for (int size_log2 = GetSizeGroup(size); size_log2 <= MAX_BLOCK_SIZE; ++size_log2) {
+    if (header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].free_blocks_count.value())
+      return true;
+  }
+  return false;
+}
+
 void SubBlockAllocatorBase::Free(uint16_t offset, uint16_t size) {
   int size_log2 = GetSizeGroup(size);
   assert(!(offset & ((1 << size_log2) - 1)));
@@ -119,6 +127,13 @@ void SubBlockAllocatorBase::Shrink(uint16_t offset, uint16_t old_size, uint16_t 
     free_offset += 1 << new_size_log2++;
   }
   assert(free_offset == offset + (1 << old_size_log2));
+}
+
+uint16_t SubBlockAllocatorBase::GetFreeBytes() const {
+  uint16_t sum = 0;
+  for (int size_log2 = BLOCK_SIZE_QUANTA; size_log2 <= MAX_BLOCK_SIZE; ++size_log2)
+    sum += header()->free_list[size_log2 - BLOCK_SIZE_QUANTA].free_blocks_count.value() << size_log2;
+  return sum;
 }
 
 void SubBlockAllocatorBase::Unlink(const SubBlockAllocatorFreeListEntry* entry, int size_index) {
