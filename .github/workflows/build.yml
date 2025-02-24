@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-24.04	, windows-latest, macos-13]
+        platform: [ubuntu-latest, windows-latest, macos-13]
         compiler: [msvc, gcc, llvm]
         config: [debug, release]
         exclude:
@@ -18,7 +18,7 @@ jobs:
             compiler: gcc
           - platform: windows-latest
             compiler: llvm
-          - platform: ubuntu-24.04
+          - platform: ubuntu-latest
             compiler: msvc
           - platform: macos-13
             compiler: msvc
@@ -44,7 +44,7 @@ jobs:
           echo "CC=gcc-14" >> $GITHUB_ENV
           echo "CXX=g++-14" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'ubuntu-24.04' && matrix.compiler == 'gcc'
+        if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'gcc'
 
       - name: Set llvm (Ubuntu)
         run: |
@@ -55,7 +55,7 @@ jobs:
           echo "CC=clang-19" >> $GITHUB_ENV
           echo "CXX=clang++-19" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'ubuntu-24.04' && matrix.compiler == 'llvm'
+        if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
 
       - name: Set llvm (MacOS)
         run: |
