@@ -110,6 +110,17 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
       (wfs_header->root_quota_metadata.flags.value() & EntryMetadata::Flags::AREA_SIZE_REGULAR))
     block_size = BlockSize::Logical;
   block.reset();
+
+  if (!key.has_value()) {
+    // This is a plain file, assume that the sector size is the default. It only matters right now for reencrypting when
+    // we copy the parameters of the input device to the output. Once we won't do that, we could set the sectors count
+    // according to the actual file size.
+    // device->SetSectorsCount(device->GetFileSize() >> device->Log2SectorSize());
+    device->SetSectorsCount(wfs_header->root_quota_metadata.quota_blocks_count.value()
+                            << (static_cast<uint32_t>(block_size) - device->Log2SectorSize()));
+    return std::nullopt;
+  }
+
   uint32_t area_xor_wfs_iv;
   if (!RestoreMetadataBlockIVParameters(device, blocks_device, 0, 0, block_size, area_xor_wfs_iv)) {
     return WfsError::kAreaHeaderCorrupted;
