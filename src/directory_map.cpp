@@ -47,6 +47,21 @@ DirectoryMap::iterator DirectoryMap::end() const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
+// Or maybe realloc?
+Block::DataRef<EntryMetadata> DirectoryMap::alloc_metadata(iterator it, size_t log2_size) {
+  auto size = static_cast<uint16_t>(1 << log2_size);
+  auto parents = it.parents();
+  auto leaf_tree = it.leaf().node;
+  auto name = (*it).name;
+  while (true) {
+    auto new_offset = leaf_tree.Alloc(size);
+    if (new_offset.has_value()) {
+      return {leaf_tree.block(), *new_offset};
+    }
+    split_tree(parents, leaf_tree, name);
+  }
+}
+
 DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
   auto current_block = root_block_;
   std::vector<iterator::parent_node_info> parents;
