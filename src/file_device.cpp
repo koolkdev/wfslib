@@ -32,15 +32,6 @@ FileDevice::FileDevice(const std::filesystem::path& path,
   if (log2_sector_size < 9) {
     throw std::runtime_error("FileDevice: Invalid sector size (<512)");
   }
-  /*file->seekg(0, std::ios::end);
-  if (file->tellg() >> 9 > UINT32_MAX) {
-          throw std::exception("FileDevice: File too big! (>2TB)");
-  }
-  if (file->tellg() & ((1 << log2_sector_size) - 1)) {
-          throw std::exception("FileDevice: Invalid file size. (Not multiply of
-  sector size)");
-  }
-  sectors_count_ = static_cast<uint32_t>(file->tellg() >> log2_sector_size);*/
   if (sectors_count_ == 0)
     sectors_count_ = 0x10;  // we will find the exact sectors count later with
                             // Wfs::DetectSectorsCount
@@ -73,4 +64,9 @@ void FileDevice::WriteSectors(const std::span<std::byte>& data, uint32_t sector_
   file_->write(reinterpret_cast<const char*>(data.data()), data.size());
   if (file_->fail())
     throw std::runtime_error("FileDevice: Failed to write to file.");
+}
+
+uint64_t FileDevice::GetFileSize() {
+  file_->seekg(0, std::ios::end);
+  return file_->tellg();
 }
