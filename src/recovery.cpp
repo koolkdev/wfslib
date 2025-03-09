@@ -13,14 +13,14 @@
 #include "blocks_device.h"
 #include "device_encryption.h"
 #include "directory.h"
-#include "file_device.h"
+#include "device.h"
 #include "quota_area.h"
 #include "structs.h"
 #include "wfs_device.h"
 
 namespace {
 
-bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
+bool RestoreMetadataBlockIVParameters(std::shared_ptr<Device> device,
                                       std::shared_ptr<BlocksDevice> blocks_device,
                                       uint32_t block_number,
                                       uint32_t area_start_block_number,
@@ -88,7 +88,7 @@ bool RestoreMetadataBlockIVParameters(std::shared_ptr<FileDevice> device,
 
 }  // namespace
 
-bool Recovery::CheckWfsKey(std::shared_ptr<FileDevice> device, std::optional<std::vector<std::byte>> key) {
+bool Recovery::CheckWfsKey(std::shared_ptr<Device> device, std::optional<std::vector<std::byte>> key) {
   auto blocks_device = std::make_shared<BlocksDevice>(device, key);
   auto block = *Block::LoadMetadataBlock(blocks_device, 0, BlockSize::Physical, /*iv=*/0, /*load_data=*/true,
                                          /*check_hash=*/false);
@@ -97,7 +97,7 @@ bool Recovery::CheckWfsKey(std::shared_ptr<FileDevice> device, std::optional<std
   return wfs_header->version.value() == WFS_VERSION;
 }
 
-std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice> device,
+std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<Device> device,
                                                      std::optional<std::vector<std::byte>> key) {
   if (!CheckWfsKey(device, key))
     return WfsError::kInvalidWfsVersion;
@@ -129,7 +129,7 @@ std::optional<WfsError> Recovery::DetectDeviceParams(std::shared_ptr<FileDevice>
 }
 
 std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenWfsDeviceWithoutDeviceParams(
-    std::shared_ptr<FileDevice> device,
+    std::shared_ptr<Device> device,
     std::optional<std::vector<std::byte>> key) {
   auto res = DetectDeviceParams(device, key);
   if (res.has_value())
@@ -172,7 +172,7 @@ class FakeWfsDeviceHeaderBlocksDevice final : public BlocksDevice {
 }  // namespace
 
 std::expected<std::shared_ptr<WfsDevice>, WfsError> Recovery::OpenUsrDirectoryWithoutWfsDeviceHeader(
-    std::shared_ptr<FileDevice> device,
+    std::shared_ptr<Device> device,
     std::optional<std::vector<std::byte>> key) {
   // First step: Read the /usr directory and restore root area ^ wfs ivs
   const uint32_t kUsrDirectoryBlockNumber = 0x1000;

@@ -26,8 +26,8 @@ class FileDevice : public Device {
   uint32_t Log2SectorSize() const override { return log2_sector_size_; }
   bool IsReadOnly() const override { return read_only_; }
 
-  void SetSectorsCount(uint32_t sectors_count) { sectors_count_ = sectors_count; }
-  void SetLog2SectorSize(uint32_t log2_sector_size) { log2_sector_size_ = log2_sector_size; }
+  void SetSectorsCount(uint32_t sectors_count) override { sectors_count_ = sectors_count; }
+  void SetLog2SectorSize(uint32_t log2_sector_size) override { log2_sector_size_ = log2_sector_size; }
 
   uint64_t GetFileSize();
 
