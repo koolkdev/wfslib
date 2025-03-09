@@ -116,7 +116,7 @@ class Block {
   template <typename T>
   size_t to_offset(const T* obj) const {
     auto res = reinterpret_cast<const std::byte*>(obj) - data_.data();
-    assert(res >= 0 && res < size());
+    assert(res >= 0 && res < static_cast<std::ptrdiff_t>(size()));
     // TODO: [[assume(res >= 0)]]; and remove cast
     return static_cast<size_t>(res);
   }
