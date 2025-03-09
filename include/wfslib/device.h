@@ -19,4 +19,6 @@ class Device {
   virtual uint32_t Log2SectorSize() const = 0;
   virtual bool IsReadOnly() const = 0;
   uint32_t SectorSize() const { return 1 << Log2SectorSize(); }
+  virtual void SetSectorsCount(uint32_t sectors_count) = 0;
+  virtual void SetLog2SectorSize(uint32_t log2_sector_size) = 0;
 };
