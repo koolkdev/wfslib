@@ -7,13 +7,16 @@
 
 #pragma once
 
+#include <span>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 class KeyFile {
  public:
-  KeyFile(const std::vector<std::byte>& data, size_t expected_size) : data_(std::move(data)) {
+  KeyFile(const std::span<const std::byte>& data, size_t expected_size)
+      : KeyFile(std::vector<std::byte>(data.begin(), data.end()), expected_size) {}
+
+  KeyFile(std::vector<std::byte> data, size_t expected_size) : data_(std::move(data)) {
     if (data_.size() != expected_size)
       throw std::runtime_error("Unexpected key file size");
   }
@@ -32,7 +35,8 @@ class OTP : KeyFile {
  public:
   static const size_t OTP_SIZE = 0x400;
 
-  OTP(const std::vector<std::byte>& data) : KeyFile(data, OTP_SIZE) {}
+  OTP(const std::span<const std::byte>& data) : KeyFile(data, OTP_SIZE) {}
+  OTP(std::vector<std::byte> data) : KeyFile(std::move(data), OTP_SIZE) {}
 
   static OTP* LoadFromFile(std::string_view path);
 
@@ -44,7 +48,8 @@ class SEEPROM : KeyFile {
  public:
   static const size_t SEEPROM_SIZE = 0x200;
 
-  SEEPROM(const std::vector<std::byte>& data) : KeyFile(data, SEEPROM_SIZE) {}
+  SEEPROM(const std::span<const std::byte>& data) : KeyFile(data, SEEPROM_SIZE) {}
+  SEEPROM(std::vector<std::byte> data) : KeyFile(std::move(data), SEEPROM_SIZE) {}
 
   static SEEPROM* LoadFromFile(std::string_view path);
 
