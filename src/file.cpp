@@ -27,6 +27,10 @@ uint32_t File::SizeOnDisk() const {
   return metadata()->size_on_disk.value();
 }
 
+bool File::IsEncrypted() const {
+  return !(metadata()->flags.value() & EntryMetadata::UNENCRYPTED_FILE);
+}
+
 class File::DataCategoryReader {
  public:
   DataCategoryReader(const std::shared_ptr<File>& file) : file_(file) {}

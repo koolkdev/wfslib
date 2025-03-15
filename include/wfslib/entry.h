@@ -29,6 +29,12 @@ class Entry {
   bool is_link() const { return metadata()->is_link(); }
   bool is_quota() const { return metadata()->is_directory() && metadata()->is_quota(); }
 
+  uint32_t owner() const;
+  uint32_t group() const;
+  uint32_t mode() const;
+  uint32_t creation_time() const;
+  uint32_t modification_time() const;
+
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                               std::string name,
                                                               MetadataRef metadata_ref);
