@@ -13,5 +13,10 @@
 #include "file.h"
 #include "file_device.h"
 #include "key_file.h"
+#include "link.h"
 #include "recovery.h"
 #include "wfs_device.h"
+
+// TODO: We need to move it to the include directory including header dependencies
+#include "quota_area.h"
+#include "free_blocks_allocator.h"

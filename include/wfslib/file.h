@@ -32,6 +32,8 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   uint32_t SizeOnDisk() const;
   void Resize(size_t new_size);
 
+  bool IsEncrypted() const;
+
   class file_device {
    public:
     typedef char char_type;

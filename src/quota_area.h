@@ -47,7 +47,6 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
   std::expected<std::vector<QuotaFragment>, WfsError> AllocAreaBlocks(uint32_t blocks_count);
   bool DeleteBlocks(uint32_t area_block_number, uint32_t area_blocks_count);
 
-  // TODO: Private
   std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> GetFreeBlocksAllocator();
 
  private:

@@ -43,3 +43,9 @@ std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<Quot
     return std::make_shared<File>(std::move(name), std::move(metadata_ref), std::move(quota));
   }
 }
+
+uint32_t Entry::owner() const { return metadata()->permissions.owner.value(); }
+uint32_t Entry::group() const { return metadata()->permissions.group.value(); }
+uint32_t Entry::mode() const { return metadata()->permissions.mode.value(); }
+uint32_t Entry::creation_time() const { return metadata()->ctime.value(); }
+uint32_t Entry::modification_time() const { return metadata()->mtime.value(); }
