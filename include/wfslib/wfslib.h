@@ -18,5 +18,5 @@
 #include "wfs_device.h"
 
 // TODO: We need to move it to the include directory including header dependencies
-#include "quota_area.h"
 #include "free_blocks_allocator.h"
+#include "quota_area.h"
