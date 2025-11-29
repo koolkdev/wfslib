@@ -7,6 +7,7 @@
 
 #include "block.h"
 
+#include <algorithm>
 #include "blocks_device.h"
 #include "device.h"
 #include "structs.h"
@@ -47,16 +48,28 @@ Block::~Block() {
 }
 
 void Block::Resize(uint32_t data_size) {
+  if (detached_) {
+    data_size_ = data_size;
+    if (data_.size() < data_size_)
+      data_.resize(data_size_, std::byte{0});
+    return;
+  }
   assert(!device_->device()->IsReadOnly());
-  // Ensure that block data is aligned to device sectors
-  if (data_size_ == data_size)
+  const auto old_size = data_size_;
+  if (old_size == data_size)
     return;
 
-  auto new_size = GetAlignedSize(data_size);
+  data_size_ = data_size;
+
+  // Ensure that block data is aligned to device sectors
+  auto new_size = GetAlignedSize(data_size_);
   if (new_size != data_.size()) {
     data_.resize(new_size, std::byte{0});
-    dirty_ = true;
+  } else if (data_size_ > old_size) {
+    auto* begin = data_.data() + old_size;
+    std::fill(begin, begin + (data_size_ - old_size), std::byte{0});
   }
+  dirty_ = true;
 }
 
 void Block::Detach() {
@@ -87,10 +100,17 @@ void Block::Flush() {
 
 uint32_t Block::GetAlignedSize(uint32_t size) const {
   assert(size > 0 && size <= capacity());
+  if (detached_ || !device_) {
+    return size;
+  }
   return static_cast<uint32_t>(div_ceil(size, device_->device()->SectorSize()) * device_->device()->SectorSize());
 }
 
 std::span<std::byte> Block::GetDataForWriting() {
+  if (detached_ || !device_) {
+    dirty_ = true;
+    return {data_.data(), data_.data() + size()};
+  }
   assert(!device_->device()->IsReadOnly());
   dirty_ = true;
   return {data_.data(), data_.data() + size()};
@@ -111,8 +131,9 @@ std::expected<std::shared_ptr<Block>, WfsError> Block::LoadDataBlock(std::shared
     assert(cached_block->physical_block_number() == physical_block_number);
     assert(cached_block->block_size() == block_size);
     assert(cached_block->block_type() == block_type);
-    assert(cached_block->size() == data_size);
     assert(cached_block->encrypted() == encrypted);
+    if (cached_block->size() != data_size)
+      cached_block->Resize(data_size);
     return cached_block;
   }
   auto block = std::make_shared<Block>(device, physical_block_number, block_size, block_type, data_size, iv,

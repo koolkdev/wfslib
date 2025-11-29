@@ -57,6 +57,8 @@ struct Permissions {
 };
 static_assert(sizeof(Permissions) == 0xc, "Incorrect sizeof Permissions");
 
+// const uint64_t kMinimumFreeSpace = 0x15E00000; // 350MB on device that at least 1GB
+
 // sizeof 0x2c
 struct EntryMetadata {
   enum Flags : uint32_t {
@@ -71,7 +73,8 @@ struct EntryMetadata {
   uint32_be_t size_on_disk;
   uint32_be_t ctime;
   uint32_be_t mtime;
-  uint32_be_t unknown;  // TODO: ????
+  uint32_be_t maybe_transaction_id;  // Looks to be something that should have been related to transactions but in
+                                     // reality it is always 0
   union {
     uint32_be_t file_size;           // for file
     uint32_be_t quota_blocks_count;  // for quota

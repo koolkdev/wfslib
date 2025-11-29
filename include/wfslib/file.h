@@ -17,13 +17,13 @@ class QuotaArea;
 
 class File : public Entry, public std::enable_shared_from_this<File> {
  public:
-  class DataCategoryReader;
-  class DataCategory0Reader;
-  class RegularDataCategoryReader;
-  class DataCategory1Reader;
-  class DataCategory2Reader;
-  class DataCategory3Reader;
-  class DataCategory4Reader;
+  class FileStorage;
+  class InlineStorage;
+  class BlockStorage;
+  class SingleBlockStorage;
+  class LargeBlockStorage;
+  class ClusterBlockStorage;
+  class ExtendedClusterBlockStorage;
 
   File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota)
       : Entry(std::move(name), std::move(metadata)), quota_(std::move(quota)) {}
@@ -31,6 +31,10 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;
   void Resize(size_t new_size);
+
+  void EnsureSize(size_t size);
+
+  void Truncate(size_t size);
 
   class file_device {
    public:
@@ -45,18 +49,22 @@ class File : public Entry, public std::enable_shared_from_this<File> {
 
    private:
     size_t size() const;
+    void refresh_storage_if_needed();
     std::shared_ptr<File> file_;
-    std::shared_ptr<DataCategoryReader> reader_;
+    std::shared_ptr<FileStorage> storage_;
     boost::iostreams::stream_offset pos_;
+    uint8_t storage_type_;
   };
 
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
+  friend struct FileResizer;
+
   std::shared_ptr<QuotaArea> quota() const { return quota_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;
 
-  static std::shared_ptr<DataCategoryReader> CreateReader(std::shared_ptr<File> file);
+  static std::shared_ptr<FileStorage> CreateStorage(std::shared_ptr<File> file);
 };

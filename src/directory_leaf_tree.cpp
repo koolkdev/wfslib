@@ -23,5 +23,6 @@ void DirectoryLeafTree::copy_value(DirectoryTree& new_tree,
   assert(new_offset.has_value());
   Block::RawDataRef<EntryMetadata> new_metadata{new_tree.block().get(), *new_offset};
   std::memcpy(new_metadata.get_mutable(), metadata.get(), size);
+  // TODO: Also update current references
   new_node.set_leaf(*new_offset);
 }

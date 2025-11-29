@@ -34,10 +34,14 @@ bool TestBlocksDevice::ReadBlock(uint32_t block_number,
                                  uint32_t /*iv*/,
                                  bool /*encrypt*/,
                                  bool /*check_hash*/) {
+  read_log_.push_back(block_number);
   auto it = blocks_.find(block_number);
   if (it != blocks_.end()) {
-    assert(data.size() == it->second.size());
-    std::memcpy(data.data(), it->second.data(), data.size());
+    auto copy_size = std::min(data.size(), it->second.size());
+    std::memcpy(data.data(), it->second.data(), copy_size);
+    if (copy_size < data.size()) {
+      std::ranges::fill(std::span<std::byte>{data.begin() + copy_size, data.end()}, std::byte{0});
+    }
   } else {
     std::ranges::fill(data, std::byte{0});
   }

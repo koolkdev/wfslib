@@ -34,4 +34,5 @@ class TestBlocksDevice : public BlocksDevice {
 
  public:
   std::map<uint32_t, std::vector<std::byte>> blocks_;
+  std::vector<uint32_t> read_log_;
 };
