@@ -159,10 +159,10 @@ class DirectoryTreeIterator {
  private:
   std::string key() const {
     return (parents_ | std::views::transform([](const auto& parent) {
-              return (parent.node.prefix() | std::ranges::to<std::string>()) + (*parent.iterator).key();
+              return std::ranges::to<std::string>(parent.node.prefix()) + (*parent.iterator).key();
             }) |
             std::views::join | std::ranges::to<std::string>()) +
-           (leaf_->get_node().prefix() | std::ranges::to<std::string>());
+           std::ranges::to<std::string>(leaf_->get_node().prefix());
   };
 
   Block* block_;
