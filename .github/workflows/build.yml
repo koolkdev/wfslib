@@ -8,7 +8,7 @@ on:
 
 env:
   LLVM_VERSION: 21
-  GCC_VERSION: 15
+  GCC_VERSION: 14
 
 jobs:
   build:
