@@ -8,6 +8,7 @@
 #include <algorithm>
 #include <bit>
 #include <cassert>
+#include <optional>
 
 #include "sub_block_allocator.h"
 

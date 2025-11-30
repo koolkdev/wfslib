@@ -7,14 +7,14 @@ on:
   pull_request:
 
 env:
-  LLVM_VERSION: 19
+  LLVM_VERSION: 21
   GCC_VERSION: 14
 
 jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest, macos-13]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
         compiler: [msvc, gcc, llvm]
         config: [debug, release]
         exclude:
@@ -24,9 +24,9 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
-          - platform: macos-13
+          - platform: macos-latest
             compiler: msvc
-          - platform: macos-13
+          - platform: macos-latest
             compiler: gcc
     runs-on: ${{matrix.platform}}
 
@@ -64,14 +64,11 @@ jobs:
       - name: Set llvm (MacOS)
         run: |
           brew update
-          # Temporary fix, see https://github.com/actions/runner-images/issues/9966
-          brew install --overwrite python@3.12
-          brew install --overwrite python@3.13
           brew install llvm@$LLVM_VERSION
-          echo "CC=/usr/local/opt/llvm/bin/clang" >> $GITHUB_ENV
-          echo "CXX=/usr/local/opt/llvm/bin/clang++" >> $GITHUB_ENV
+          echo "CC=/opt/homebrew/opt/llvm/bin/clang" >> $GITHUB_ENV
+          echo "CXX=/opt/homebrew/opt/llvm/bin/clang++" >> $GITHUB_ENV
         shell: bash
-        if: matrix.platform == 'macos-13'
+        if: matrix.platform == 'macos-latest'
 
       - name: Build
         uses: lukka/run-cmake@v10
