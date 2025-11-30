@@ -106,9 +106,8 @@ TEST_CASE("FreeBlocksTreeTests") {
     // Should be empty
     REQUIRE(tree.begin() == tree.end());
 
-    auto blocks_numbers_to_delete =
-        std::views::transform(blocks_to_delete, [](const FreeBlocksRangeInfo& range) { return range.block_number; }) |
-        std::ranges::to<std::vector>();
+    auto blocks_numbers_to_delete = std::ranges::to<std::vector>(std::views::transform(
+        blocks_to_delete, [](const FreeBlocksRangeInfo& range) { return range.block_number; }));
 
     std::ranges::sort(blocks_numbers_to_delete);
     // Check deleted blocks, everything beside first ftree should be deleted
