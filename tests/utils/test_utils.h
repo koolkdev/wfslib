@@ -14,7 +14,7 @@
 
 template <int N>
 std::vector<uint32_t> createShuffledKeysArray() {
-  auto array = std::ranges::iota_view(0, N) | std::ranges::to<std::vector<uint32_t>>();
+  auto array = std::ranges::to<std::vector<uint32_t>>(std::ranges::iota_view(0, N));
   std::ranges::shuffle(array, std::default_random_engine{Catch::getSeed()});
   return array;
 }

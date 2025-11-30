@@ -388,9 +388,9 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     auto val = *current_node.begin();
     auto new_offset = val.value();
     parent_node child{dir_tree_node_ref<LeafValueType>::load(block().get(), new_offset)};
-    std::string new_prefix = current_node.prefix() | std::ranges::to<std::string>();
+    std::string new_prefix = std::ranges::to<std::string>(current_node.prefix());
     new_prefix += val.key();
-    new_prefix += child.prefix() | std::ranges::to<std::string>();
+    new_prefix += std::ranges::to<std::string>(child.prefix());
     if (child.set_prefix(new_prefix)) {
       Free(current_node.offset(), current_node.allocated_size());
       if (parent)
@@ -408,7 +408,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
       return;
     }
     // Ok we failed to alloc, we need to reallocate the whole tree.
-    auto old_tree = create(Block::CreateDetached(block()->data() | std::ranges::to<std::vector>()));
+    auto old_tree = create(Block::CreateDetached(std::ranges::to<std::vector>(block()->data())));
     parent_node root_node{
         dir_tree_node_ref<LeafValueType>::load(old_tree->block().get(), extra_header()->root.value())};
     parent_node merge_node{dir_tree_node_ref<LeafValueType>::load(
@@ -469,7 +469,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
                   std::string_view merge_prefix = {}) {
     if (merge_node == node) {
       assert(!node.has_leaf() && node.size() == 1);
-      std::string new_merge_prefix = node.prefix() | std::ranges::to<std::string>();
+      std::string new_merge_prefix = std::ranges::to<std::string>(node.prefix());
       new_merge_prefix += (*node.begin()).key();
       merge_copy(new_tree, {dir_tree_node_ref<LeafValueType>::load(block().get(), (*node.begin()).value())}, merge_node,
                  new_parent, new_merge_prefix);
@@ -479,7 +479,7 @@ class DirectoryTree : public SubBlockAllocator<DirectoryTreeHeader> {
     auto new_node = *new_tree.alloc_new_node(
         merge_prefix.empty()
             ? node.prefix()
-            : (merge_prefix | std::ranges::to<std::string>()) + (node.prefix() | std::ranges::to<std::string>()),
+            : std::ranges::to<std::string>(merge_prefix) + std::ranges::to<std::string>(node.prefix()),
         node, leaf);
     if (leaf) {
       copy_value(new_tree, new_node, *leaf);

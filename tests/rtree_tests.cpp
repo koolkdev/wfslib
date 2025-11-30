@@ -203,7 +203,8 @@ TEST_CASE("RTreeTests") {
       REQUIRE(rtree.erase(key));
     }
 
-    auto sorted_upper_half = std::ranges::subrange(middle, unsorted_keys.end()) | std::ranges::to<std::vector>();
+    auto sorted_upper_half =
+        std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right items were deleted
     REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key(); }),

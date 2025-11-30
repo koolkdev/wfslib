@@ -201,7 +201,8 @@ TEST_CASE("FreeBlocksAllocatorTests") {
     const uint32_t kCacheBlocksCount = 600;
     REQUIRE(allocator.Init(kCacheBlocksCount));
 
-    auto blocks_to_free = std::views::iota(uint32_t{0}, kBlocksToFree) | std::ranges::to<std::vector>();
+    auto blocks_to_free =
+        std::ranges::to<std::vector>(std::views::iota(uint32_t{0}, kBlocksToFree));
 
     std::ranges::shuffle(blocks_to_free, std::default_random_engine{Catch::getSeed()});
     REQUIRE(std::ranges::all_of(blocks_to_free, [&allocator](uint32_t i) -> bool {
