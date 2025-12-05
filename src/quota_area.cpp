@@ -103,9 +103,9 @@ std::expected<std::vector<QuotaArea::QuotaFragment>, WfsError> QuotaArea::AllocA
   auto res = (*allocator)->AllocAreaBlocks(extents_count, BlockType::Cluster);
   if (!res)
     return std::unexpected(kNoSpace);
-  return *res | std::views::transform([](const auto& frag) {
-    return QuotaFragment{frag.block_number, frag.blocks_count};
-  }) | std::ranges::to<std::vector>();
+  return *res |
+         std::views::transform([](const auto& frag) { return QuotaFragment{frag.block_number, frag.blocks_count}; }) |
+         std::ranges::to<std::vector>();
 }
 
 bool QuotaArea::DeleteBlocks(uint32_t block_number, uint32_t blocks_count) {
