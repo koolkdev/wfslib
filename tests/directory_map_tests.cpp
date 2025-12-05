@@ -145,7 +145,7 @@ TEST_CASE("DirectoryMapTests") {
       REQUIRE(dir_tree.erase(std::format("{:05}", i)));
     }
 
-    auto sorted_upper_half = std::ranges::subrange(middle, unsorted_indexes.end()) | std::ranges::to<std::vector>();
+    auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_indexes.end()));
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right entries were deleted
     REQUIRE(std::ranges::equal(
@@ -181,7 +181,7 @@ TEST_CASE("DirectoryMapTests") {
       REQUIRE(dir_tree.erase(std::format("{:05}", i)));
     }
 
-    auto sorted_upper_half = std::ranges::subrange(middle, unsorted_indexes.end()) | std::ranges::to<std::vector>();
+    auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_indexes.end()));
     std::ranges::sort(sorted_upper_half);
     // Ensure that the right entries were deleted
     REQUIRE(std::ranges::equal(

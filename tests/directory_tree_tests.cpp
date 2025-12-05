@@ -94,20 +94,20 @@ TEST_CASE("DirectoryTreeTests") {
 
   SECTION("insert and erase entries randomlly") {
     constexpr std::array<char, 3> chars = {'a', 'b', 'c'};
-    auto one_char = std::views::cartesian_product(chars) |
-                    std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                    std::ranges::to<std::vector>();
-    auto two_chars = std::views::cartesian_product(chars, chars) |
-                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                     std::ranges::to<std::vector>();
-    auto three_chars = std::views::cartesian_product(chars, chars, chars) |
-                       std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                       std::ranges::to<std::vector>();
-    auto four_chars = std::views::cartesian_product(chars, chars, chars, chars) |
-                      std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                      std::ranges::to<std::vector>();
+    auto one_char =
+        std::ranges::to<std::vector>(std::views::cartesian_product(chars) |
+                                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }));
+    auto two_chars =
+        std::ranges::to<std::vector>(std::views::cartesian_product(chars, chars) |
+                                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }));
+    auto three_chars =
+        std::ranges::to<std::vector>(std::views::cartesian_product(chars, chars, chars) |
+                                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }));
+    auto four_chars =
+        std::ranges::to<std::vector>(std::views::cartesian_product(chars, chars, chars, chars) |
+                                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }));
     auto keys =
-        std::views::join(std::vector{one_char, two_chars, three_chars, four_chars}) | std::ranges::to<std::vector>();
+        std::ranges::to<std::vector>(std::views::join(std::vector{one_char, two_chars, three_chars, four_chars}));
     std::ranges::sort(keys);
 
     auto unsorted_keys_indxes = createShuffledKeysArray<3 + 3 * 3 + 3 * 3 * 3 + 3 * 3 * 3 * 3>();
