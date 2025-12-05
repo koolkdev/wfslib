@@ -159,8 +159,8 @@ class DirectoryTreeIterator {
  private:
   std::string key() const {
     auto parent_segments = parents_ | std::views::transform([](const auto& parent) {
-                              return std::string(parent.node.prefix()) + (*parent.iterator).key();
-                            }) |
+                             return std::string(parent.node.prefix()) + (*parent.iterator).key();
+                           }) |
                            std::views::join;
     auto parent_prefix = std::ranges::to<std::string>(parent_segments);
     auto leaf_prefix = std::string(leaf_->get_node().prefix());

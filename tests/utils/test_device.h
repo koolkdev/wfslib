@@ -11,8 +11,7 @@
 
 class TestDevice : public Device {
  public:
-  TestDevice(uint32_t sectors_count)
-      : sectors_count_(sectors_count), log2_sector_size_(9) {}
+  TestDevice(uint32_t sectors_count) : sectors_count_(sectors_count), log2_sector_size_(9) {}
   ~TestDevice() override = default;
 
   void ReadSectors(const std::span<std::byte>& /*data*/,
