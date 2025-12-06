@@ -11,9 +11,9 @@
 
 #include "area.h"
 #include "blocks_device.h"
+#include "device.h"
 #include "device_encryption.h"
 #include "directory.h"
-#include "device.h"
 #include "quota_area.h"
 #include "structs.h"
 #include "wfs_device.h"

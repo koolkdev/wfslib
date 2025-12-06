@@ -1,0 +1,31 @@
+name: Clang Format
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  clang-format:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "true"
+
+      - name: Install clang-format
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-format
+
+      - name: Verify formatting
+        shell: bash
+        run: |
+          mapfile -t files < <(git ls-files '*.c' '*.cc' '*.cxx' '*.cpp' '*.h' '*.hh' '*.hpp' '*.hxx' '*.ipp')
+          if [ "${#files[@]}" -eq 0 ]; then
+            exit 0
+          fi
+          clang-format --version
+          clang-format -style=file --dry-run --Werror "${files[@]}"
