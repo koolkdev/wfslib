@@ -14,7 +14,7 @@ jobs:
   build:
     strategy:
       matrix:
-        platform: [ubuntu-latest, windows-latest]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
         compiler: [msvc, gcc, llvm]
         config: [debug, release]
         exclude:
@@ -24,6 +24,10 @@ jobs:
             compiler: llvm
           - platform: ubuntu-latest
             compiler: msvc
+          - platform: macos-latest
+            compiler: msvc
+          - platform: macos-latest
+            compiler: gcc
     runs-on: ${{matrix.platform}}
 
     steps:
@@ -56,6 +60,15 @@ jobs:
           echo "CXX=clang++-$LLVM_VERSION" >> $GITHUB_ENV
         shell: bash
         if: matrix.platform == 'ubuntu-latest' && matrix.compiler == 'llvm'
+
+      - name: Set llvm (macOS)
+        run: |
+          brew update
+          brew install llvm@$LLVM_VERSION
+          echo "CC=$(brew --prefix llvm@$LLVM_VERSION)/bin/clang" >> $GITHUB_ENV
+          echo "CXX=$(brew --prefix llvm@$LLVM_VERSION)/bin/clang++" >> $GITHUB_ENV
+        shell: bash
+        if: matrix.platform == 'macos-latest'
 
       - name: Build
         uses: lukka/run-cmake@v10
