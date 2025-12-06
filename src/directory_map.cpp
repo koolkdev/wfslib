@@ -102,7 +102,7 @@ bool DirectoryMap::insert(std::string_view name, const EntryMetadata* metadata) 
     auto new_offset = leaf_tree.Alloc(size);
     if (new_offset.has_value()) {
       Block::RawDataRef<EntryMetadata> new_metadata{leaf_tree.block().get(), *new_offset};
-      if (leaf_tree.insert({name | std::ranges::to<std::string>(), *new_offset})) {
+      if (leaf_tree.insert({std::ranges::to<std::string>(name), *new_offset})) {
         std::memcpy(new_metadata.get_mutable(), metadata, size);
         return true;
       }
