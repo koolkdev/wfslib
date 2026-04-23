@@ -1,0 +1,35 @@
+/*
+ * Copyright (C) 2026 koolkdev
+ *
+ * This software may be modified and distributed under the terms
+ * of the MIT license.  See the LICENSE file for details.
+ */
+
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+
+enum class FileLayoutMode {
+  MinimumForGrow,
+  MaximumForShrink,
+};
+
+struct FileLayoutSpec {
+  uint8_t size_category;
+  uint8_t metadata_log2_size;
+  uint32_t file_size;
+  uint32_t size_on_disk;
+  uint32_t data_units_count;
+  uint32_t category4_metadata_blocks_count;
+};
+
+size_t FileLayoutBaseMetadataSize(uint8_t filename_length);
+uint32_t FileLayoutInlineCapacity(uint8_t filename_length);
+uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
+uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
+
+FileLayoutSpec CalculateFileLayout(uint32_t file_size,
+                                   uint8_t filename_length,
+                                   uint8_t block_size_log2,
+                                   FileLayoutMode mode);

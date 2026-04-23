@@ -38,6 +38,7 @@ add_library(${PROJECT_NAME}
     src/eptree.cpp
     src/errors.cpp
     src/file.cpp
+    src/file_layout.cpp
     src/file_device.cpp
     src/free_blocks_allocator.cpp
     src/free_blocks_tree_iterator.cpp
