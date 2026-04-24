@@ -17,10 +17,10 @@ enum class FileLayoutMode {
 
 enum class FileLayoutCategory : uint8_t {
   Inline = 0,
-  SingleBlock = 1,
-  LargeBlock = 2,
-  Cluster = 3,
-  IndirectCluster = 4,
+  Blocks = 1,
+  LargeBlocks = 2,
+  Clusters = 3,
+  ClusterMetadataBlocks = 4,
 };
 
 struct FileLayout {

@@ -298,13 +298,13 @@ std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<Fil
   switch (FileLayoutCategoryFromValue(file->metadata()->size_category.value())) {
     case FileLayoutCategory::Inline:
       return std::make_shared<DataCategory0Reader>(file);
-    case FileLayoutCategory::SingleBlock:
+    case FileLayoutCategory::Blocks:
       return std::make_shared<DataCategory1Reader>(file);
-    case FileLayoutCategory::LargeBlock:
+    case FileLayoutCategory::LargeBlocks:
       return std::make_shared<DataCategory2Reader>(file);
-    case FileLayoutCategory::Cluster:
+    case FileLayoutCategory::Clusters:
       return std::make_shared<DataCategory3Reader>(file);
-    case FileLayoutCategory::IndirectCluster:
+    case FileLayoutCategory::ClusterMetadataBlocks:
       return std::make_shared<DataCategory4Reader>(file);
   }
   throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
