@@ -34,15 +34,13 @@ size_t DataBlockLog2Size(uint8_t block_size_log2, BlockType block_type) {
 uint32_t RoundUpToUnit(uint32_t size, uint32_t unit_size) {
   const uint64_t units = (uint64_t{size} + unit_size - 1) / unit_size;
   const uint64_t rounded_size = units * unit_size;
-  if (rounded_size > std::numeric_limits<uint32_t>::max())
-    throw WfsException(WfsError::kFileTooLarge);
+  assert(rounded_size <= std::numeric_limits<uint32_t>::max());
   return static_cast<uint32_t>(rounded_size);
 }
 
 uint8_t MetadataLog2Size(size_t metadata_size) {
   auto log2_size = static_cast<uint8_t>(std::max<size_t>(kMinMetadataLog2Size, std::bit_width(metadata_size - 1)));
-  if (log2_size > kMaxMetadataLog2Size)
-    throw std::invalid_argument("File layout metadata exceeds maximum WFS metadata allocation size");
+  assert(log2_size <= kMaxMetadataLog2Size);
   return log2_size;
 }
 
