@@ -20,7 +20,7 @@
 
 namespace {
 constexpr uint8_t kMinMetadataLog2Size = 6;
-constexpr uint8_t kMaxMetadataLog2Size = 10;
+[[maybe_unused]] constexpr uint8_t kMaxMetadataLog2Size = 10;
 constexpr uint8_t kInlineMaxMetadataLog2Size = 9;
 constexpr uint32_t kBlocksMaxCount = 5;
 constexpr uint32_t kLargeBlocksMaxCount = 5;
