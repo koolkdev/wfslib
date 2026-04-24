@@ -39,6 +39,7 @@ add_library(${PROJECT_NAME}
     src/errors.cpp
     src/file.cpp
     src/file_device.cpp
+    src/file_layout.cpp
     src/free_blocks_allocator.cpp
     src/free_blocks_tree_iterator.cpp
     src/free_blocks_tree.cpp

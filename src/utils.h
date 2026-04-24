@@ -91,6 +91,11 @@ inline size_t align_to_power_of_2(size_t size) {
   return static_cast<size_t>(1ULL << std::bit_width(size - 1));
 }
 
+template <typename T = size_t>
+constexpr T pow2(size_t pow) {
+  return T{1} << pow;
+}
+
 inline size_t div_ceil(size_t n, size_t div) {
   return (n + div - 1) / div;
 }
