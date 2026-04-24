@@ -20,10 +20,9 @@ namespace {
 class FTreeFixture : public MetadataBlockFixture {
  public:
   FTreeFixture() {
-    FTreesBlock{ftrees_block}.Init();
-    ftrees = std::ranges::iota_view(size_t{0}, kSizeBuckets.size()) |
-             std::views::transform([this](size_t i) -> FTree { return FTree{ftrees_block, i}; }) |
-             std::ranges::to<std::vector>();
+    ftrees = std::ranges::to<std::vector<FTree>>(
+        std::ranges::iota_view(size_t{0}, kSizeBuckets.size()) |
+        std::views::transform([this](size_t i) -> FTree { return FTree{ftrees_block, i}; }));
   }
 
   std::shared_ptr<TestBlock> ftrees_block = LoadMetadataBlock(0);
