@@ -6,6 +6,7 @@ find_package(Catch2 CONFIG REQUIRED)
 enable_testing()
 
 add_executable(${PROJECT_NAME}
+  block_tests.cpp
   # Requirements: P2374R4 and P2164R9
   $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_map_tests.cpp>
   $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_tree_tests.cpp>

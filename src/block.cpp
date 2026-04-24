@@ -7,6 +7,8 @@
 
 #include "block.h"
 
+#include <algorithm>
+
 #include "blocks_device.h"
 #include "device.h"
 #include "structs.h"
@@ -52,11 +54,16 @@ void Block::Resize(uint32_t data_size) {
   if (data_size_ == data_size)
     return;
 
+  if (data_size > data_size_)
+    std::ranges::fill(data_.begin() + data_size_, data_.begin() + std::min<size_t>(data_size, data_.size()),
+                      std::byte{0});
+
   auto new_size = GetAlignedSize(data_size);
   if (new_size != data_.size()) {
     data_.resize(new_size, std::byte{0});
-    dirty_ = true;
   }
+  data_size_ = data_size;
+  dirty_ = true;
 }
 
 void Block::Detach() {
