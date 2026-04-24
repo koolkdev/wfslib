@@ -38,7 +38,11 @@ class File::DataCategoryReader {
   virtual ~DataCategoryReader() {}
 
   virtual size_t GetMetadataSize() const = 0;
-  virtual size_t GetMetadataItemsCount() const = 0;
+  virtual size_t GetMetadataItemsCount() const {
+    return FileLayoutMetadataItemsCount(FileLayoutCategoryFromValue(file_->metadata()->size_category.value()),
+                                        file_->metadata()->size_on_disk.value(),
+                                        static_cast<uint8_t>(file_->quota()->block_size_log2()));
+  }
 
   virtual std::span<const std::byte> GetData(size_t offset, size_t size) = 0;
   virtual std::span<std::byte> GetMutableData(size_t offset, size_t size) = 0;
@@ -59,12 +63,6 @@ class File::DataCategoryReader {
 
  protected:
   std::shared_ptr<File> file_;
-
-  size_t GetLayoutMetadataItemsCount() const {
-    return FileLayoutMetadataItemsCount(file_->metadata()->size_category.value(),
-                                        file_->metadata()->size_on_disk.value(),
-                                        static_cast<uint8_t>(file_->quota()->block_size_log2()));
-  }
 
   template <typename T, bool AlignToEnd = false>
   auto GetMetadata() const {
@@ -93,7 +91,6 @@ class File::DataCategory0Reader : public File::DataCategoryReader {
   DataCategory0Reader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(std::byte); }
-  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
     return GetMetadata<const std::byte>().subspan(offset, size);
@@ -113,7 +110,6 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   RegularDataCategoryReader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlockMetadata); }
-  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
     auto data_ref = GetFileDataRef(offset, size);
@@ -232,7 +228,6 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
   DataCategory3Reader(const std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlocksClusterMetadata); }
-  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   FileDataRef GetFileDataRef(size_t offset, size_t size) override {
     return GetFileDataRefFromClustersList(
@@ -268,7 +263,6 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   DataCategory4Reader(const std::shared_ptr<File>& file) : DataCategory3Reader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(uint32_be_t); }
-  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   FileDataRef GetFileDataRef(size_t offset, size_t size) override {
     auto blocks_list = GetMetadata<const uint32_be_t, true>();
@@ -301,20 +295,19 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
 };
 
 std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<File> file) {
-  switch (file->metadata()->size_category.value()) {
-    case 0:
+  switch (FileLayoutCategoryFromValue(file->metadata()->size_category.value())) {
+    case FileLayoutCategory::Inline:
       return std::make_shared<DataCategory0Reader>(file);
-    case 1:
+    case FileLayoutCategory::SingleBlock:
       return std::make_shared<DataCategory1Reader>(file);
-    case 2:
+    case FileLayoutCategory::LargeBlock:
       return std::make_shared<DataCategory2Reader>(file);
-    case 3:
+    case FileLayoutCategory::Cluster:
       return std::make_shared<DataCategory3Reader>(file);
-    case 4:
+    case FileLayoutCategory::IndirectCluster:
       return std::make_shared<DataCategory4Reader>(file);
-    default:
-      throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
   }
+  throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
 }
 
 void File::Resize(size_t new_size) {

@@ -39,17 +39,17 @@ TEST_CASE("File layout category 0 inline threshold depends on filename length") 
 
   auto inline_limit = FileLayoutInlineCapacity(long_name);
   auto inline_spec = Minimum(inline_limit, long_name);
-  CHECK(inline_spec.size_category == 0);
+  CHECK(inline_spec.category == FileLayoutCategory::Inline);
   CHECK(inline_spec.size_on_disk == inline_limit);
 
   auto external_spec = Minimum(inline_limit + 1, long_name);
-  CHECK(external_spec.size_category == 1);
+  CHECK(external_spec.category == FileLayoutCategory::SingleBlock);
   CHECK(external_spec.size_on_disk == kSingleBlockSize);
 }
 
 TEST_CASE("File layout handles empty files") {
   auto spec = Minimum(0);
-  CHECK(spec.size_category == 0);
+  CHECK(spec.category == FileLayoutCategory::Inline);
   CHECK(spec.metadata_log2_size == 6);
   CHECK(spec.file_size == 0);
   CHECK(spec.size_on_disk == 0);
@@ -58,51 +58,51 @@ TEST_CASE("File layout handles empty files") {
 
 TEST_CASE("File layout minimum category 1 thresholds are single blocks") {
   auto one_block = Minimum(FileLayoutInlineCapacity(kFilenameLength) + 1);
-  CHECK(one_block.size_category == 1);
+  CHECK(one_block.category == FileLayoutCategory::SingleBlock);
   CHECK(one_block.size_on_disk == kSingleBlockSize);
   CHECK(one_block.data_units_count == 1);
 
   auto five_blocks = Minimum(5 * kSingleBlockSize);
-  CHECK(five_blocks.size_category == 1);
+  CHECK(five_blocks.category == FileLayoutCategory::SingleBlock);
   CHECK(five_blocks.size_on_disk == 5 * kSingleBlockSize);
   CHECK(five_blocks.data_units_count == 5);
 
   auto next = Minimum(5 * kSingleBlockSize + 1);
-  CHECK(next.size_category == 2);
+  CHECK(next.category == FileLayoutCategory::LargeBlock);
   CHECK(next.size_on_disk == kLargeBlockSize);
   CHECK(next.data_units_count == 1);
 }
 
 TEST_CASE("File layout minimum category 2 thresholds are large blocks") {
   auto one_large = Minimum(5 * kSingleBlockSize + 1);
-  CHECK(one_large.size_category == 2);
+  CHECK(one_large.category == FileLayoutCategory::LargeBlock);
   CHECK(one_large.size_on_disk == kLargeBlockSize);
   CHECK(one_large.data_units_count == 1);
 
   auto five_large = Minimum(5 * kLargeBlockSize);
-  CHECK(five_large.size_category == 2);
+  CHECK(five_large.category == FileLayoutCategory::LargeBlock);
   CHECK(five_large.size_on_disk == 5 * kLargeBlockSize);
   CHECK(five_large.data_units_count == 5);
 
   auto next = Minimum(5 * kLargeBlockSize + 1);
-  CHECK(next.size_category == 3);
+  CHECK(next.category == FileLayoutCategory::Cluster);
   CHECK(next.size_on_disk == kClusterSize);
   CHECK(next.data_units_count == 1);
 }
 
 TEST_CASE("File layout minimum category 3 thresholds are clusters") {
   auto one_cluster = Minimum(5 * kLargeBlockSize + 1);
-  CHECK(one_cluster.size_category == 3);
+  CHECK(one_cluster.category == FileLayoutCategory::Cluster);
   CHECK(one_cluster.size_on_disk == kClusterSize);
   CHECK(one_cluster.data_units_count == 1);
 
   auto four_clusters = Minimum(4 * kClusterSize);
-  CHECK(four_clusters.size_category == 3);
+  CHECK(four_clusters.category == FileLayoutCategory::Cluster);
   CHECK(four_clusters.size_on_disk == 4 * kClusterSize);
   CHECK(four_clusters.data_units_count == 4);
 
   auto next = Minimum(4 * kClusterSize + 1);
-  CHECK(next.size_category == 4);
+  CHECK(next.category == FileLayoutCategory::IndirectCluster);
   CHECK(next.size_on_disk == 5 * kClusterSize);
   CHECK(next.data_units_count == 5);
 }
@@ -113,30 +113,38 @@ TEST_CASE("File layout category 4 computes metadata block counts") {
   CHECK(FileLayoutMaxFileSize(kBlockSizeLog2) == 0xFFF80000);
 
   auto first_category4 = Minimum(4 * kClusterSize + 1);
-  CHECK(first_category4.size_category == 4);
+  CHECK(first_category4.category == FileLayoutCategory::IndirectCluster);
   CHECK(first_category4.data_units_count == 5);
   CHECK(FileLayoutCategory4MetadataBlocksCount(first_category4.data_units_count, kBlockSizeLog2) == 1);
 
   auto second_metadata_block = Minimum(48 * kClusterSize + 1);
-  CHECK(second_metadata_block.size_category == 4);
+  CHECK(second_metadata_block.category == FileLayoutCategory::IndirectCluster);
   CHECK(second_metadata_block.data_units_count == 49);
   CHECK(FileLayoutCategory4MetadataBlocksCount(second_metadata_block.data_units_count, kBlockSizeLog2) == 2);
 }
 
 TEST_CASE("File layout metadata item counts match category storage units") {
-  CHECK(FileLayoutMetadataItemsCount(0, 7, kBlockSizeLog2) == 7);
-  CHECK(FileLayoutMetadataItemsCount(1, 5 * kSingleBlockSize, kBlockSizeLog2) == 5);
-  CHECK(FileLayoutMetadataItemsCount(2, 5 * kLargeBlockSize, kBlockSizeLog2) == 5);
-  CHECK(FileLayoutMetadataItemsCount(3, 4 * kClusterSize, kBlockSizeLog2) == 4);
-  CHECK(FileLayoutMetadataItemsCount(4, 49 * kClusterSize, kBlockSizeLog2) == 2);
+  CHECK(FileLayoutMetadataItemsCount(FileLayoutCategory::Inline, 7, kBlockSizeLog2) == 7);
+  CHECK(FileLayoutMetadataItemsCount(FileLayoutCategory::SingleBlock, 5 * kSingleBlockSize, kBlockSizeLog2) == 5);
+  CHECK(FileLayoutMetadataItemsCount(FileLayoutCategory::LargeBlock, 5 * kLargeBlockSize, kBlockSizeLog2) == 5);
+  CHECK(FileLayoutMetadataItemsCount(FileLayoutCategory::Cluster, 4 * kClusterSize, kBlockSizeLog2) == 4);
+  CHECK(FileLayoutMetadataItemsCount(FileLayoutCategory::IndirectCluster, 49 * kClusterSize, kBlockSizeLog2) == 2);
+}
+
+TEST_CASE("File layout category converts to on-disk values") {
+  CHECK(FileLayoutCategoryFromValue(0) == FileLayoutCategory::Inline);
+  CHECK(FileLayoutCategoryValue(FileLayoutCategory::SingleBlock) == 1);
+  CHECK(FileLayoutCategoryValue(FileLayoutCategory::LargeBlock) == 2);
+  CHECK(FileLayoutCategoryValue(FileLayoutCategory::Cluster) == 3);
+  CHECK(FileLayoutCategoryValue(FileLayoutCategory::IndirectCluster) == 4);
 }
 
 TEST_CASE("File layout maximum shrink keeps the largest valid category") {
-  CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength)).size_category == 0);
-  CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength) + 1).size_category == 1);
-  CHECK(Maximum(kSingleBlockSize + 1).size_category == 2);
-  CHECK(Maximum(kLargeBlockSize + 1).size_category == 3);
-  CHECK(Maximum(kClusterSize).size_category == 4);
+  CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength)).category == FileLayoutCategory::Inline);
+  CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength) + 1).category == FileLayoutCategory::SingleBlock);
+  CHECK(Maximum(kSingleBlockSize + 1).category == FileLayoutCategory::LargeBlock);
+  CHECK(Maximum(kLargeBlockSize + 1).category == FileLayoutCategory::Cluster);
+  CHECK(Maximum(kClusterSize).category == FileLayoutCategory::IndirectCluster);
 }
 
 TEST_CASE("File layout rounds metadata log2 sizes") {
@@ -153,7 +161,7 @@ TEST_CASE("File layout rounds metadata log2 sizes") {
 TEST_CASE("File layout throws when requested size exceeds max file size") {
   auto max_file_size = FileLayoutMaxFileSize(kBlockSizeLog2);
   auto max_spec = Minimum(max_file_size);
-  CHECK(max_spec.size_category == 4);
+  CHECK(max_spec.category == FileLayoutCategory::IndirectCluster);
   CHECK(max_spec.file_size == max_file_size);
   CHECK(max_spec.size_on_disk == max_file_size);
 

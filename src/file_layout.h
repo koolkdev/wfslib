@@ -15,8 +15,16 @@ enum class FileLayoutMode {
   MaximumForShrink,
 };
 
+enum class FileLayoutCategory : uint8_t {
+  Inline = 0,
+  SingleBlock = 1,
+  LargeBlock = 2,
+  Cluster = 3,
+  IndirectCluster = 4,
+};
+
 struct FileLayout {
-  uint8_t size_category;
+  FileLayoutCategory category;
   uint8_t metadata_log2_size;
   uint32_t file_size;
   uint32_t size_on_disk;
@@ -25,8 +33,10 @@ struct FileLayout {
 
 size_t FileLayoutBaseMetadataSize(uint8_t filename_length);
 uint32_t FileLayoutInlineCapacity(uint8_t filename_length);
-uint32_t FileLayoutDataUnitsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2);
-uint32_t FileLayoutMetadataItemsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2);
+FileLayoutCategory FileLayoutCategoryFromValue(uint8_t value);
+uint8_t FileLayoutCategoryValue(FileLayoutCategory category);
+uint32_t FileLayoutDataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
+uint32_t FileLayoutMetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
 uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
 uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
