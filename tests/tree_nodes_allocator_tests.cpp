@@ -9,8 +9,7 @@
 
 #include "tree_nodes_allocator.h"
 
-#include "utils/test_block.h"
-#include "utils/test_blocks_device.h"
+#include "utils/test_fixtures.h"
 
 namespace {
 
@@ -26,8 +25,6 @@ struct DummyEntry {
   uint32_be_t a, b, c, d;
 };
 
-}  // namespace
-
 using DummyAllocatorBlockArgs = TreeNodesAllocatorArgs<DummyExtraHeader, DummyExtraHeader, sizeof(DummyEntry)>;
 
 class DummyAllocatorBlock : public TreeNodesAllocator<DummyAllocatorBlockArgs> {
@@ -40,111 +37,122 @@ class DummyAllocatorBlock : public TreeNodesAllocator<DummyAllocatorBlockArgs> {
   const HeapFreelistEntry* get_freelist_entry(uint32_t index) const { return base::get_freelist_entry(index); }
 };
 
-TEST_CASE("TreeNodesAllocatorTests") {
-  auto test_device = std::make_shared<TestBlocksDevice>();
-  auto block = TestBlock::LoadMetadataBlock(test_device, 0);
+class TreeNodesAllocatorFixture : public MetadataBlockFixture {
+ public:
+  TreeNodesAllocatorFixture() { allocator.Init(); }
+
+  std::shared_ptr<TestBlock> block = LoadMetadataBlock(0);
   DummyAllocatorBlock allocator{block};
-  allocator.Init();
 
-  constexpr size_t total_bytes = (size_t{1} << log2_size(BlockSize::Logical)) - sizeof(MetadataBlockHeader) -
-                                 sizeof(DummyExtraHeader) - sizeof(DummyTreeHeader) - sizeof(HeapHeader);
-  constexpr size_t max_entries_count = total_bytes / 0x10;
-  constexpr size_t offset = sizeof(MetadataBlockHeader) + sizeof(DummyExtraHeader);
+  static constexpr size_t kTotalBytes = (size_t{1} << log2_size(BlockSize::Logical)) - sizeof(MetadataBlockHeader) -
+                                        sizeof(DummyExtraHeader) - sizeof(DummyTreeHeader) - sizeof(HeapHeader);
+  static constexpr size_t kMaxEntriesCount = kTotalBytes / 0x10;
+  static constexpr size_t kOffset = sizeof(MetadataBlockHeader) + sizeof(DummyExtraHeader);
+};
 
-  SECTION("Check initial heap state") {
-    auto* heap_header = allocator.get_heap_header();
-    REQUIRE(heap_header->freelist_head.value() == 0);
-    REQUIRE(heap_header->allocated_entries.value() == 0);
-    REQUIRE(heap_header->total_bytes.value() == total_bytes);
-    REQUIRE(heap_header->start_offset.value() == offset);
+}  // namespace
 
-    auto freelist_entry = allocator.get_freelist_entry(0);
-    REQUIRE(freelist_entry->count.value() == max_entries_count);
-    REQUIRE(freelist_entry->next.value() == max_entries_count);
-  }
+TEST_CASE_METHOD(TreeNodesAllocatorFixture,
+                 "TreeNodesAllocator initializes heap metadata",
+                 "[tree-nodes-allocator][white-box]") {
+  auto* heap_header = allocator.get_heap_header();
+  REQUIRE(heap_header->freelist_head.value() == 0);
+  REQUIRE(heap_header->allocated_entries.value() == 0);
+  REQUIRE(heap_header->total_bytes.value() == kTotalBytes);
+  REQUIRE(heap_header->start_offset.value() == kOffset);
 
-  SECTION("Alloc and free one") {
-    auto* entry = allocator.Alloc<DummyEntry>(1);
-    REQUIRE(entry == block->get_object<DummyEntry>(offset));
-    REQUIRE(allocator.to_offset(entry) == offset);
+  auto freelist_entry = allocator.get_freelist_entry(0);
+  REQUIRE(freelist_entry->count.value() == kMaxEntriesCount);
+  REQUIRE(freelist_entry->next.value() == kMaxEntriesCount);
+}
 
-    auto* heap_header = allocator.get_heap_header();
-    REQUIRE(heap_header->freelist_head.value() == 1);
-    REQUIRE(heap_header->allocated_entries.value() == 1);
-    REQUIRE(heap_header->total_bytes.value() == total_bytes);
-    REQUIRE(heap_header->start_offset.value() == offset);
+TEST_CASE_METHOD(TreeNodesAllocatorFixture,
+                 "TreeNodesAllocator allocates and frees one entry",
+                 "[tree-nodes-allocator][unit]") {
+  auto* entry = allocator.Alloc<DummyEntry>(1);
+  REQUIRE(entry == block->get_object<DummyEntry>(kOffset));
+  REQUIRE(allocator.to_offset(entry) == kOffset);
 
-    auto freelist_entry1 = allocator.get_freelist_entry(1);
-    REQUIRE(freelist_entry1->count.value() == max_entries_count - 1);
-    REQUIRE(freelist_entry1->next.value() == max_entries_count);
+  auto* heap_header = allocator.get_heap_header();
+  REQUIRE(heap_header->freelist_head.value() == 1);
+  REQUIRE(heap_header->allocated_entries.value() == 1);
+  REQUIRE(heap_header->total_bytes.value() == kTotalBytes);
+  REQUIRE(heap_header->start_offset.value() == kOffset);
 
-    allocator.Free(entry, 1);
-    REQUIRE(heap_header->freelist_head.value() == 0);
-    REQUIRE(heap_header->allocated_entries.value() == 0);
+  auto freelist_entry1 = allocator.get_freelist_entry(1);
+  REQUIRE(freelist_entry1->count.value() == kMaxEntriesCount - 1);
+  REQUIRE(freelist_entry1->next.value() == kMaxEntriesCount);
 
-    auto freelist_entry0 = allocator.get_freelist_entry(0);
-    REQUIRE(freelist_entry0->count.value() == max_entries_count);
-    REQUIRE(freelist_entry0->next.value() == max_entries_count);
-  }
+  allocator.Free(entry, 1);
+  REQUIRE(heap_header->freelist_head.value() == 0);
+  REQUIRE(heap_header->allocated_entries.value() == 0);
 
-  SECTION("Alloc and free multiple") {
-    auto* entry1 = allocator.Alloc<DummyEntry>(1);
-    REQUIRE(allocator.to_offset(entry1) == offset);
-    auto* entry2 = allocator.Alloc<DummyEntry>(2);
-    REQUIRE(entry2 == entry1 + 1);
-    auto* entry3 = allocator.Alloc<DummyEntry>(1);
-    REQUIRE(entry3 == entry2 + 2);
+  auto freelist_entry0 = allocator.get_freelist_entry(0);
+  REQUIRE(freelist_entry0->count.value() == kMaxEntriesCount);
+  REQUIRE(freelist_entry0->next.value() == kMaxEntriesCount);
+}
 
-    auto* heap_header = allocator.get_heap_header();
-    REQUIRE(heap_header->freelist_head.value() == 4);
-    REQUIRE(heap_header->allocated_entries.value() == 4);
-    REQUIRE(heap_header->total_bytes.value() == total_bytes);
-    REQUIRE(heap_header->start_offset.value() == offset);
-    auto freelist_entry4 = allocator.get_freelist_entry(4);
-    REQUIRE(freelist_entry4->count.value() == max_entries_count - 4);
-    REQUIRE(freelist_entry4->next.value() == max_entries_count);
+TEST_CASE_METHOD(TreeNodesAllocatorFixture,
+                 "TreeNodesAllocator coalesces multiple freed entries",
+                 "[tree-nodes-allocator][unit]") {
+  auto* entry1 = allocator.Alloc<DummyEntry>(1);
+  REQUIRE(allocator.to_offset(entry1) == kOffset);
+  auto* entry2 = allocator.Alloc<DummyEntry>(2);
+  REQUIRE(entry2 == entry1 + 1);
+  auto* entry3 = allocator.Alloc<DummyEntry>(1);
+  REQUIRE(entry3 == entry2 + 2);
 
-    allocator.Free(entry2, 2);
-    REQUIRE(heap_header->freelist_head.value() == 1);
-    REQUIRE(heap_header->allocated_entries.value() == 2);
-    auto freelist_entry1 = allocator.get_freelist_entry(1);
-    REQUIRE(freelist_entry1->count.value() == 2);
-    REQUIRE(freelist_entry1->next.value() == 4);
-    REQUIRE(freelist_entry4->count.value() == max_entries_count - 4);
-    REQUIRE(freelist_entry4->next.value() == max_entries_count);
+  auto* heap_header = allocator.get_heap_header();
+  REQUIRE(heap_header->freelist_head.value() == 4);
+  REQUIRE(heap_header->allocated_entries.value() == 4);
+  REQUIRE(heap_header->total_bytes.value() == kTotalBytes);
+  REQUIRE(heap_header->start_offset.value() == kOffset);
+  auto freelist_entry4 = allocator.get_freelist_entry(4);
+  REQUIRE(freelist_entry4->count.value() == kMaxEntriesCount - 4);
+  REQUIRE(freelist_entry4->next.value() == kMaxEntriesCount);
 
-    allocator.Free(entry1, 1);
-    REQUIRE(heap_header->freelist_head.value() == 0);
-    REQUIRE(heap_header->allocated_entries.value() == 1);
-    auto freelist_entry0 = allocator.get_freelist_entry(0);
-    REQUIRE(freelist_entry0->count.value() == 3);
-    REQUIRE(freelist_entry0->next.value() == 4);
-    REQUIRE(freelist_entry4->count.value() == max_entries_count - 4);
-    REQUIRE(freelist_entry4->next.value() == max_entries_count);
+  allocator.Free(entry2, 2);
+  REQUIRE(heap_header->freelist_head.value() == 1);
+  REQUIRE(heap_header->allocated_entries.value() == 2);
+  auto freelist_entry1 = allocator.get_freelist_entry(1);
+  REQUIRE(freelist_entry1->count.value() == 2);
+  REQUIRE(freelist_entry1->next.value() == 4);
+  REQUIRE(freelist_entry4->count.value() == kMaxEntriesCount - 4);
+  REQUIRE(freelist_entry4->next.value() == kMaxEntriesCount);
 
-    allocator.Free(entry3, 1);
-    REQUIRE(heap_header->freelist_head.value() == 0);
-    REQUIRE(heap_header->allocated_entries.value() == 0);
-    REQUIRE(freelist_entry0->count.value() == max_entries_count);
-    REQUIRE(freelist_entry0->next.value() == max_entries_count);
-  }
+  allocator.Free(entry1, 1);
+  REQUIRE(heap_header->freelist_head.value() == 0);
+  REQUIRE(heap_header->allocated_entries.value() == 1);
+  auto freelist_entry0 = allocator.get_freelist_entry(0);
+  REQUIRE(freelist_entry0->count.value() == 3);
+  REQUIRE(freelist_entry0->next.value() == 4);
+  REQUIRE(freelist_entry4->count.value() == kMaxEntriesCount - 4);
+  REQUIRE(freelist_entry4->next.value() == kMaxEntriesCount);
 
-  SECTION("Fill heap") {
-    auto* entry = allocator.Alloc<DummyEntry>(max_entries_count);
-    REQUIRE(allocator.to_offset(entry) == offset);
-    auto* entry2 = allocator.Alloc<DummyEntry>(1);
-    REQUIRE(entry2 == nullptr);
-    auto* heap_header = allocator.get_heap_header();
-    REQUIRE(heap_header->freelist_head.value() == max_entries_count);
-    REQUIRE(heap_header->allocated_entries.value() == max_entries_count);
+  allocator.Free(entry3, 1);
+  REQUIRE(heap_header->freelist_head.value() == 0);
+  REQUIRE(heap_header->allocated_entries.value() == 0);
+  REQUIRE(freelist_entry0->count.value() == kMaxEntriesCount);
+  REQUIRE(freelist_entry0->next.value() == kMaxEntriesCount);
+}
 
-    allocator.Free(entry, max_entries_count);
-    REQUIRE(heap_header->freelist_head.value() == 0);
-    REQUIRE(heap_header->allocated_entries.value() == 0);
-  }
+TEST_CASE_METHOD(TreeNodesAllocatorFixture, "TreeNodesAllocator fills the heap", "[tree-nodes-allocator][unit]") {
+  auto* entry = allocator.Alloc<DummyEntry>(kMaxEntriesCount);
+  REQUIRE(allocator.to_offset(entry) == kOffset);
+  auto* entry2 = allocator.Alloc<DummyEntry>(1);
+  REQUIRE(entry2 == nullptr);
+  auto* heap_header = allocator.get_heap_header();
+  REQUIRE(heap_header->freelist_head.value() == kMaxEntriesCount);
+  REQUIRE(heap_header->allocated_entries.value() == kMaxEntriesCount);
 
-  SECTION("Alloc too much") {
-    auto* entry = allocator.Alloc<DummyEntry>(max_entries_count + 1);
-    REQUIRE(entry == nullptr);
-  }
+  allocator.Free(entry, kMaxEntriesCount);
+  REQUIRE(heap_header->freelist_head.value() == 0);
+  REQUIRE(heap_header->allocated_entries.value() == 0);
+}
+
+TEST_CASE_METHOD(TreeNodesAllocatorFixture,
+                 "TreeNodesAllocator rejects allocations larger than the heap",
+                 "[tree-nodes-allocator][unit]") {
+  auto* entry = allocator.Alloc<DummyEntry>(kMaxEntriesCount + 1);
+  REQUIRE(entry == nullptr);
 }
