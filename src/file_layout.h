@@ -15,7 +15,7 @@ enum class FileLayoutMode {
   MaximumForShrink,
 };
 
-struct FileLayoutSpec {
+struct FileLayout {
   uint8_t size_category;
   uint8_t metadata_log2_size;
   uint32_t file_size;
@@ -29,7 +29,7 @@ uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
 uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
 
-FileLayoutSpec CalculateFileLayout(uint32_t file_size,
-                                   uint8_t filename_length,
-                                   uint8_t block_size_log2,
-                                   FileLayoutMode mode);
+FileLayout CalculateFileLayout(uint32_t file_size,
+                               uint8_t filename_length,
+                               uint8_t block_size_log2,
+                               FileLayoutMode mode);

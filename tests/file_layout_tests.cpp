@@ -21,11 +21,11 @@ constexpr uint32_t kSingleBlockSize = uint32_t{1} << kBlockSizeLog2;
 constexpr uint32_t kLargeBlockSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(BlockType::Large));
 constexpr uint32_t kClusterSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(BlockType::Cluster));
 
-FileLayoutSpec Minimum(uint32_t file_size, uint8_t filename_length = kFilenameLength) {
+FileLayout Minimum(uint32_t file_size, uint8_t filename_length = kFilenameLength) {
   return CalculateFileLayout(file_size, filename_length, kBlockSizeLog2, FileLayoutMode::MinimumForGrow);
 }
 
-FileLayoutSpec Maximum(uint32_t file_size, uint8_t filename_length = kFilenameLength) {
+FileLayout Maximum(uint32_t file_size, uint8_t filename_length = kFilenameLength) {
   return CalculateFileLayout(file_size, filename_length, kBlockSizeLog2, FileLayoutMode::MaximumForShrink);
 }
 }  // namespace

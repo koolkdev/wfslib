@@ -10,6 +10,7 @@
 #include <cassert>
 #include <ranges>
 #include "block.h"
+#include "file_layout.h"
 #include "quota_area.h"
 #include "structs.h"
 
@@ -267,7 +268,8 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(uint32_be_t); }
   size_t GetMetadataItemsCount() const override {
     size_t data_blocks_clusters_count = div_ceil_pow2(file_->metadata()->size_on_disk.value(), ClusterDataLog2Size());
-    return div_ceil(data_blocks_clusters_count, ClustersInBlock());
+    return FileLayoutCategory4MetadataBlocksCount(static_cast<uint32_t>(data_blocks_clusters_count),
+                                                  file_->quota()->block_size_log2());
   }
 
   FileDataRef GetFileDataRef(size_t offset, size_t size) override {
@@ -296,10 +298,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 
   size_t ClustersInBlock() const {
-    size_t clusters_in_block =
-        (file_->quota()->block_size() - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata);
-    clusters_in_block = std::min(clusters_in_block, size_t{48});
-    return clusters_in_block;
+    return FileLayoutCategory4ClustersPerMetadataBlock(file_->quota()->block_size_log2());
   }
 };
 

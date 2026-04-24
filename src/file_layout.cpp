@@ -64,7 +64,7 @@ size_t CategoryMetadataSize(uint8_t size_category,
   }
 }
 
-FileLayoutSpec BuildSpec(uint32_t file_size, uint8_t filename_length, uint8_t block_size_log2, uint8_t size_category) {
+FileLayout BuildLayout(uint32_t file_size, uint8_t filename_length, uint8_t block_size_log2, uint8_t size_category) {
   const auto single_block_size = pow2<uint32_t>(block_size_log2);
   const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
   const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
@@ -100,7 +100,7 @@ FileLayoutSpec BuildSpec(uint32_t file_size, uint8_t filename_length, uint8_t bl
   if (size_category == 0 && metadata_log2_size > kCategory0MaxMetadataLog2Size)
     throw WfsException(WfsError::kFileTooLarge);
 
-  return FileLayoutSpec{
+  return FileLayout{
       .size_category = size_category,
       .metadata_log2_size = metadata_log2_size,
       .file_size = file_size,
@@ -174,12 +174,12 @@ uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2) {
   return static_cast<uint32_t>(std::min(max_by_size_on_disk, max_by_category4_metadata));
 }
 
-FileLayoutSpec CalculateFileLayout(uint32_t file_size,
-                                   uint8_t filename_length,
-                                   uint8_t block_size_log2,
-                                   FileLayoutMode mode) {
+FileLayout CalculateFileLayout(uint32_t file_size,
+                               uint8_t filename_length,
+                               uint8_t block_size_log2,
+                               FileLayoutMode mode) {
   const auto category = mode == FileLayoutMode::MinimumForGrow
                             ? MinimumCategory(file_size, filename_length, block_size_log2)
                             : MaximumCategory(file_size, filename_length, block_size_log2);
-  return BuildSpec(file_size, filename_length, block_size_log2, category);
+  return BuildLayout(file_size, filename_length, block_size_log2, category);
 }
