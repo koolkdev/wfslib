@@ -37,8 +37,8 @@ FileLayoutCategory FileLayoutCategoryFromValue(uint8_t value);
 uint8_t FileLayoutCategoryValue(FileLayoutCategory category);
 uint32_t FileLayoutDataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
 uint32_t FileLayoutMetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
-uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
-uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
+uint32_t FileLayoutClustersPerClusterMetadataBlock(uint8_t block_size_log2);
+uint32_t FileLayoutClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
 
 FileLayout CalculateFileLayout(uint32_t file_size,

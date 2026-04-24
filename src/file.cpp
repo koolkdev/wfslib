@@ -290,7 +290,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 
   size_t ClustersInBlock() const {
-    return FileLayoutCategory4ClustersPerMetadataBlock(static_cast<uint8_t>(file_->quota()->block_size_log2()));
+    return FileLayoutClustersPerClusterMetadataBlock(static_cast<uint8_t>(file_->quota()->block_size_log2()));
   }
 };
 
