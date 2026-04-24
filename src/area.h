@@ -51,7 +51,7 @@ class Area {
     return area_blocks_count << (block_size_log2() - log2_size(BlockSize::Physical));
   }
 
-  size_t block_size_log2() const { return header()->block_size_log2.value(); }
+  uint8_t block_size_log2() const { return header()->block_size_log2.value(); }
   size_t block_size() const { return size_t{1} << block_size_log2(); }
 
   uint32_t physical_block_number() const { return header_block_->physical_block_number(); }

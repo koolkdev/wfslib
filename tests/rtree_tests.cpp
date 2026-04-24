@@ -12,211 +12,183 @@
 
 #include "rtree.h"
 
-#include "utils/test_block.h"
-#include "utils/test_blocks_device.h"
-#include "utils/test_free_blocks_allocator.h"
+#include "utils/range_assertions.h"
+#include "utils/test_fixtures.h"
 #include "utils/test_utils.h"
 
-TEST_CASE("RTreeTests") {
-  auto test_device = std::make_shared<TestBlocksDevice>();
-  auto rtree_block = TestBlock::LoadMetadataBlock(test_device, 0);
+namespace {
+
+class RTreeFixture : public MetadataBlockFixture {
+ public:
+  RTreeFixture() { rtree.Init(/*depth=*/1, /*block_number=*/0); }
+
+  std::shared_ptr<TestBlock> rtree_block = LoadMetadataBlock(0);
   RTree rtree{rtree_block};
-  rtree.Init(/*depth=*/1, /*block_number=*/0);
+};
 
-  SECTION("Check empty rtree size") {
-    REQUIRE(rtree.size() == 0);
+constexpr int kRTreeItems = 500;
+
+void InsertSequential(RTree& rtree, uint32_t count, uint32_t value = 0) {
+  for (uint32_t i = 0; i < count; ++i) {
+    REQUIRE(rtree.insert({i, value ? value : i + 1}));
   }
+}
 
-  SECTION("insert items sorted") {
-    uint32_t index = 0;
-    for (int i = 0; i < 4; ++i) {
-      REQUIRE(rtree.insert({index, index + 1}));
-      ++index;
-    }
-    REQUIRE(rtree.size() == index);
-    // No parent nodes yet
-    REQUIRE(rtree.header()->tree_depth.value() == 0);
-    REQUIRE(rtree.begin().parents().size() == 0);
-    REQUIRE(rtree.begin().leaf().node.full());
+}  // namespace
 
-    // for (auto [i, extent] : std::views::enumerate(rtree)) {
-    //  REQUIRE(extent.key == static_cast<uint32_t>(i));
-    //  REQUIRE(extent.value == static_cast<uint32_t>(i + 1));
-    //}
+TEST_CASE_METHOD(RTreeFixture, "RTree is empty after initialization", "[rtree][unit]") {
+  REQUIRE(rtree.size() == 0);
+}
 
+TEST_CASE_METHOD(RTreeFixture, "RTree sorted inserts grow through expected split depths", "[rtree][tree][white-box]") {
+  uint32_t index = 0;
+  for (int i = 0; i < 4; ++i) {
     REQUIRE(rtree.insert({index, index + 1}));
     ++index;
+  }
+  REQUIRE(rtree.size() == index);
+  REQUIRE(rtree.header()->tree_depth.value() == 0);
+  REQUIRE(rtree.begin().parents().size() == 0);
+  REQUIRE(rtree.begin().leaf().node.full());
 
-    auto it = rtree.begin();
-    REQUIRE(rtree.header()->tree_depth.value() == 1);
-    REQUIRE(it.parents().size() == 1);
-    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
-    // Should have splitted it to 3/1 + plus the new one
-    REQUIRE(it.leaf().node.size() == 3);
-    // Go to next node
-    for (int i = 0; i < 3; ++i)
-      ++it;
-    REQUIRE(it.leaf().node.size() == 2);
+  REQUIRE(rtree.insert({index, index + 1}));
+  ++index;
 
-    // Now fill the second one 5 more times
-    for (int i = 0; i < 3 * 5 - 1; ++i) {
-      REQUIRE(rtree.insert({index, index + 1}));
-      ++index;
-    }
-    REQUIRE(rtree.size() == index);
-    // Still one parent, but it is full now
-    it = rtree.end();
-    REQUIRE(rtree.header()->tree_depth.value() == 1);
-    REQUIRE(it.parents()[0].node.full());
-    REQUIRE(it.leaf().node.full());
+  auto it = rtree.begin();
+  REQUIRE(rtree.header()->tree_depth.value() == 1);
+  REQUIRE(it.parents().size() == 1);
+  REQUIRE(it.parents()[0].node.size() == 2);
+  REQUIRE(it.leaf().node.size() == 3);
+  for (int i = 0; i < 3; ++i) {
+    ++it;
+  }
+  REQUIRE(it.leaf().node.size() == 2);
 
+  for (int i = 0; i < 3 * 5 - 1; ++i) {
     REQUIRE(rtree.insert({index, index + 1}));
     ++index;
-    // new parent
-    it = rtree.end();
-    REQUIRE(rtree.header()->tree_depth.value() == 2);
-    REQUIRE(it.parents().size() == 2);
-    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2 + the new one
-    REQUIRE(it.leaf().node.size() == 2);
+  }
+  REQUIRE(rtree.size() == index);
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 1);
+  REQUIRE(it.parents()[0].node.full());
+  REQUIRE(it.leaf().node.full());
 
-    // Now fill our parent again 4 X 5 times
-    for (int i = 0; i < 3 * 4 * 5 - 1; ++i) {
-      REQUIRE(rtree.insert({index, index + 1}));
-      ++index;
-    }
-    REQUIRE(rtree.size() == index);
-    it = rtree.end();
-    // our parents should be full now
-    REQUIRE(rtree.header()->tree_depth.value() == 2);
-    REQUIRE(it.parents().size() == 2);
-    REQUIRE(it.parents()[0].node.full());
-    REQUIRE(it.parents()[1].node.full());
-    REQUIRE(it.leaf().node.full());
+  REQUIRE(rtree.insert({index, index + 1}));
+  ++index;
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 2);
+  REQUIRE(it.parents().size() == 2);
+  REQUIRE(it.parents()[0].node.size() == 2);
+  REQUIRE(it.parents()[1].node.size() == 3);
+  REQUIRE(it.leaf().node.size() == 2);
 
-    // Now we should grow by another depth
+  for (int i = 0; i < 3 * 4 * 5 - 1; ++i) {
     REQUIRE(rtree.insert({index, index + 1}));
     ++index;
+  }
+  REQUIRE(rtree.size() == index);
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 2);
+  REQUIRE(it.parents().size() == 2);
+  REQUIRE(it.parents()[0].node.full());
+  REQUIRE(it.parents()[1].node.full());
+  REQUIRE(it.leaf().node.full());
 
-    it = rtree.end();
-    REQUIRE(rtree.header()->tree_depth.value() == 3);
-    REQUIRE(it.parents().size() == 3);
-    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[2].node.size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.leaf().node.size() == 2);
+  REQUIRE(rtree.insert({index, index + 1}));
+  ++index;
 
-    // Now fill our parent again 4 X 4 X 5 times
-    for (int i = 0; i < 3 * 4 * 4 * 5 - 1; ++i) {
-      REQUIRE(rtree.insert({index, index + 1}));
-      ++index;
-    }
-    REQUIRE(rtree.size() == index);
-    it = rtree.end();
-    // our parents should be full now
-    REQUIRE(rtree.header()->tree_depth.value() == 3);
-    REQUIRE(it.parents().size() == 3);
-    REQUIRE(it.parents()[0].node.full());
-    REQUIRE(it.parents()[1].node.full());
-    REQUIRE(it.parents()[2].node.full());
-    REQUIRE(it.leaf().node.full());
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 3);
+  REQUIRE(it.parents().size() == 3);
+  REQUIRE(it.parents()[0].node.size() == 2);
+  REQUIRE(it.parents()[1].node.size() == 3);
+  REQUIRE(it.parents()[2].node.size() == 3);
+  REQUIRE(it.leaf().node.size() == 2);
 
-    // Now we should grow by another depth
+  for (int i = 0; i < 3 * 4 * 4 * 5 - 1; ++i) {
     REQUIRE(rtree.insert({index, index + 1}));
     ++index;
+  }
+  REQUIRE(rtree.size() == index);
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 3);
+  REQUIRE(it.parents().size() == 3);
+  REQUIRE(it.parents()[0].node.full());
+  REQUIRE(it.parents()[1].node.full());
+  REQUIRE(it.parents()[2].node.full());
+  REQUIRE(it.leaf().node.full());
 
-    it = rtree.end();
-    REQUIRE(rtree.header()->tree_depth.value() == 4);
-    REQUIRE(it.parents().size() == 4);
-    REQUIRE(it.parents()[0].node.size() == 2);  // the two splitted nodes
-    REQUIRE(it.parents()[1].node.size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[2].node.size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.parents()[3].node.size() == 3);  // should have been splitted 4/2
-    REQUIRE(it.leaf().node.size() == 2);
+  REQUIRE(rtree.insert({index, index + 1}));
+  ++index;
 
-    // Now fill our tree until full
-    while (rtree.insert({index, index + 1})) {
-      ++index;
-    }
-    REQUIRE(!rtree.begin().parents()[0].node.full());
+  it = rtree.end();
+  REQUIRE(rtree.header()->tree_depth.value() == 4);
+  REQUIRE(it.parents().size() == 4);
+  REQUIRE(it.parents()[0].node.size() == 2);
+  REQUIRE(it.parents()[1].node.size() == 3);
+  REQUIRE(it.parents()[2].node.size() == 3);
+  REQUIRE(it.parents()[3].node.size() == 3);
+  REQUIRE(it.leaf().node.size() == 2);
 
-    REQUIRE(std::ranges::equal(
-        std::views::transform(
-            rtree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
-        std::views::transform(std::views::iota(0, static_cast<int>(index)),
-                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
+  while (rtree.insert({index, index + 1})) {
+    ++index;
+  }
+  REQUIRE(!rtree.begin().parents()[0].node.full());
+  REQUIRE(CollectKeyValues(rtree) == SequentialKeyValues(index));
 
-    for (uint32_t i = 0; i < index; ++i) {
-      REQUIRE((*rtree.find(i, true)).key() == i);
-    }
+  for (uint32_t i = 0; i < index; ++i) {
+    CAPTURE(i);
+    REQUIRE((*rtree.find(i, true)).key() == i);
+  }
+}
+
+TEST_CASE_METHOD(RTreeFixture, "RTree keeps unsorted inserts ordered", "[rtree][tree][unit]") {
+  auto unsorted_keys = createShuffledKeysArray<kRTreeItems>();
+  for (auto key : unsorted_keys) {
+    REQUIRE(rtree.insert({key, key + 1}));
   }
 
-  SECTION("insert items unsorted") {
-    constexpr int kItemsCount = 500;
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    for (auto key : unsorted_keys) {
-      REQUIRE(rtree.insert({key, key + 1}));
-    }
+  auto sorted_keys = unsorted_keys;
+  std::ranges::sort(sorted_keys);
+  REQUIRE(CollectKeys(rtree) == sorted_keys);
+  REQUIRE(CollectKeyValues(rtree) == SequentialKeyValues(kRTreeItems));
+}
 
-    // Check that the tree is sorted
-    auto keys = std::views::transform(rtree, [](const auto& extent) -> uint32_t { return extent.key(); });
-    auto sorted_keys = unsorted_keys;
-    std::ranges::sort(sorted_keys);
-    REQUIRE(std::ranges::equal(keys, sorted_keys));
+TEST_CASE_METHOD(RTreeFixture, "RTree erases all sorted items and can be reused", "[rtree][tree][unit]") {
+  InsertSequential(rtree, kRTreeItems);
+  for (uint32_t i = 0; i < kRTreeItems; ++i) {
+    CAPTURE(i);
+    REQUIRE(rtree.erase(i));
+  }
+  REQUIRE(rtree.begin() == rtree.end());
+  REQUIRE(rtree.empty());
+  REQUIRE(rtree.header()->tree_depth.value() == 0);
 
-    REQUIRE(std::ranges::equal(
-        std::views::transform(
-            rtree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
-        std::views::transform(std::views::iota(0, static_cast<int>(kItemsCount)),
-                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
+  InsertSequential(rtree, kRTreeItems);
+  REQUIRE(CollectKeys(rtree) == SequentialKeys(kRTreeItems));
+}
+
+TEST_CASE_METHOD(RTreeFixture, "RTree erases shuffled items and collapses empty", "[rtree][tree][unit]") {
+  InsertSequential(rtree, kRTreeItems);
+
+  auto unsorted_keys = createShuffledKeysArray<kRTreeItems>();
+  auto middle = unsorted_keys.begin() + kRTreeItems / 2;
+  for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
+    CAPTURE(key);
+    REQUIRE(rtree.erase(key));
   }
 
-  SECTION("erase items after inserting") {
-    constexpr int kItemsCount = 500;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(rtree.insert({i, 0}));
-    }
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(rtree.erase(i));
-    }
-    REQUIRE(rtree.begin() == rtree.end());
-    REQUIRE(rtree.empty());
-    REQUIRE(rtree.header()->tree_depth.value() == 0);
+  auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
+  std::ranges::sort(sorted_upper_half);
+  REQUIRE(CollectKeys(rtree) == sorted_upper_half);
 
-    // Check that we can insert items again
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(rtree.insert({i, 0}));
-    }
-    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key(); }),
-                               std::ranges::iota_view(0, kItemsCount)));
+  for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
+    CAPTURE(key);
+    REQUIRE(rtree.erase(key));
   }
 
-  SECTION("erase items randomly") {
-    constexpr int kItemsCount = 500;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(rtree.insert({i, 0}));
-    }
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    auto middle = unsorted_keys.begin() + kItemsCount / 2;
-    // Remove half the items first
-    for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
-      REQUIRE(rtree.erase(key));
-    }
-
-    auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
-    std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(rtree, [](const auto& extent) -> int { return extent.key(); }),
-                               sorted_upper_half));
-
-    // Remove the second half
-    for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
-      REQUIRE(rtree.erase(key));
-    }
-
-    // Should be empty
-    REQUIRE(rtree.begin() == rtree.end());
-    REQUIRE(rtree.empty());
-    REQUIRE(rtree.header()->tree_depth.value() == 0);
-  }
+  REQUIRE(rtree.begin() == rtree.end());
+  REQUIRE(rtree.empty());
+  REQUIRE(rtree.header()->tree_depth.value() == 0);
 }
