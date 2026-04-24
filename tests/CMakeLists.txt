@@ -6,6 +6,7 @@ find_package(Catch2 CONFIG REQUIRED)
 enable_testing()
 
 set(WFSLIB_BEHAVIOR_TEST_SOURCES
+  block_tests.cpp
   eptree_tests.cpp
   file_layout_tests.cpp
   free_blocks_allocator_tests.cpp
