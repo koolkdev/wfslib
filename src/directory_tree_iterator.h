@@ -162,8 +162,7 @@ class DirectoryTreeIterator {
                               return std::ranges::to<std::string>(parent.node.prefix()) + (*parent.iterator).key();
                             }) |
                             std::views::join;
-    return std::ranges::to<std::string>(parent_key_parts) +
-           std::ranges::to<std::string>(leaf_->get_node().prefix());
+    return std::ranges::to<std::string>(parent_key_parts) + std::ranges::to<std::string>(leaf_->get_node().prefix());
   };
 
   Block* block_;
