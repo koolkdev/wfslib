@@ -60,6 +60,11 @@ class File::DataCategoryReader {
  protected:
   std::shared_ptr<File> file_;
 
+  size_t GetLayoutMetadataItemsCount() const {
+    return FileLayoutMetadataItemsCount(file_->metadata()->size_category.value(),
+                                        file_->metadata()->size_on_disk.value(), file_->quota()->block_size_log2());
+  }
+
   template <typename T, bool AlignToEnd = false>
   auto GetMetadata() const {
     const auto count = GetMetadataItemsCount();
@@ -87,7 +92,7 @@ class File::DataCategory0Reader : public File::DataCategoryReader {
   DataCategory0Reader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(std::byte); }
-  size_t GetMetadataItemsCount() const override { return file_->metadata()->size_on_disk.value(); }
+  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
     return GetMetadata<const std::byte>().subspan(offset, size);
@@ -107,9 +112,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
   RegularDataCategoryReader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlockMetadata); }
-  size_t GetMetadataItemsCount() const override {
-    return div_ceil_pow2(file_->metadata()->size_on_disk.value(), GetDataBlockSize());
-  }
+  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
     auto data_ref = GetFileDataRef(offset, size);
@@ -228,9 +231,7 @@ class File::DataCategory3Reader : public File::DataCategory2Reader {
   DataCategory3Reader(const std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlocksClusterMetadata); }
-  size_t GetMetadataItemsCount() const override {
-    return div_ceil_pow2(file_->metadata()->size_on_disk.value(), ClusterDataLog2Size());
-  }
+  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   FileDataRef GetFileDataRef(size_t offset, size_t size) override {
     return GetFileDataRefFromClustersList(
@@ -266,11 +267,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   DataCategory4Reader(const std::shared_ptr<File>& file) : DataCategory3Reader(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(uint32_be_t); }
-  size_t GetMetadataItemsCount() const override {
-    size_t data_blocks_clusters_count = div_ceil_pow2(file_->metadata()->size_on_disk.value(), ClusterDataLog2Size());
-    return FileLayoutCategory4MetadataBlocksCount(static_cast<uint32_t>(data_blocks_clusters_count),
-                                                  file_->quota()->block_size_log2());
-  }
+  size_t GetMetadataItemsCount() const override { return GetLayoutMetadataItemsCount(); }
 
   FileDataRef GetFileDataRef(size_t offset, size_t size) override {
     auto blocks_list = GetMetadata<const uint32_be_t, true>();

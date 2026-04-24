@@ -25,6 +25,8 @@ struct FileLayout {
 
 size_t FileLayoutBaseMetadataSize(uint8_t filename_length);
 uint32_t FileLayoutInlineCapacity(uint8_t filename_length);
+uint32_t FileLayoutDataUnitsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2);
+uint32_t FileLayoutMetadataItemsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2);
 uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
 uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);

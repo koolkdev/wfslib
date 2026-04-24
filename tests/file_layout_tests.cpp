@@ -123,6 +123,14 @@ TEST_CASE("File layout category 4 computes metadata block counts") {
   CHECK(FileLayoutCategory4MetadataBlocksCount(second_metadata_block.data_units_count, kBlockSizeLog2) == 2);
 }
 
+TEST_CASE("File layout metadata item counts match category storage units") {
+  CHECK(FileLayoutMetadataItemsCount(0, 7, kBlockSizeLog2) == 7);
+  CHECK(FileLayoutMetadataItemsCount(1, 5 * kSingleBlockSize, kBlockSizeLog2) == 5);
+  CHECK(FileLayoutMetadataItemsCount(2, 5 * kLargeBlockSize, kBlockSizeLog2) == 5);
+  CHECK(FileLayoutMetadataItemsCount(3, 4 * kClusterSize, kBlockSizeLog2) == 4);
+  CHECK(FileLayoutMetadataItemsCount(4, 49 * kClusterSize, kBlockSizeLog2) == 2);
+}
+
 TEST_CASE("File layout maximum shrink keeps the largest valid category") {
   CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength)).size_category == 0);
   CHECK(Maximum(FileLayoutInlineCapacity(kFilenameLength) + 1).size_category == 1);

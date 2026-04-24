@@ -40,25 +40,34 @@ uint8_t MetadataLog2Size(size_t metadata_size) {
   return log2_size;
 }
 
-size_t CategoryMetadataSize(uint8_t size_category,
-                            uint32_t size_on_disk,
-                            uint8_t block_size_log2,
-                            uint32_t data_units_count) {
-  const auto single_block_size = pow2<uint32_t>(block_size_log2);
-  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
-  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
+uint32_t CategoryDataUnitSize(uint8_t size_category, uint8_t block_size_log2) {
+  switch (size_category) {
+    case 0:
+    case 1:
+      return pow2<uint32_t>(block_size_log2);
+    case 2:
+      return pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+    case 3:
+    case 4:
+      return pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
+    default:
+      throw std::invalid_argument("Unexpected file layout category");
+  }
+}
+
+size_t CategoryMetadataSize(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2) {
+  const auto metadata_items_count = FileLayoutMetadataItemsCount(size_category, size_on_disk, block_size_log2);
 
   switch (size_category) {
     case 0:
-      return size_on_disk;
+      return metadata_items_count * sizeof(std::byte);
     case 1:
-      return div_ceil(size_on_disk, single_block_size) * sizeof(DataBlockMetadata);
     case 2:
-      return div_ceil(size_on_disk, large_block_size) * sizeof(DataBlockMetadata);
+      return metadata_items_count * sizeof(DataBlockMetadata);
     case 3:
-      return div_ceil(size_on_disk, cluster_size) * sizeof(DataBlocksClusterMetadata);
+      return metadata_items_count * sizeof(DataBlocksClusterMetadata);
     case 4:
-      return FileLayoutCategory4MetadataBlocksCount(data_units_count, block_size_log2) * sizeof(uint32_be_t);
+      return metadata_items_count * sizeof(uint32_be_t);
     default:
       throw std::invalid_argument("Unexpected file layout category");
   }
@@ -70,32 +79,28 @@ FileLayout BuildLayout(uint32_t file_size, uint8_t filename_length, uint8_t bloc
   const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
   uint32_t size_on_disk = file_size;
-  uint32_t data_units_count = 0;
   switch (size_category) {
     case 0:
       break;
     case 1:
       size_on_disk = RoundUpToUnit(file_size, single_block_size);
-      data_units_count = size_on_disk / single_block_size;
       break;
     case 2:
       size_on_disk = RoundUpToUnit(file_size, large_block_size);
-      data_units_count = size_on_disk / large_block_size;
       break;
     case 3:
       size_on_disk = RoundUpToUnit(file_size, cluster_size);
-      data_units_count = size_on_disk / cluster_size;
       break;
     case 4:
       size_on_disk = RoundUpToUnit(file_size, cluster_size);
-      data_units_count = size_on_disk / cluster_size;
       break;
     default:
       throw std::invalid_argument("Unexpected file layout category");
   }
+  const auto data_units_count = FileLayoutDataUnitsCount(size_category, size_on_disk, block_size_log2);
 
-  const auto metadata_size = FileLayoutBaseMetadataSize(filename_length) +
-                             CategoryMetadataSize(size_category, size_on_disk, block_size_log2, data_units_count);
+  const auto metadata_size =
+      FileLayoutBaseMetadataSize(filename_length) + CategoryMetadataSize(size_category, size_on_disk, block_size_log2);
   auto metadata_log2_size = MetadataLog2Size(metadata_size);
   if (size_category == 0 && metadata_log2_size > kCategory0MaxMetadataLog2Size)
     throw WfsException(WfsError::kFileTooLarge);
@@ -155,6 +160,21 @@ size_t FileLayoutBaseMetadataSize(uint8_t filename_length) {
 uint32_t FileLayoutInlineCapacity(uint8_t filename_length) {
   return static_cast<uint32_t>(pow2<uint32_t>(kCategory0MaxMetadataLog2Size) -
                                FileLayoutBaseMetadataSize(filename_length));
+}
+
+uint32_t FileLayoutDataUnitsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2) {
+  if (size_category == 0)
+    return 0;
+  return static_cast<uint32_t>(div_ceil(size_on_disk, CategoryDataUnitSize(size_category, block_size_log2)));
+}
+
+uint32_t FileLayoutMetadataItemsCount(uint8_t size_category, uint32_t size_on_disk, uint8_t block_size_log2) {
+  const auto data_units_count = FileLayoutDataUnitsCount(size_category, size_on_disk, block_size_log2);
+  if (size_category == 4)
+    return FileLayoutCategory4MetadataBlocksCount(data_units_count, block_size_log2);
+  if (size_category <= 3)
+    return size_category == 0 ? size_on_disk : data_units_count;
+  throw std::invalid_argument("Unexpected file layout category");
 }
 
 uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2) {
