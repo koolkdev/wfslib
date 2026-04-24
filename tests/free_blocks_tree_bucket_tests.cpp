@@ -12,204 +12,172 @@
 
 #include "free_blocks_tree_bucket.h"
 
-#include "utils/test_block.h"
-#include "utils/test_blocks_device.h"
-#include "utils/test_free_blocks_allocator.h"
+#include "utils/range_assertions.h"
+#include "utils/test_fixtures.h"
 #include "utils/test_utils.h"
 
-TEST_CASE("FreeBlocksTreeBucketTests") {
-  auto test_device = std::make_shared<TestBlocksDevice>();
-  auto allocator_block = TestBlock::LoadMetadataBlock(test_device, 0);
-  TestFreeBlocksAllocator allocator{allocator_block, test_device};
-  REQUIRE(allocator.Init(1000000));
+namespace {
 
+class FreeBlocksTreeBucketFixture : public FreeBlocksAllocatorFixture {
+ public:
+  FreeBlocksTreeBucketFixture() { allocator_initialized = allocator.Init(1000000); }
+
+  bool allocator_initialized = false;
   FreeBlocksTreeBucket bucket{&allocator, 3};
+};
 
-  SECTION("iterate empty tree") {
-    REQUIRE(std::distance(bucket.begin(), bucket.end()) == 0);
+constexpr int kFreeBlocksBucketStressItems = 600 * 300;
+
+}  // namespace
+
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket is empty after initialization",
+                 "[free-blocks][tree-bucket][unit]") {
+  REQUIRE(allocator_initialized);
+
+  REQUIRE(std::distance(bucket.begin(), bucket.end()) == 0);
+}
+
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket inserts sorted extents",
+                 "[free-blocks][tree-bucket][stress]") {
+  REQUIRE(allocator_initialized);
+
+  for (uint32_t i = 0; i < kFreeBlocksBucketStressItems; ++i) {
+    REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
   }
 
-  SECTION("insert items sorted") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
-    }
+  REQUIRE(CollectFreeExtents(bucket) == SequentialFreeExtents(kFreeBlocksBucketStressItems, 3));
 
-    REQUIRE(std::ranges::equal(
-        std::views::transform(bucket,
-                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {extent.key(), extent.value(), extent.bucket_index};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(3)};
-        })));
+  for (uint32_t i = 0; i < kFreeBlocksBucketStressItems; ++i) {
+    CAPTURE(i);
+    REQUIRE((*bucket.find(i, true)).key() == i);
+  }
+}
 
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*bucket.find(i, true)).key() == i);
-    }
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket keeps unsorted inserts ordered and searchable",
+                 "[free-blocks][tree-bucket][stress]") {
+  REQUIRE(allocator_initialized);
+
+  auto unsorted_keys = createShuffledKeysArray<kFreeBlocksBucketStressItems>();
+  for (auto key : unsorted_keys) {
+    REQUIRE(bucket.insert({key, static_cast<nibble>(key % 16)}));
   }
 
-  SECTION("insert items unsorted") {
-    constexpr int kItemsCount = 600 * 300;
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    for (auto key : unsorted_keys) {
-      REQUIRE(bucket.insert({key, static_cast<nibble>(key % 16)}));
-    }
+  auto sorted_keys = unsorted_keys;
+  std::ranges::sort(sorted_keys);
+  REQUIRE(CollectKeys(bucket) == sorted_keys);
+  REQUIRE(CollectFreeExtents(bucket) == SequentialFreeExtents(kFreeBlocksBucketStressItems, 3));
 
-    // Check that the tree is sorted
-    auto keys = std::views::transform(bucket, [](const auto& extent) -> uint32_t { return extent.key(); });
-    auto sorted_keys = unsorted_keys;
-    std::ranges::sort(sorted_keys);
-    REQUIRE(std::ranges::equal(sorted_keys, keys));
+  for (uint32_t i = 0; i < kFreeBlocksBucketStressItems; ++i) {
+    CAPTURE(i);
+    REQUIRE((*bucket.find(i, true)).key() == i);
+  }
+}
 
-    // Check the values
-    REQUIRE(std::ranges::equal(
-        std::views::transform(bucket,
-                              [](const auto& extent) -> std::tuple<uint32_t, nibble, size_t> {
-                                return {extent.key(), extent.value(), extent.bucket_index};
-                              }),
-        std::views::transform(std::views::iota(0, kItemsCount), [](int i) -> std::tuple<uint32_t, nibble, size_t> {
-          return {i, static_cast<nibble>(i % 16), static_cast<size_t>(3)};
-        })));
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket erases shuffled extents and releases backing blocks",
+                 "[free-blocks][tree-bucket][stress]") {
+  REQUIRE(allocator_initialized);
 
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*bucket.find(i, true)).key() == i);
-    }
+  for (uint32_t i = 0; i < kFreeBlocksBucketStressItems; ++i) {
+    REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
   }
 
-  SECTION("erase items randomly") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
-    }
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    auto middle = unsorted_keys.begin() + kItemsCount / 2;
-    std::vector<FreeBlocksRangeInfo> blocks_to_delete;
-    // Remove half the items first
-    for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
-      REQUIRE(bucket.erase(key, blocks_to_delete));
-    }
-
-    auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
-    std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(bucket, [](const auto& extent) -> int { return extent.key(); }),
-                               sorted_upper_half));
-
-    // Remove the second half
-    for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
-      REQUIRE(bucket.erase(key, blocks_to_delete));
-    }
-
-    // Should be empty
-    REQUIRE(bucket.begin() == bucket.end());
-
-    auto blocks_numbers_to_delete = std::ranges::to<std::vector>(
-        std::views::transform(blocks_to_delete, [](const FreeBlocksRangeInfo& range) { return range.block_number; }));
-
-    std::ranges::sort(blocks_numbers_to_delete);
-    // Check deleted blocks, everything beside first ftree should be deleted
-    REQUIRE(std::ranges::equal(blocks_numbers_to_delete, std::views::iota(allocator.initial_frees_block_number(),
-                                                                          allocator.AllocFreeBlockFromCache())));
+  auto unsorted_keys = createShuffledKeysArray<kFreeBlocksBucketStressItems>();
+  auto middle = unsorted_keys.begin() + kFreeBlocksBucketStressItems / 2;
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+  for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
+    CAPTURE(key);
+    REQUIRE(bucket.erase(key, blocks_to_delete));
   }
 
-  SECTION("empty ftree find") {
-    EPTree eptree{&allocator};
-    // Have three empty ftrees, check that items are added to the correct ones, and check how find works with them.
-    auto ftree_100_to_200_block_number = allocator.AllocFreeBlockFromCache();
-    auto ftree_100_to_200_block = allocator.LoadAllocatorBlock(ftree_100_to_200_block_number, true);
-    FTreesBlock{ftree_100_to_200_block}.Init();
-    REQUIRE(eptree.insert({100, ftree_100_to_200_block_number}));
-    auto ftree_200_plus_block_number = allocator.AllocFreeBlockFromCache();
-    auto ftree_200_plus_block = allocator.LoadAllocatorBlock(ftree_200_plus_block_number, true);
-    FTreesBlock{ftree_200_plus_block}.Init();
-    REQUIRE(eptree.insert({200, ftree_200_plus_block_number}));
+  auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
+  std::ranges::sort(sorted_upper_half);
+  REQUIRE(CollectKeys(bucket) == sorted_upper_half);
 
-    auto ftree_0_to_100_block = allocator.LoadAllocatorBlock(allocator.initial_ftrees_block_number(), false);
-    FTree ftree1{ftree_0_to_100_block, 3};
-    FTree ftree2{ftree_100_to_200_block, 3};
-    FTree ftree3{ftree_200_plus_block, 3};
-
-    REQUIRE(ftree1.empty());
-    REQUIRE(ftree2.empty());
-    REQUIRE(ftree3.empty());
-    REQUIRE(bucket.find(150, false) == bucket.end());
-
-    // insert to first ftree
-    REQUIRE(bucket.insert({50, nibble{0}}));
-    REQUIRE(ftree1.size() == 1);
-    REQUIRE(ftree2.empty());
-    REQUIRE(ftree3.empty());
-    REQUIRE(bucket.find(150, false) != bucket.end());
-    REQUIRE((*bucket.find(150, false)).key() == 50);
-    REQUIRE((*bucket.find(25, false)).key() == 50);
-    REQUIRE(std::ranges::equal(std::views::transform(bucket, [](const auto& extent) -> int { return extent.key(); }),
-                               std::list<uint32_t>{50}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket), [](const auto& extent) -> int { return extent.key(); }),
-        std::list<uint32_t>{50}));
-
-    REQUIRE(bucket.insert({160, nibble{0}}));
-    REQUIRE(ftree1.size() == 1);
-    REQUIRE(ftree2.size() == 1);
-    REQUIRE(ftree3.empty());
-    REQUIRE((*bucket.find(150, false)).key() == 50);
-    REQUIRE((*bucket.find(250, false)).key() == 160);
-    REQUIRE(std::ranges::equal(std::views::transform(bucket, [](const auto& extent) -> int { return extent.key(); }),
-                               std::list<uint32_t>{50, 160}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket), [](const auto& extent) -> int { return extent.key(); }),
-        std::list<uint32_t>{160, 50}));
-
-    std::vector<FreeBlocksRangeInfo> blocks_to_delete;
-    REQUIRE(bucket.erase(50, blocks_to_delete));
-    REQUIRE(blocks_to_delete.empty());  // first block should delete it
-    REQUIRE(ftree1.empty());
-    REQUIRE(ftree2.size() == 1);
-    REQUIRE(ftree3.empty());
-    REQUIRE((*bucket.find(150, false)).key() == 160);
-    REQUIRE((*bucket.find(250, false)).key() == 160);
-    REQUIRE((*bucket.find(25, false)).key() == 160);
-    REQUIRE(std::ranges::equal(std::views::transform(bucket, [](const auto& extent) -> int { return extent.key(); }),
-                               std::list<uint32_t>{160}));
-    REQUIRE(std::ranges::equal(
-        std::views::transform(std::views::reverse(bucket), [](const auto& extent) -> int { return extent.key(); }),
-        std::list<uint32_t>{160}));
+  for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
+    CAPTURE(key);
+    REQUIRE(bucket.erase(key, blocks_to_delete));
   }
 
-  SECTION("check backward/forward iterator") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
-    }
+  REQUIRE(bucket.begin() == bucket.end());
 
-    auto it = bucket.begin();
-    uint32_t steps = 0;
-    while (it != bucket.end()) {
-      REQUIRE((*it).key() == steps);
-      ++it;
-      ++steps;
-    }
-    REQUIRE(steps == kItemsCount);
-    REQUIRE(it.is_end());
-    while (it != bucket.begin()) {
-      --it;
-      --steps;
-      REQUIRE((*it).key() == steps);
-    }
-    REQUIRE(steps == 0);
-    REQUIRE(it.is_begin());
+  auto blocks_numbers_to_delete = CollectRange(blocks_to_delete, [](const FreeBlocksRangeInfo& range) {
+    return range.block_number;
+  });
+  std::ranges::sort(blocks_numbers_to_delete);
+  REQUIRE(blocks_numbers_to_delete ==
+          SequentialKeys(allocator.AllocFreeBlockFromCache() - allocator.initial_frees_block_number(),
+                         allocator.initial_frees_block_number()));
+}
 
-    for (int i = 0; i < 40; ++i) {
-      ++it;
-      ++steps;
-      REQUIRE((*it).key() == steps);
-    }
-    for (int i = 0; i < 20; ++i) {
-      --it;
-      --steps;
-      REQUIRE((*it).key() == steps);
-    }
-    REQUIRE((*it).key() == 20);
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket skips empty FTrees during non-exact find",
+                 "[free-blocks][tree-bucket][unit]") {
+  REQUIRE(allocator_initialized);
+
+  EPTree eptree{&allocator};
+  auto ftree_100_to_200_block_number = allocator.AllocFreeBlockFromCache();
+  auto ftree_100_to_200_block = allocator.LoadAllocatorBlock(ftree_100_to_200_block_number, true);
+  FTreesBlock{ftree_100_to_200_block}.Init();
+  REQUIRE(eptree.insert({100, ftree_100_to_200_block_number}));
+  auto ftree_200_plus_block_number = allocator.AllocFreeBlockFromCache();
+  auto ftree_200_plus_block = allocator.LoadAllocatorBlock(ftree_200_plus_block_number, true);
+  FTreesBlock{ftree_200_plus_block}.Init();
+  REQUIRE(eptree.insert({200, ftree_200_plus_block_number}));
+
+  auto ftree_0_to_100_block = allocator.LoadAllocatorBlock(allocator.initial_ftrees_block_number(), false);
+  FTree ftree1{ftree_0_to_100_block, 3};
+  FTree ftree2{ftree_100_to_200_block, 3};
+  FTree ftree3{ftree_200_plus_block, 3};
+
+  REQUIRE(ftree1.empty());
+  REQUIRE(ftree2.empty());
+  REQUIRE(ftree3.empty());
+  REQUIRE(bucket.find(150, false) == bucket.end());
+
+  REQUIRE(bucket.insert({50, nibble{0}}));
+  REQUIRE(ftree1.size() == 1);
+  REQUIRE(ftree2.empty());
+  REQUIRE(ftree3.empty());
+  REQUIRE(bucket.find(150, false) != bucket.end());
+  REQUIRE((*bucket.find(150, false)).key() == 50);
+  REQUIRE((*bucket.find(25, false)).key() == 50);
+  REQUIRE(CollectKeys(bucket) == std::vector<uint32_t>{50});
+  REQUIRE(CollectKeys(std::views::reverse(bucket)) == std::vector<uint32_t>{50});
+
+  REQUIRE(bucket.insert({160, nibble{0}}));
+  REQUIRE(ftree1.size() == 1);
+  REQUIRE(ftree2.size() == 1);
+  REQUIRE(ftree3.empty());
+  REQUIRE((*bucket.find(150, false)).key() == 50);
+  REQUIRE((*bucket.find(250, false)).key() == 160);
+  REQUIRE(CollectKeys(bucket) == std::vector<uint32_t>{50, 160});
+  REQUIRE(CollectKeys(std::views::reverse(bucket)) == std::vector<uint32_t>{160, 50});
+
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+  REQUIRE(bucket.erase(50, blocks_to_delete));
+  REQUIRE(blocks_to_delete.empty());
+  REQUIRE(ftree1.empty());
+  REQUIRE(ftree2.size() == 1);
+  REQUIRE(ftree3.empty());
+  REQUIRE((*bucket.find(150, false)).key() == 160);
+  REQUIRE((*bucket.find(250, false)).key() == 160);
+  REQUIRE((*bucket.find(25, false)).key() == 160);
+  REQUIRE(CollectKeys(bucket) == std::vector<uint32_t>{160});
+  REQUIRE(CollectKeys(std::views::reverse(bucket)) == std::vector<uint32_t>{160});
+}
+
+TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
+                 "FreeBlocksTreeBucket iterator walks forward and backward",
+                 "[free-blocks][tree-bucket][iterator][stress]") {
+  REQUIRE(allocator_initialized);
+
+  for (uint32_t i = 0; i < kFreeBlocksBucketStressItems; ++i) {
+    REQUIRE(bucket.insert({i, static_cast<nibble>(i % 16)}));
   }
+
+  RequireBidirectionalIteration(bucket, kFreeBlocksBucketStressItems, [](const auto& extent) { return extent.key(); });
 }

@@ -12,121 +12,91 @@
 
 #include "eptree.h"
 
-#include "utils/test_block.h"
-#include "utils/test_blocks_device.h"
-#include "utils/test_free_blocks_allocator.h"
+#include "utils/range_assertions.h"
+#include "utils/test_fixtures.h"
 #include "utils/test_utils.h"
 
-TEST_CASE("EPTreeTests") {
-  auto test_device = std::make_shared<TestBlocksDevice>();
-  auto allocator_block = TestBlock::LoadMetadataBlock(test_device, 0);
-  TestFreeBlocksAllocator allocator{allocator_block, test_device};
-  allocator.Init(1000000);
+namespace {
+
+class EPTreeFixture : public FreeBlocksAllocatorFixture {
+ public:
+  EPTreeFixture() {
+    allocator_initialized = allocator.Init(1000000);
+    eptree.Init(/*block_number=*/0);
+  }
+
   EPTree eptree{&allocator};
-  eptree.Init(/*block_number=*/0);
+  bool allocator_initialized = false;
+};
 
-  SECTION("insert items sorted") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(eptree.insert({i, i + 1}));
-    }
+constexpr uint32_t kEPTreeStressItems = 600 * 300;
 
-    REQUIRE(eptree.tree_header()->depth.value() == 3);
+}  // namespace
 
-    REQUIRE(std::ranges::equal(
-        std::views::transform(
-            eptree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
-        std::views::transform(std::views::iota(0, kItemsCount),
-                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
+TEST_CASE_METHOD(EPTreeFixture, "EPTree inserts sorted extents and grows depth", "[eptree][tree][stress]") {
+  REQUIRE(allocator_initialized);
+
+  for (uint32_t i = 0; i < kEPTreeStressItems; ++i) {
+    REQUIRE(eptree.insert({i, i + 1}));
   }
 
-  SECTION("insert items unsorted") {
-    constexpr int kItemsCount = 600 * 300;
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    for (auto key : unsorted_keys) {
-      REQUIRE(eptree.insert({key, key + 1}));
-    }
+  REQUIRE(eptree.tree_header()->depth.value() == 3);
+  REQUIRE(CollectKeyValues(eptree) == SequentialKeyValues(kEPTreeStressItems));
+}
 
-    // Check that the tree is sorted
-    auto keys = std::views::transform(eptree, [](const auto& extent) -> uint32_t { return extent.key(); });
-    auto sorted_keys = unsorted_keys;
-    std::ranges::sort(sorted_keys);
-    REQUIRE(std::ranges::equal(sorted_keys, keys));
+TEST_CASE_METHOD(EPTreeFixture, "EPTree keeps unsorted inserts ordered and searchable", "[eptree][tree][stress]") {
+  REQUIRE(allocator_initialized);
 
-    // Check the values
-    REQUIRE(std::ranges::equal(
-        std::views::transform(
-            eptree, [](const auto& extent) -> std::pair<uint32_t, uint32_t> { return {extent.key(), extent.value()}; }),
-        std::views::transform(std::views::iota(0, kItemsCount),
-                              [](int i) -> std::pair<uint32_t, uint32_t> { return {i, i + 1}; })));
-
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE((*eptree.find(i, true)).key() == i);
-    }
+  auto unsorted_keys = createShuffledKeysArray<kEPTreeStressItems>();
+  for (auto key : unsorted_keys) {
+    REQUIRE(eptree.insert({key, key + 1}));
   }
 
-  SECTION("erase items randomly") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(eptree.insert({i, 0}));
-    }
-    auto unsorted_keys = createShuffledKeysArray<kItemsCount>();
-    auto middle = unsorted_keys.begin() + kItemsCount / 2;
-    std::vector<FreeBlocksRangeInfo> blocks_to_delete;
-    // Remove half the items first
-    for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
-      REQUIRE(eptree.erase(key, blocks_to_delete));
-    }
+  auto sorted_keys = unsorted_keys;
+  std::ranges::sort(sorted_keys);
+  REQUIRE(CollectKeys(eptree) == sorted_keys);
+  REQUIRE(CollectKeyValues(eptree) == SequentialKeyValues(kEPTreeStressItems));
 
-    auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
-    std::ranges::sort(sorted_upper_half);
-    // Ensure that the right items were deleted
-    REQUIRE(std::ranges::equal(std::views::transform(eptree, [](const auto& extent) -> int { return extent.key(); }),
-                               sorted_upper_half));
+  for (uint32_t i = 0; i < kEPTreeStressItems; ++i) {
+    CAPTURE(i);
+    REQUIRE((*eptree.find(i, true)).key() == i);
+  }
+}
 
-    // Remove the second half
-    for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
-      REQUIRE(eptree.erase(key, blocks_to_delete));
-    }
+TEST_CASE_METHOD(EPTreeFixture, "EPTree erases shuffled extents and collapses to an empty root", "[eptree][tree][stress]") {
+  REQUIRE(allocator_initialized);
 
-    // Should be empty
-    REQUIRE(eptree.begin() == eptree.end());
-    REQUIRE(eptree.tree_header()->depth.value() == 1);
+  for (uint32_t i = 0; i < kEPTreeStressItems; ++i) {
+    REQUIRE(eptree.insert({i, 0}));
   }
 
-  SECTION("check backward/forward iterator") {
-    constexpr int kItemsCount = 600 * 300;
-    for (uint32_t i = 0; i < kItemsCount; ++i) {
-      REQUIRE(eptree.insert({i, i}));
-    }
-
-    auto it = eptree.begin();
-    uint32_t steps = 0;
-    while (it != eptree.end()) {
-      REQUIRE((*it).key() == steps);
-      ++it;
-      ++steps;
-    }
-    REQUIRE(steps == kItemsCount);
-    REQUIRE(it.is_end());
-    while (it != eptree.begin()) {
-      --it;
-      --steps;
-      REQUIRE((*it).key() == steps);
-    }
-    REQUIRE(steps == 0);
-    REQUIRE(it.is_begin());
-
-    for (int i = 0; i < 40; ++i) {
-      ++it;
-      ++steps;
-      REQUIRE((*it).key() == steps);
-    }
-    for (int i = 0; i < 20; ++i) {
-      --it;
-      --steps;
-      REQUIRE((*it).key() == steps);
-    }
-    REQUIRE((*it).key() == 20);
+  auto unsorted_keys = createShuffledKeysArray<kEPTreeStressItems>();
+  auto middle = unsorted_keys.begin() + kEPTreeStressItems / 2;
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+  for (auto key : std::ranges::subrange(unsorted_keys.begin(), middle)) {
+    CAPTURE(key);
+    REQUIRE(eptree.erase(key, blocks_to_delete));
   }
+
+  auto sorted_upper_half = std::ranges::to<std::vector>(std::ranges::subrange(middle, unsorted_keys.end()));
+  std::ranges::sort(sorted_upper_half);
+  REQUIRE(CollectKeys(eptree) == sorted_upper_half);
+
+  for (auto key : std::ranges::subrange(middle, unsorted_keys.end())) {
+    CAPTURE(key);
+    REQUIRE(eptree.erase(key, blocks_to_delete));
+  }
+
+  REQUIRE(eptree.begin() == eptree.end());
+  REQUIRE(eptree.tree_header()->depth.value() == 1);
+}
+
+TEST_CASE_METHOD(EPTreeFixture, "EPTree iterator walks forward and backward", "[eptree][tree][iterator][stress]") {
+  REQUIRE(allocator_initialized);
+
+  for (uint32_t i = 0; i < kEPTreeStressItems; ++i) {
+    REQUIRE(eptree.insert({i, i}));
+  }
+
+  RequireBidirectionalIteration(eptree, kEPTreeStressItems, [](const auto& extent) { return extent.key(); });
 }

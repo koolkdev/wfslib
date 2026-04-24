@@ -5,10 +5,7 @@ find_package(Catch2 CONFIG REQUIRED)
 
 enable_testing()
 
-add_executable(${PROJECT_NAME}
-  # Requirements: P2374R4 and P2164R9
-  $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_map_tests.cpp>
-  $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_tree_tests.cpp>
+set(WFSLIB_BEHAVIOR_TEST_SOURCES
   eptree_tests.cpp
   file_layout_tests.cpp
   free_blocks_allocator_tests.cpp
@@ -19,10 +16,31 @@ add_executable(${PROJECT_NAME}
   rtree_tests.cpp
   sub_block_allocator_tests.cpp
   tree_nodes_allocator_tests.cpp
+)
+
+# Requirements: P2374R4 and P2164R9.
+if(NOT CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  list(APPEND WFSLIB_BEHAVIOR_TEST_SOURCES
+    directory_map_tests.cpp
+    directory_tree_tests.cpp
+  )
+endif()
+
+set(WFSLIB_TEST_SUPPORT_SOURCES
   utils/test_area.cpp
   utils/test_block.cpp
   utils/test_blocks_device.cpp
   utils/test_free_blocks_allocator.cpp
+)
+
+add_executable(${PROJECT_NAME}
+  ${WFSLIB_BEHAVIOR_TEST_SOURCES}
+  ${WFSLIB_TEST_SUPPORT_SOURCES}
+)
+
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES
+  ${WFSLIB_BEHAVIOR_TEST_SOURCES}
+  ${WFSLIB_TEST_SUPPORT_SOURCES}
 )
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
