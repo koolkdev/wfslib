@@ -7,8 +7,8 @@ enable_testing()
 
 add_executable(${PROJECT_NAME}
   # Requirements: P2374R4 and P2164R9
-  $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_tree_tests.cpp>
   $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_map_tests.cpp>
+  $<$<NOT:$<CXX_COMPILER_ID:Clang>>:directory_tree_tests.cpp>
   eptree_tests.cpp
   file_layout_tests.cpp
   free_blocks_allocator_tests.cpp
