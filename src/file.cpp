@@ -62,7 +62,8 @@ class File::DataCategoryReader {
 
   size_t GetLayoutMetadataItemsCount() const {
     return FileLayoutMetadataItemsCount(file_->metadata()->size_category.value(),
-                                        file_->metadata()->size_on_disk.value(), file_->quota()->block_size_log2());
+                                        file_->metadata()->size_on_disk.value(),
+                                        static_cast<uint8_t>(file_->quota()->block_size_log2()));
   }
 
   template <typename T, bool AlignToEnd = false>
@@ -295,7 +296,7 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 
   size_t ClustersInBlock() const {
-    return FileLayoutCategory4ClustersPerMetadataBlock(file_->quota()->block_size_log2());
+    return FileLayoutCategory4ClustersPerMetadataBlock(static_cast<uint8_t>(file_->quota()->block_size_log2()));
   }
 };
 
