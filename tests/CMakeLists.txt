@@ -48,8 +48,8 @@ target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_23)
 target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
-  $<$<CXX_COMPILER_ID:Clang>:-Wno-c2y-extensions>
 )
+target_compile_definitions(${PROJECT_NAME} PRIVATE CATCH_CONFIG_NO_COUNTER)
 
 get_property(wfs_include_dirs TARGET wfslib PROPERTY INCLUDE_DIRECTORIES)
 
