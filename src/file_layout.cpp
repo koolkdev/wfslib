@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <bit>
+#include <cassert>
 #include <limits>
 #include <stdexcept>
 
@@ -104,8 +105,7 @@ FileLayout BuildLayout(uint32_t file_size,
   const auto metadata_size =
       FileLayout::BaseMetadataSize(filename_length) + CategoryMetadataSize(category, size_on_disk, block_size_log2);
   auto metadata_log2_size = MetadataLog2Size(metadata_size);
-  if (category == FileLayoutCategory::Inline && metadata_log2_size > kInlineMaxMetadataLog2Size)
-    throw WfsException(WfsError::kFileTooLarge);
+  assert(category != FileLayoutCategory::Inline || metadata_log2_size <= kInlineMaxMetadataLog2Size);
 
   return FileLayout{
       .category = category,
