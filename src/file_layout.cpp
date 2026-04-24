@@ -14,20 +14,15 @@
 
 #include "block.h"
 #include "errors.h"
+#include "file_layout_constants.h"
 #include "structs.h"
 #include "utils.h"
 
 namespace {
-constexpr uint8_t kMinMetadataLog2Size = 6;
-constexpr uint8_t kMaxMetadataLog2Size = 10;
-constexpr uint8_t kCategory0MaxMetadataLog2Size = 9;
-constexpr uint32_t kCategory1MaxSingleBlocks = 5;
-constexpr uint32_t kCategory2MaxLargeBlocks = 5;
-constexpr uint32_t kCategory3MaxClusters = 4;
-constexpr uint32_t kCategory4MaxMetadataBlocks = 237;
+using namespace file_layout_constants;
 
-uint32_t Pow2(uint8_t log2_size) {
-  return uint32_t{1} << log2_size;
+size_t DataBlockLog2Size(uint8_t block_size_log2, BlockType block_type) {
+  return static_cast<size_t>(block_size_log2) + static_cast<size_t>(log2_size(block_type));
 }
 
 uint32_t RoundUpToUnit(uint32_t size, uint32_t unit_size) {
@@ -41,17 +36,17 @@ uint32_t RoundUpToUnit(uint32_t size, uint32_t unit_size) {
 uint8_t MetadataLog2Size(size_t metadata_size) {
   auto log2_size = static_cast<uint8_t>(std::max<size_t>(kMinMetadataLog2Size, std::bit_width(metadata_size - 1)));
   if (log2_size > kMaxMetadataLog2Size)
-    throw WfsException(WfsError::kFileTooLarge);
+    throw std::invalid_argument("File layout metadata exceeds maximum WFS metadata allocation size");
   return log2_size;
 }
 
 size_t CategoryMetadataSize(uint8_t size_category,
                             uint32_t size_on_disk,
                             uint8_t block_size_log2,
-                            uint32_t category4_metadata_blocks_count) {
-  const auto single_block_size = Pow2(block_size_log2);
-  const auto large_block_size = Pow2(block_size_log2 + log2_size(BlockType::Large));
-  const auto cluster_size = Pow2(block_size_log2 + log2_size(BlockType::Cluster));
+                            uint32_t data_units_count) {
+  const auto single_block_size = pow2<uint32_t>(block_size_log2);
+  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
   switch (size_category) {
     case 0:
@@ -63,20 +58,19 @@ size_t CategoryMetadataSize(uint8_t size_category,
     case 3:
       return div_ceil(size_on_disk, cluster_size) * sizeof(DataBlocksClusterMetadata);
     case 4:
-      return category4_metadata_blocks_count * sizeof(uint32_be_t);
+      return FileLayoutCategory4MetadataBlocksCount(data_units_count, block_size_log2) * sizeof(uint32_be_t);
     default:
       throw std::invalid_argument("Unexpected file layout category");
   }
 }
 
 FileLayoutSpec BuildSpec(uint32_t file_size, uint8_t filename_length, uint8_t block_size_log2, uint8_t size_category) {
-  const auto single_block_size = Pow2(block_size_log2);
-  const auto large_block_size = Pow2(block_size_log2 + log2_size(BlockType::Large));
-  const auto cluster_size = Pow2(block_size_log2 + log2_size(BlockType::Cluster));
+  const auto single_block_size = pow2<uint32_t>(block_size_log2);
+  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
   uint32_t size_on_disk = file_size;
   uint32_t data_units_count = 0;
-  uint32_t category4_metadata_blocks_count = 0;
   switch (size_category) {
     case 0:
       break;
@@ -95,16 +89,13 @@ FileLayoutSpec BuildSpec(uint32_t file_size, uint8_t filename_length, uint8_t bl
     case 4:
       size_on_disk = RoundUpToUnit(file_size, cluster_size);
       data_units_count = size_on_disk / cluster_size;
-      category4_metadata_blocks_count = static_cast<uint32_t>(
-          div_ceil(data_units_count, FileLayoutCategory4ClustersPerMetadataBlock(block_size_log2)));
       break;
     default:
       throw std::invalid_argument("Unexpected file layout category");
   }
 
-  const auto metadata_size =
-      FileLayoutBaseMetadataSize(filename_length) +
-      CategoryMetadataSize(size_category, size_on_disk, block_size_log2, category4_metadata_blocks_count);
+  const auto metadata_size = FileLayoutBaseMetadataSize(filename_length) +
+                             CategoryMetadataSize(size_category, size_on_disk, block_size_log2, data_units_count);
   auto metadata_log2_size = MetadataLog2Size(metadata_size);
   if (size_category == 0 && metadata_log2_size > kCategory0MaxMetadataLog2Size)
     throw WfsException(WfsError::kFileTooLarge);
@@ -115,7 +106,6 @@ FileLayoutSpec BuildSpec(uint32_t file_size, uint8_t filename_length, uint8_t bl
       .file_size = file_size,
       .size_on_disk = size_on_disk,
       .data_units_count = data_units_count,
-      .category4_metadata_blocks_count = category4_metadata_blocks_count,
   };
 }
 
@@ -123,9 +113,9 @@ uint8_t MinimumCategory(uint32_t file_size, uint8_t filename_length, uint8_t blo
   if (file_size > FileLayoutMaxFileSize(block_size_log2))
     throw WfsException(WfsError::kFileTooLarge);
 
-  const auto single_block_size = Pow2(block_size_log2);
-  const auto large_block_size = Pow2(block_size_log2 + log2_size(BlockType::Large));
-  const auto cluster_size = Pow2(block_size_log2 + log2_size(BlockType::Cluster));
+  const auto single_block_size = pow2<uint32_t>(block_size_log2);
+  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
   if (file_size <= FileLayoutInlineCapacity(filename_length))
     return 0;
@@ -142,9 +132,9 @@ uint8_t MaximumCategory(uint32_t file_size, uint8_t filename_length, uint8_t blo
   if (file_size > FileLayoutMaxFileSize(block_size_log2))
     throw WfsException(WfsError::kFileTooLarge);
 
-  const auto single_block_size = Pow2(block_size_log2);
-  const auto large_block_size = Pow2(block_size_log2 + log2_size(BlockType::Large));
-  const auto cluster_size = Pow2(block_size_log2 + log2_size(BlockType::Cluster));
+  const auto single_block_size = pow2<uint32_t>(block_size_log2);
+  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
   if (file_size >= cluster_size)
     return 4;
@@ -163,18 +153,22 @@ size_t FileLayoutBaseMetadataSize(uint8_t filename_length) {
 }
 
 uint32_t FileLayoutInlineCapacity(uint8_t filename_length) {
-  return static_cast<uint32_t>((uint32_t{1} << kCategory0MaxMetadataLog2Size) -
+  return static_cast<uint32_t>(pow2<uint32_t>(kCategory0MaxMetadataLog2Size) -
                                FileLayoutBaseMetadataSize(filename_length));
 }
 
 uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2) {
-  return static_cast<uint32_t>(
-      std::min((Pow2(block_size_log2) - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata), size_t{48}));
+  return static_cast<uint32_t>(std::min(
+      (pow2<size_t>(block_size_log2) - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata), size_t{48}));
+}
+
+uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2) {
+  return static_cast<uint32_t>(div_ceil(clusters_count, FileLayoutCategory4ClustersPerMetadataBlock(block_size_log2)));
 }
 
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2) {
-  const auto cluster_size = uint64_t{1} << (block_size_log2 + log2_size(BlockType::Cluster));
-  const auto max_by_size_on_disk = (uint64_t{1} << 32) - cluster_size;
+  const auto cluster_size = pow2<uint64_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
+  const auto max_by_size_on_disk = pow2<uint64_t>(32) - cluster_size;
   const auto max_by_category4_metadata = uint64_t{kCategory4MaxMetadataBlocks} *
                                          FileLayoutCategory4ClustersPerMetadataBlock(block_size_log2) * cluster_size;
   return static_cast<uint32_t>(std::min(max_by_size_on_disk, max_by_category4_metadata));

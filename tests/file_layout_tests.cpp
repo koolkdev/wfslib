@@ -15,7 +15,8 @@
 
 namespace {
 constexpr uint8_t kFilenameLength = 16;
-constexpr uint8_t kBlockSizeLog2 = log2_size(BlockSize::Logical);
+constexpr uint8_t kBlockSizeLog2 = static_cast<uint8_t>(log2_size(BlockSize::Logical));
+constexpr uint8_t kPhysicalBlockSizeLog2 = static_cast<uint8_t>(log2_size(BlockSize::Physical));
 constexpr uint32_t kSingleBlockSize = uint32_t{1} << kBlockSizeLog2;
 constexpr uint32_t kLargeBlockSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(BlockType::Large));
 constexpr uint32_t kClusterSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(BlockType::Cluster));
@@ -53,7 +54,6 @@ TEST_CASE("File layout handles empty files") {
   CHECK(spec.file_size == 0);
   CHECK(spec.size_on_disk == 0);
   CHECK(spec.data_units_count == 0);
-  CHECK(spec.category4_metadata_blocks_count == 0);
 }
 
 TEST_CASE("File layout minimum category 1 thresholds are single blocks") {
@@ -109,18 +109,18 @@ TEST_CASE("File layout minimum category 3 thresholds are clusters") {
 
 TEST_CASE("File layout category 4 computes metadata block counts") {
   CHECK(FileLayoutCategory4ClustersPerMetadataBlock(kBlockSizeLog2) == 48);
-  CHECK(FileLayoutMaxFileSize(log2_size(BlockSize::Physical)) == 237 * 24 * (uint32_t{1} << 18));
+  CHECK(FileLayoutMaxFileSize(kPhysicalBlockSizeLog2) == 237 * 24 * (uint32_t{1} << 18));
   CHECK(FileLayoutMaxFileSize(kBlockSizeLog2) == 0xFFF80000);
 
   auto first_category4 = Minimum(4 * kClusterSize + 1);
   CHECK(first_category4.size_category == 4);
   CHECK(first_category4.data_units_count == 5);
-  CHECK(first_category4.category4_metadata_blocks_count == 1);
+  CHECK(FileLayoutCategory4MetadataBlocksCount(first_category4.data_units_count, kBlockSizeLog2) == 1);
 
   auto second_metadata_block = Minimum(48 * kClusterSize + 1);
   CHECK(second_metadata_block.size_category == 4);
   CHECK(second_metadata_block.data_units_count == 49);
-  CHECK(second_metadata_block.category4_metadata_blocks_count == 2);
+  CHECK(FileLayoutCategory4MetadataBlocksCount(second_metadata_block.data_units_count, kBlockSizeLog2) == 2);
 }
 
 TEST_CASE("File layout maximum shrink keeps the largest valid category") {

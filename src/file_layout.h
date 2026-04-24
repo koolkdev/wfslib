@@ -21,12 +21,12 @@ struct FileLayoutSpec {
   uint32_t file_size;
   uint32_t size_on_disk;
   uint32_t data_units_count;
-  uint32_t category4_metadata_blocks_count;
 };
 
 size_t FileLayoutBaseMetadataSize(uint8_t filename_length);
 uint32_t FileLayoutInlineCapacity(uint8_t filename_length);
 uint32_t FileLayoutCategory4ClustersPerMetadataBlock(uint8_t block_size_log2);
+uint32_t FileLayoutCategory4MetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
 uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
 
 FileLayoutSpec CalculateFileLayout(uint32_t file_size,
