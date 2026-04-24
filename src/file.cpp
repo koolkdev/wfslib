@@ -39,9 +39,9 @@ class File::DataCategoryReader {
 
   virtual size_t GetMetadataSize() const = 0;
   virtual size_t GetMetadataItemsCount() const {
-    return FileLayoutMetadataItemsCount(FileLayoutCategoryFromValue(file_->metadata()->size_category.value()),
-                                        file_->metadata()->size_on_disk.value(),
-                                        static_cast<uint8_t>(file_->quota()->block_size_log2()));
+    return FileLayout::MetadataItemsCount(FileLayout::CategoryFromValue(file_->metadata()->size_category.value()),
+                                          file_->metadata()->size_on_disk.value(),
+                                          static_cast<uint8_t>(file_->quota()->block_size_log2()));
   }
 
   virtual std::span<const std::byte> GetData(size_t offset, size_t size) = 0;
@@ -290,12 +290,12 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
   }
 
   size_t ClustersInBlock() const {
-    return FileLayoutClustersPerClusterMetadataBlock(static_cast<uint8_t>(file_->quota()->block_size_log2()));
+    return FileLayout::ClustersPerClusterMetadataBlock(static_cast<uint8_t>(file_->quota()->block_size_log2()));
   }
 };
 
 std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<File> file) {
-  switch (FileLayoutCategoryFromValue(file->metadata()->size_category.value())) {
+  switch (FileLayout::CategoryFromValue(file->metadata()->size_category.value())) {
     case FileLayoutCategory::Inline:
       return std::make_shared<DataCategory0Reader>(file);
     case FileLayoutCategory::Blocks:

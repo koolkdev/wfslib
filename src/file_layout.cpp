@@ -60,7 +60,7 @@ uint32_t CategoryDataUnitSize(FileLayoutCategory category, uint8_t block_size_lo
 }
 
 size_t CategoryMetadataSize(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2) {
-  const auto metadata_items_count = FileLayoutMetadataItemsCount(category, size_on_disk, block_size_log2);
+  const auto metadata_items_count = FileLayout::MetadataItemsCount(category, size_on_disk, block_size_log2);
 
   switch (category) {
     case FileLayoutCategory::Inline:
@@ -99,10 +99,10 @@ FileLayout BuildLayout(uint32_t file_size,
       size_on_disk = RoundUpToUnit(file_size, cluster_size);
       break;
   }
-  const auto data_units_count = FileLayoutDataUnitsCount(category, size_on_disk, block_size_log2);
+  const auto data_units_count = FileLayout::DataUnitsCount(category, size_on_disk, block_size_log2);
 
   const auto metadata_size =
-      FileLayoutBaseMetadataSize(filename_length) + CategoryMetadataSize(category, size_on_disk, block_size_log2);
+      FileLayout::BaseMetadataSize(filename_length) + CategoryMetadataSize(category, size_on_disk, block_size_log2);
   auto metadata_log2_size = MetadataLog2Size(metadata_size);
   if (category == FileLayoutCategory::Inline && metadata_log2_size > kInlineMaxMetadataLog2Size)
     throw WfsException(WfsError::kFileTooLarge);
@@ -117,14 +117,14 @@ FileLayout BuildLayout(uint32_t file_size,
 }
 
 FileLayoutCategory MinimumCategory(uint32_t file_size, uint8_t filename_length, uint8_t block_size_log2) {
-  if (file_size > FileLayoutMaxFileSize(block_size_log2))
+  if (file_size > FileLayout::MaxFileSize(block_size_log2))
     throw WfsException(WfsError::kFileTooLarge);
 
   const auto single_block_size = pow2<uint32_t>(block_size_log2);
   const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
   const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
 
-  if (file_size <= FileLayoutInlineCapacity(filename_length))
+  if (file_size <= FileLayout::InlineCapacity(filename_length))
     return FileLayoutCategory::Inline;
   if (file_size <= kBlocksMaxCount * single_block_size)
     return FileLayoutCategory::Blocks;
@@ -136,7 +136,7 @@ FileLayoutCategory MinimumCategory(uint32_t file_size, uint8_t filename_length, 
 }
 
 FileLayoutCategory MaximumCategory(uint32_t file_size, uint8_t filename_length, uint8_t block_size_log2) {
-  if (file_size > FileLayoutMaxFileSize(block_size_log2))
+  if (file_size > FileLayout::MaxFileSize(block_size_log2))
     throw WfsException(WfsError::kFileTooLarge);
 
   const auto single_block_size = pow2<uint32_t>(block_size_log2);
@@ -149,22 +149,22 @@ FileLayoutCategory MaximumCategory(uint32_t file_size, uint8_t filename_length, 
     return FileLayoutCategory::Clusters;
   if (file_size > single_block_size)
     return FileLayoutCategory::LargeBlocks;
-  if (file_size > FileLayoutInlineCapacity(filename_length))
+  if (file_size > FileLayout::InlineCapacity(filename_length))
     return FileLayoutCategory::Blocks;
   return FileLayoutCategory::Inline;
 }
 }  // namespace
 
-size_t FileLayoutBaseMetadataSize(uint8_t filename_length) {
+size_t FileLayout::BaseMetadataSize(uint8_t filename_length) {
   return offsetof(EntryMetadata, case_bitmap) + div_ceil(filename_length, 8);
 }
 
-uint32_t FileLayoutInlineCapacity(uint8_t filename_length) {
+uint32_t FileLayout::InlineCapacity(uint8_t filename_length) {
   return static_cast<uint32_t>(pow2<uint32_t>(kInlineMaxMetadataLog2Size) -
-                               FileLayoutBaseMetadataSize(filename_length));
+                               FileLayout::BaseMetadataSize(filename_length));
 }
 
-FileLayoutCategory FileLayoutCategoryFromValue(uint8_t value) {
+FileLayoutCategory FileLayout::CategoryFromValue(uint8_t value) {
   switch (value) {
     case 0:
       return FileLayoutCategory::Inline;
@@ -181,44 +181,45 @@ FileLayoutCategory FileLayoutCategoryFromValue(uint8_t value) {
   }
 }
 
-uint8_t FileLayoutCategoryValue(FileLayoutCategory category) {
+uint8_t FileLayout::CategoryValue(FileLayoutCategory category) {
   return static_cast<uint8_t>(category);
 }
 
-uint32_t FileLayoutDataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2) {
+uint32_t FileLayout::DataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2) {
   if (category == FileLayoutCategory::Inline)
     return 0;
   return static_cast<uint32_t>(div_ceil(size_on_disk, CategoryDataUnitSize(category, block_size_log2)));
 }
 
-uint32_t FileLayoutMetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2) {
-  const auto data_units_count = FileLayoutDataUnitsCount(category, size_on_disk, block_size_log2);
+uint32_t FileLayout::MetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2) {
+  const auto data_units_count = FileLayout::DataUnitsCount(category, size_on_disk, block_size_log2);
   if (category == FileLayoutCategory::ClusterMetadataBlocks)
-    return FileLayoutClusterMetadataBlocksCount(data_units_count, block_size_log2);
+    return FileLayout::ClusterMetadataBlocksCount(data_units_count, block_size_log2);
   return category == FileLayoutCategory::Inline ? size_on_disk : data_units_count;
 }
 
-uint32_t FileLayoutClustersPerClusterMetadataBlock(uint8_t block_size_log2) {
+uint32_t FileLayout::ClustersPerClusterMetadataBlock(uint8_t block_size_log2) {
   return static_cast<uint32_t>(std::min(
       (pow2<size_t>(block_size_log2) - sizeof(MetadataBlockHeader)) / sizeof(DataBlocksClusterMetadata), size_t{48}));
 }
 
-uint32_t FileLayoutClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2) {
-  return static_cast<uint32_t>(div_ceil(clusters_count, FileLayoutClustersPerClusterMetadataBlock(block_size_log2)));
+uint32_t FileLayout::ClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2) {
+  return static_cast<uint32_t>(div_ceil(clusters_count, FileLayout::ClustersPerClusterMetadataBlock(block_size_log2)));
 }
 
-uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2) {
+uint32_t FileLayout::MaxFileSize(uint8_t block_size_log2) {
   const auto cluster_size = pow2<uint64_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
   const auto max_by_size_on_disk = pow2<uint64_t>(32) - cluster_size;
   const auto max_by_cluster_metadata_blocks = uint64_t{kClusterMetadataBlocksMaxCount} *
-                                              FileLayoutClustersPerClusterMetadataBlock(block_size_log2) * cluster_size;
+                                              FileLayout::ClustersPerClusterMetadataBlock(block_size_log2) *
+                                              cluster_size;
   return static_cast<uint32_t>(std::min(max_by_size_on_disk, max_by_cluster_metadata_blocks));
 }
 
-FileLayout CalculateFileLayout(uint32_t file_size,
-                               uint8_t filename_length,
-                               uint8_t block_size_log2,
-                               FileLayoutMode mode) {
+FileLayout FileLayout::Calculate(uint32_t file_size,
+                                 uint8_t filename_length,
+                                 uint8_t block_size_log2,
+                                 FileLayoutMode mode) {
   const auto category = mode == FileLayoutMode::MinimumForGrow
                             ? MinimumCategory(file_size, filename_length, block_size_log2)
                             : MaximumCategory(file_size, filename_length, block_size_log2);

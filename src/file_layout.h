@@ -29,19 +29,19 @@ struct FileLayout {
   uint32_t file_size;
   uint32_t size_on_disk;
   uint32_t data_units_count;
+
+  static size_t BaseMetadataSize(uint8_t filename_length);
+  static uint32_t InlineCapacity(uint8_t filename_length);
+  static FileLayoutCategory CategoryFromValue(uint8_t value);
+  static uint8_t CategoryValue(FileLayoutCategory category);
+  static uint32_t DataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
+  static uint32_t MetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
+  static uint32_t ClustersPerClusterMetadataBlock(uint8_t block_size_log2);
+  static uint32_t ClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
+  static uint32_t MaxFileSize(uint8_t block_size_log2);
+
+  static FileLayout Calculate(uint32_t file_size,
+                              uint8_t filename_length,
+                              uint8_t block_size_log2,
+                              FileLayoutMode mode);
 };
-
-size_t FileLayoutBaseMetadataSize(uint8_t filename_length);
-uint32_t FileLayoutInlineCapacity(uint8_t filename_length);
-FileLayoutCategory FileLayoutCategoryFromValue(uint8_t value);
-uint8_t FileLayoutCategoryValue(FileLayoutCategory category);
-uint32_t FileLayoutDataUnitsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
-uint32_t FileLayoutMetadataItemsCount(FileLayoutCategory category, uint32_t size_on_disk, uint8_t block_size_log2);
-uint32_t FileLayoutClustersPerClusterMetadataBlock(uint8_t block_size_log2);
-uint32_t FileLayoutClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
-uint32_t FileLayoutMaxFileSize(uint8_t block_size_log2);
-
-FileLayout CalculateFileLayout(uint32_t file_size,
-                               uint8_t filename_length,
-                               uint8_t block_size_log2,
-                               FileLayoutMode mode);
