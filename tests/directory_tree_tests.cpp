@@ -73,10 +73,10 @@ std::vector<std::string> CartesianDirectoryKeys() {
   auto two_char_keys = std::views::cartesian_product(chars, chars) | std::views::transform(to_key);
   auto three_char_keys = std::views::cartesian_product(chars, chars, chars) | std::views::transform(to_key);
   auto four_char_keys = std::views::cartesian_product(chars, chars, chars, chars) | std::views::transform(to_key);
-  auto one_char = std::ranges::to<std::vector<std::string>>(one_char_keys);
-  auto two_chars = std::ranges::to<std::vector<std::string>>(two_char_keys);
-  auto three_chars = std::ranges::to<std::vector<std::string>>(three_char_keys);
-  auto four_chars = std::ranges::to<std::vector<std::string>>(four_char_keys);
+  auto one_char = std::ranges::to<std::vector>(one_char_keys);
+  auto two_chars = std::ranges::to<std::vector>(two_char_keys);
+  auto three_chars = std::ranges::to<std::vector>(three_char_keys);
+  auto four_chars = std::ranges::to<std::vector>(four_char_keys);
   auto keys = std::ranges::to<std::vector>(std::views::join(std::vector{one_char, two_chars, three_chars, four_chars}));
   std::ranges::sort(keys);
   return keys;

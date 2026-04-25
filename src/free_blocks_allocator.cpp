@@ -481,7 +481,7 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
   for (const auto& range : used_ranges)
     std::ranges::for_each(range.extents,
                           std::bind(&FreeBlocksAllocator::RemoveFreeBlocksExtent, this, std::placeholders::_1));
-  return std::ranges::to<std::vector<FreeBlocksRangeInfo>>(
+  return std::ranges::to<std::vector>(
       used_ranges | std::views::transform([](const auto& x) { return x.range; }));
 }
 

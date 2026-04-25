@@ -105,7 +105,7 @@ std::expected<std::vector<QuotaArea::QuotaFragment>, WfsError> QuotaArea::AllocA
     return std::unexpected(kNoSpace);
   auto to_quota_fragment = [](const auto& frag) { return QuotaFragment{frag.block_number, frag.blocks_count}; };
   auto quota_fragments = *res | std::views::transform(to_quota_fragment);
-  return std::ranges::to<std::vector<QuotaFragment>>(quota_fragments);
+  return std::ranges::to<std::vector>(quota_fragments);
 }
 
 bool QuotaArea::DeleteBlocks(uint32_t block_number, uint32_t blocks_count) {
@@ -157,7 +157,7 @@ void QuotaArea::Init(std::shared_ptr<Area> parent_area,
 
   auto free_blocks_allocator =
       std::make_unique<FreeBlocksAllocator>(shared_from_this(), std::move(free_blocks_allocator_block));
-  auto quota_free_blocks = std::ranges::to<std::vector<FreeBlocksRangeInfo>>(
+  auto quota_free_blocks = std::ranges::to<std::vector>(
       fragments | std::views::transform([&](const auto& frag) {
         return FreeBlocksRangeInfo{
             to_area_block_number(parent_area ? parent_area->to_physical_block_number(frag.block_number)
