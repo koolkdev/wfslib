@@ -19,9 +19,7 @@ Entry::~Entry() = default;
 // static
 std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<QuotaArea> quota,
                                                             std::string name,
-                                                            MetadataRef metadata_ref,
-                                                            MetadataUpdater metadata_updater,
-                                                            MetadataRefresher metadata_refresher) {
+                                                            MetadataRef metadata_ref) {
   auto* metadata = metadata_ref.get();
   if (metadata->is_link()) {
     // TODO, I think that the link info is in the metadata metadata
@@ -42,8 +40,7 @@ std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<Quot
     }
   } else {
     // IsFile()
-    return std::make_shared<File>(std::move(name), std::move(metadata_ref), std::move(quota),
-                                  std::move(metadata_updater), std::move(metadata_refresher));
+    return std::make_shared<File>(std::move(name), std::move(metadata_ref), std::move(quota));
   }
 }
 

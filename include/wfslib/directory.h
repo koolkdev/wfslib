@@ -31,10 +31,10 @@ class Directory : public Entry, public std::enable_shared_from_this<Directory> {
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(std::string_view name) const;
   std::expected<std::shared_ptr<File>, WfsError> GetFile(std::string_view name) const;
 
-  size_t size() const { return map_->size(); }
+  size_t size() const { return map_.size(); }
 
-  iterator begin() const { return {map_->begin(), map_}; }
-  iterator end() const { return {map_->end(), map_}; }
+  iterator begin() const { return {map_.begin()}; }
+  iterator end() const { return {map_.end()}; }
 
   iterator find(std::string_view key) const;
 
@@ -46,5 +46,5 @@ class Directory : public Entry, public std::enable_shared_from_this<Directory> {
   std::shared_ptr<QuotaArea> quota_;
   std::shared_ptr<Block> block_;
 
-  std::shared_ptr<DirectoryMap> map_;
+  DirectoryMap map_;
 };
