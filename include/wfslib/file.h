@@ -16,15 +16,15 @@
 class QuotaArea;
 
 class File : public Entry, public std::enable_shared_from_this<File> {
- public:
-  class DataCategoryReader;
-  class DataCategory0Reader;
-  class RegularDataCategoryReader;
-  class DataCategory1Reader;
-  class DataCategory2Reader;
-  class DataCategory3Reader;
-  class DataCategory4Reader;
+  class LayoutAccessor;
+  class InlineLayoutAccessor;
+  class BlockListLayoutAccessor;
+  class BlocksLayoutAccessor;
+  class LargeBlocksLayoutAccessor;
+  class ClustersLayoutAccessor;
+  class ClusterMetadataBlocksLayoutAccessor;
 
+ public:
   File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota)
       : Entry(std::move(name), std::move(metadata)), quota_(std::move(quota)) {}
 
@@ -48,19 +48,17 @@ class File : public Entry, public std::enable_shared_from_this<File> {
    private:
     size_t size() const;
     std::shared_ptr<File> file_;
-    std::shared_ptr<DataCategoryReader> reader_;
+    std::shared_ptr<LayoutAccessor> layout_;
     boost::iostreams::stream_offset pos_;
   };
 
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
-  class DataLayoutAccessor;
-
   std::shared_ptr<QuotaArea> quota() const { return quota_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;
 
-  static std::shared_ptr<DataCategoryReader> CreateReader(std::shared_ptr<File> file);
+  static std::shared_ptr<LayoutAccessor> CreateLayoutAccessor(std::shared_ptr<File> file);
 };

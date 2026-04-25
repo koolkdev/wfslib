@@ -9,19 +9,16 @@
 
 #include <algorithm>
 #include <cassert>
+#include <iterator>
 #include <ranges>
+#include <stdexcept>
 #include <type_traits>
+#include <vector>
 
 #include "block.h"
 #include "file_layout.h"
 #include "quota_area.h"
 #include "structs.h"
-
-struct FileDataRef {
-  std::shared_ptr<Block> data_block;
-  size_t offset_in_block;
-  size_t size;
-};
 
 uint32_t File::Size() const {
   return metadata()->file_size.value();
@@ -35,10 +32,10 @@ bool File::IsEncrypted() const {
   return !(metadata()->flags.value() & EntryMetadata::UNENCRYPTED_FILE);
 }
 
-class File::DataLayoutAccessor {
+class File::LayoutAccessor {
   template <typename T, bool AlignToEnd = false>
   auto Metadata() const {
-    const auto count = MetadataItemsCount();
+    const auto count = GetMetadataItemsCount();
     const auto file_metadata_size = sizeof(T) * count;
     const auto base_metadata_size = file_->metadata()->size();
     auto* metadata = [&]() {
@@ -57,52 +54,69 @@ class File::DataLayoutAccessor {
   }
 
  public:
+  struct DataRef {
+    std::shared_ptr<Block> data_block;
+    size_t offset_in_block;
+    size_t size;
+  };
+
   struct BlockPosition {
     size_t index;
     size_t offset;
     size_t offset_in_block;
   };
 
-  DataLayoutAccessor(const std::shared_ptr<File>& file) : file_(file) {}
+  struct DataBlockRef {
+    uint32_t block_number;
+    BlockType block_type;
+    size_t offset;
+    size_t size;
+    Block::HashRef hash;
+  };
 
-  size_t MetadataItemsCount() const {
+  LayoutAccessor(const std::shared_ptr<File>& file) : file_(file) {}
+  virtual ~LayoutAccessor() {}
+
+  virtual size_t GetMetadataSize() const = 0;
+  virtual size_t GetMetadataItemsCount() const {
     return FileLayout::MetadataItemsCount(FileLayout::CategoryFromValue(file_->metadata()->size_category.value()),
                                           file_->metadata()->size_on_disk.value(), file_->quota()->block_size_log2());
   }
 
-  auto InlinePayload() const { return Metadata<const std::byte>(); }
-  auto MutableInlinePayload() const { return Metadata<std::byte>(); }
-  auto DataBlockRefs() const { return Metadata<const DataBlockMetadata, true>(); }
-  auto ClusterRefs() const { return Metadata<const DataBlocksClusterMetadata, true>(); }
-  auto ClusterMetadataBlockRefs() const { return Metadata<const uint32_be_t, true>(); }
-
-  BlockPosition BlockPositionForOffset(size_t offset, size_t log2_block_size) const {
-    auto [index, offset_in_block] = div_pow2(offset, log2_block_size);
-    return {index, floor_pow2(offset, log2_block_size), offset_in_block};
-  }
-
-  size_t DataBlockLog2Size(BlockType type) const { return file_->quota()->block_size_log2() + log2_size(type); }
-
-  size_t ClusterDataLog2Size() const { return DataBlockLog2Size(BlockType::Cluster); }
-
-  size_t ClustersPerMetadataBlock() const {
-    return FileLayout::ClustersPerClusterMetadataBlock(file_->quota()->block_size_log2());
-  }
-
- private:
-  std::shared_ptr<File> file_;
-};
-
-class File::DataCategoryReader {
- public:
-  DataCategoryReader(const std::shared_ptr<File>& file) : file_(file), layout_(file) {}
-  virtual ~DataCategoryReader() {}
-
-  virtual size_t GetMetadataSize() const = 0;
-  virtual size_t GetMetadataItemsCount() const { return layout_.MetadataItemsCount(); }
-
   virtual std::span<const std::byte> GetData(size_t offset, size_t size) = 0;
   virtual std::span<std::byte> GetMutableData(size_t offset, size_t size) = 0;
+
+  virtual DataRef GetDataRef(size_t offset, size_t size) {
+    (void)offset;
+    (void)size;
+    throw std::runtime_error("Layout does not store data in external blocks");
+  }
+
+  virtual std::vector<DataBlockRef> EnumerateBlocks() const { return {}; }
+
+  void CopyTo(LayoutAccessor& destination, size_t bytes) {
+    std::vector<std::byte> buffer(std::min(bytes, size_t{1} << file_->quota()->block_size_log2()));
+    size_t offset = 0;
+    while (offset < bytes) {
+      const auto chunk_size = std::min(bytes - offset, buffer.size());
+      const auto read = Read(buffer.data(), offset, chunk_size);
+      if (read == 0)
+        throw std::runtime_error("Failed to copy file layout data");
+      const auto wrote = destination.Write(buffer.data(), offset, read);
+      if (wrote != read)
+        throw std::runtime_error("Failed to write file layout data");
+      offset += wrote;
+    }
+  }
+
+  virtual void ResizeLastBlock(size_t file_size) { (void)file_size; }
+
+  virtual void FreeOwnedBlocks() {
+    for (const auto& block : EnumerateBlocks()) {
+      if (!file_->quota()->DeleteBlocks(block.block_number, uint32_t{1} << log2_size(block.block_type)))
+        throw WfsException(WfsError::kFreeBlocksAllocatorCorrupted);
+    }
+  }
 
   size_t Read(std::byte* output, size_t offset, size_t size) {
     auto data = GetData(offset, size);
@@ -119,22 +133,53 @@ class File::DataCategoryReader {
   virtual void Resize(size_t new_size) = 0;
 
  protected:
+  auto InlinePayload() const { return Metadata<const std::byte>(); }
+  auto MutableInlinePayload() const { return Metadata<std::byte>(); }
+  auto DataBlockRefs() const { return Metadata<const DataBlockMetadata, true>(); }
+  auto MutableDataBlockRefs() const { return Metadata<DataBlockMetadata, true>(); }
+  auto ClusterRefs() const { return Metadata<const DataBlocksClusterMetadata, true>(); }
+  auto MutableClusterRefs() const { return Metadata<DataBlocksClusterMetadata, true>(); }
+  auto ClusterMetadataBlockRefs() const { return Metadata<const uint32_be_t, true>(); }
+  auto MutableClusterMetadataBlockRefs() const { return Metadata<uint32_be_t, true>(); }
+
+  BlockPosition BlockPositionForOffset(size_t offset, size_t log2_block_size) const {
+    auto [index, offset_in_block] = div_pow2(offset, log2_block_size);
+    return {index, floor_pow2(offset, log2_block_size), offset_in_block};
+  }
+
+  size_t DataBlockLog2Size(BlockType type) const { return file_->quota()->block_size_log2() + log2_size(type); }
+
+  size_t ClusterDataLog2Size() const { return DataBlockLog2Size(BlockType::Cluster); }
+
+  size_t ClustersPerMetadataBlock() const {
+    return FileLayout::ClustersPerClusterMetadataBlock(file_->quota()->block_size_log2());
+  }
+
+  uint32_t DataSizeForBlock(size_t file_size, size_t block_offset, size_t log2_block_size) const {
+    if (file_size <= block_offset)
+      return 0;
+    return static_cast<uint32_t>(std::min(size_t{1} << log2_block_size, file_size - block_offset));
+  }
+
+  Block::HashRef HashRef(const std::shared_ptr<Block>& hash_block, const uint8_be_t* hash) const {
+    return {hash_block, hash_block->to_offset(hash)};
+  }
+
   std::shared_ptr<File> file_;
-  DataLayoutAccessor layout_;
 };
 
 // Category 0 - File data is in the attribute metadata (limited to 512 bytes minus attribute size) (no minumum)
-class File::DataCategory0Reader : public File::DataCategoryReader {
+class File::InlineLayoutAccessor : public File::LayoutAccessor {
  public:
-  DataCategory0Reader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
+  InlineLayoutAccessor(const std::shared_ptr<File>& file) : LayoutAccessor(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(std::byte); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
-    return layout_.InlinePayload().subspan(offset, size);
+    return InlinePayload().subspan(offset, size);
   }
   std::span<std::byte> GetMutableData(size_t offset, size_t size) override {
-    return layout_.MutableInlinePayload().subspan(offset, size);
+    return MutableInlinePayload().subspan(offset, size);
   }
 
   void Resize(size_t new_size) override {
@@ -143,42 +188,53 @@ class File::DataCategory0Reader : public File::DataCategoryReader {
   }
 };
 
-class File::RegularDataCategoryReader : public File::DataCategoryReader {
+class File::BlockListLayoutAccessor : public File::LayoutAccessor {
  public:
-  RegularDataCategoryReader(const std::shared_ptr<File>& file) : DataCategoryReader(file) {}
+  BlockListLayoutAccessor(const std::shared_ptr<File>& file) : LayoutAccessor(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlockMetadata); }
 
   std::span<const std::byte> GetData(size_t offset, size_t size) override {
-    auto data_ref = GetFileDataRef(offset, size);
+    auto data_ref = GetDataRef(offset, size);
     return data_ref.data_block->data().subspan(data_ref.offset_in_block, data_ref.size);
   }
 
   std::span<std::byte> GetMutableData(size_t offset, size_t size) override {
-    auto data_ref = GetFileDataRef(offset, size);
+    auto data_ref = GetDataRef(offset, size);
     return data_ref.data_block->mutable_data().subspan(data_ref.offset_in_block, data_ref.size);
   }
 
-  FileDataRef GetDataFromBlock(uint32_t block_number,
-                               size_t block_offset,
-                               size_t offset_in_block,
-                               size_t size,
-                               const std::shared_ptr<Block>& hash_block,
-                               const uint8_be_t* hash) {
-    LoadDataBlock(block_number,
-                  std::min(uint32_t{1} << GetDataBlockSize(),
-                           static_cast<uint32_t>(file_->metadata()->file_size.value() - block_offset)),
-                  {hash_block, hash_block->to_offset(hash)});
+  DataRef GetDataRef(size_t offset, size_t size) override {
+    return GetDataRef(offset, size, file_->metadata()->file_size.value());
+  }
+
+  std::vector<DataBlockRef> EnumerateBlocks() const override {
+    return EnumerateDataBlockRefs(DataBlockRefs(), /*start_offset=*/0, file_->metadata()->size_on_disk.value(),
+                                  GetDataBlockType(), GetDataBlockSize());
+  }
+
+  void ResizeLastBlock(size_t file_size) override {
+    if (file_size == 0)
+      return;
+
+    auto data_ref = GetDataRef(file_size - 1, 1, file_size);
+    data_ref.data_block->Resize(static_cast<uint32_t>(data_ref.offset_in_block + 1));
+  }
+
+  DataRef GetDataFromBlock(DataBlockRef block_ref, size_t offset_in_block, size_t size) {
+    LoadDataBlock(block_ref.block_number, static_cast<uint32_t>(block_ref.size), std::move(block_ref.hash));
     size = std::min(size, current_data_block->size() - offset_in_block);
     return {current_data_block, offset_in_block, size};
   }
 
-  virtual FileDataRef GetFileDataRef(size_t offset, size_t size) {
-    auto blocks_list = layout_.DataBlockRefs();
-    auto block_position = layout_.BlockPositionForOffset(offset, GetDataBlockSize());
-    return GetDataFromBlock(blocks_list[block_position.index].block_number.value(), block_position.offset,
-                            block_position.offset_in_block, size, file_->metadata_block(),
-                            blocks_list[block_position.index].hash);
+  virtual DataRef GetDataRef(size_t offset, size_t size, size_t file_size) {
+    auto blocks_list = DataBlockRefs();
+    auto block_position = BlockPositionForOffset(offset, GetDataBlockSize());
+    auto block_ref =
+        DataBlockRef{blocks_list[block_position.index].block_number.value(), GetDataBlockType(), block_position.offset,
+                     DataSizeForBlock(file_size, block_position.offset, GetDataBlockSize()),
+                     HashRef(file_->metadata_block(), blocks_list[block_position.index].hash)};
+    return GetDataFromBlock(std::move(block_ref), block_position.offset_in_block, size);
   }
 
   void Resize(size_t new_size) override {
@@ -190,7 +246,7 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
         // Just update last block
         if (new_size > 0) {
           // Minus 1 because if it is right at the end of the block, we will get the next block
-          auto chunk_info = GetFileDataRef(new_size - 1, 1);
+          auto chunk_info = GetDataRef(new_size - 1, 1);
           current_block = chunk_info.data_block;
           new_block_size = std::min(chunk_info.offset_in_block + 1, size_t{1} << GetDataBlockSize());
         }
@@ -199,14 +255,14 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
         if (old_size & ((1 << GetDataBlockSize()) - 1)) {
           // We need to incrase the size of the last block
           // Minus 1 because if it is right at the end of the block, we will get the next block
-          auto chunk_info = GetFileDataRef(old_size - 1, 1);
+          auto chunk_info = GetDataRef(old_size - 1, 1);
           current_block = chunk_info.data_block;
           new_block_size =
               std::min(chunk_info.offset_in_block + 1 + (new_size - old_size), size_t{1} << GetDataBlockSize());
           old_size += new_block_size - (chunk_info.offset_in_block + 1);
         } else {
           // Open new block, the size of the loaded block will be 0
-          auto chunk_info = GetFileDataRef(old_size, 0);
+          auto chunk_info = GetDataRef(old_size, 0);
           current_block = chunk_info.data_block;
           assert(chunk_info.offset_in_block == 0);
           new_block_size = std::min(new_size - old_size, size_t{1} << GetDataBlockSize());
@@ -222,8 +278,30 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
 
  protected:
   virtual BlockType GetDataBlockType() const = 0;
-  virtual size_t GetDataBlockSize() const { return layout_.DataBlockLog2Size(GetDataBlockType()); }
+  virtual size_t GetDataBlockSize() const { return DataBlockLog2Size(GetDataBlockType()); }
   std::shared_ptr<Block> current_data_block;
+
+  template <typename DataBlocks>
+  std::vector<DataBlockRef> EnumerateDataBlockRefs(DataBlocks&& blocks,
+                                                   size_t start_offset,
+                                                   size_t size,
+                                                   BlockType block_type,
+                                                   size_t log2_block_size) const {
+    std::vector<DataBlockRef> refs;
+    refs.reserve(blocks.size());
+
+    size_t block_offset = start_offset;
+    for (const auto& block : blocks) {
+      if (block_offset >= start_offset + size)
+        break;
+      refs.push_back({block.block_number.value(), block_type, block_offset,
+                      DataSizeForBlock(start_offset + size, block_offset, log2_block_size),
+                      HashRef(file_->metadata_block(), block.hash)});
+      block_offset += size_t{1} << log2_block_size;
+    }
+
+    return refs;
+  }
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
     if (current_data_block &&
@@ -240,9 +318,9 @@ class File::RegularDataCategoryReader : public File::DataCategoryReader {
 
 // Category 1 - File data in regluar blocks, in the attribute metadata there is a reversed list of block numbers and
 // hashes. Limited to 5 blocks. (no minumum)
-class File::DataCategory1Reader : public File::RegularDataCategoryReader {
+class File::BlocksLayoutAccessor : public File::BlockListLayoutAccessor {
  public:
-  DataCategory1Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
+  BlocksLayoutAccessor(const std::shared_ptr<File>& file) : BlockListLayoutAccessor(file) {}
 
  protected:
   BlockType GetDataBlockType() const override { return BlockType::Single; }
@@ -250,9 +328,9 @@ class File::DataCategory1Reader : public File::RegularDataCategoryReader {
 
 // Category 2 - File data in large block (8 regular blocks), in the attribute metadata there is a reversed list of block
 // numbers and hashes. Limited to 5 large blocks. (minimum size of more than 1 regular block)
-class File::DataCategory2Reader : public File::RegularDataCategoryReader {
+class File::LargeBlocksLayoutAccessor : public File::BlockListLayoutAccessor {
  public:
-  DataCategory2Reader(const std::shared_ptr<File>& file) : RegularDataCategoryReader(file) {}
+  LargeBlocksLayoutAccessor(const std::shared_ptr<File>& file) : BlockListLayoutAccessor(file) {}
 
  protected:
   BlockType GetDataBlockType() const override { return BlockType::Large; }
@@ -261,56 +339,118 @@ class File::DataCategory2Reader : public File::RegularDataCategoryReader {
 // Category 3 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is a
 // reversed list of block number and 8 hashes for each cluster. Limited to 4 clusters. (minimum size of more than 1
 // large block)
-class File::DataCategory3Reader : public File::DataCategory2Reader {
+class File::ClustersLayoutAccessor : public File::LargeBlocksLayoutAccessor {
  public:
-  DataCategory3Reader(const std::shared_ptr<File>& file) : DataCategory2Reader(file) {}
+  ClustersLayoutAccessor(const std::shared_ptr<File>& file) : LargeBlocksLayoutAccessor(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(DataBlocksClusterMetadata); }
 
-  FileDataRef GetFileDataRef(size_t offset, size_t size) override {
-    return GetFileDataRefFromClustersList(/*cluster_list_start=*/0, offset, size, file_->metadata_block(),
-                                          layout_.ClusterRefs());
+  DataRef GetDataRef(size_t offset, size_t size, size_t file_size) override {
+    return GetDataRefFromClustersList(/*cluster_list_start=*/0, offset, size, file_size, file_->metadata_block(),
+                                      ClusterRefs());
+  }
+
+  std::vector<DataBlockRef> EnumerateBlocks() const override {
+    return EnumerateClusterDataBlockRefs(/*cluster_list_start=*/0, file_->metadata_block(), ClusterRefs(),
+                                         file_->metadata()->size_on_disk.value());
   }
 
  protected:
   template <typename ClusterArray>
-  FileDataRef GetFileDataRefFromClustersList(size_t cluster_list_start,
-                                             size_t offset,
-                                             size_t size,
-                                             const std::shared_ptr<Block>& metadata_block,
-                                             ClusterArray&& clusters_list) {
+  DataRef GetDataRefFromClustersList(size_t cluster_list_start,
+                                     size_t offset,
+                                     size_t size,
+                                     size_t file_size,
+                                     const std::shared_ptr<Block>& metadata_block,
+                                     ClusterArray&& clusters_list) {
     auto offset_in_cluster_list = offset - (cluster_list_start << ClusterDataLog2Size());
     auto [cluster_index, offset_in_cluster] = div_pow2(offset_in_cluster_list, ClusterDataLog2Size());
-    auto block_position = layout_.BlockPositionForOffset(offset_in_cluster, GetDataBlockSize());
+    auto block_position = BlockPositionForOffset(offset_in_cluster, GetDataBlockSize());
     auto block_offset = floor_pow2(offset, GetDataBlockSize());
-    return GetDataFromBlock(clusters_list[cluster_index].block_number.value() +
-                                static_cast<uint32_t>(block_position.index << log2_size(GetDataBlockType())),
-                            block_offset, block_position.offset_in_block, size, metadata_block,
-                            clusters_list[cluster_index].hash[block_position.index]);
+    return GetDataFromBlock(
+        {clusters_list[cluster_index].block_number.value() +
+             static_cast<uint32_t>(block_position.index << log2_size(GetDataBlockType())),
+         GetDataBlockType(), block_offset, DataSizeForBlock(file_size, block_offset, GetDataBlockSize()),
+         HashRef(metadata_block, clusters_list[cluster_index].hash[block_position.index])},
+        block_position.offset_in_block, size);
   }
 
-  size_t ClusterDataLog2Size() const { return layout_.ClusterDataLog2Size(); }
+  template <typename ClusterArray>
+  std::vector<DataBlockRef> EnumerateClusterDataBlockRefs(size_t cluster_list_start,
+                                                          const std::shared_ptr<Block>& metadata_block,
+                                                          ClusterArray&& clusters_list,
+                                                          size_t size) const {
+    std::vector<DataBlockRef> refs;
+    refs.reserve(clusters_list.size() * (size_t{1} << log2_size(BlockType::Cluster) >> log2_size(GetDataBlockType())));
+
+    size_t cluster_offset = cluster_list_start << ClusterDataLog2Size();
+    for (const auto& cluster : clusters_list) {
+      if (cluster_offset >= size)
+        break;
+      for (size_t block_index = 0; block_index < std::size(cluster.hash); ++block_index) {
+        auto block_offset = cluster_offset + (block_index << GetDataBlockSize());
+        if (block_offset >= size)
+          break;
+        refs.push_back(
+            {cluster.block_number.value() + static_cast<uint32_t>(block_index << log2_size(GetDataBlockType())),
+             GetDataBlockType(), block_offset, DataSizeForBlock(size, block_offset, GetDataBlockSize()),
+             HashRef(metadata_block, cluster.hash[block_index])});
+      }
+      cluster_offset += size_t{1} << ClusterDataLog2Size();
+    }
+
+    return refs;
+  }
+
+  size_t ClusterDataLog2Size() const { return LayoutAccessor::ClusterDataLog2Size(); }
 };
 
 // Category 4 - File data in clusters of large block (8 large blocksblocks), in the attribute metadata there is list of
 // block numbers of metadata block with lists of block number and 8 hashes for each cluster. Limited to 237 metadata
 // blocks of lists. (max file size) (minumum size of more/equal than 1 cluster)
-class File::DataCategory4Reader : public File::DataCategory3Reader {
+class File::ClusterMetadataBlocksLayoutAccessor : public File::ClustersLayoutAccessor {
  public:
-  DataCategory4Reader(const std::shared_ptr<File>& file) : DataCategory3Reader(file) {}
+  ClusterMetadataBlocksLayoutAccessor(const std::shared_ptr<File>& file) : ClustersLayoutAccessor(file) {}
 
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(uint32_be_t); }
 
-  FileDataRef GetFileDataRef(size_t offset, size_t size) override {
-    auto blocks_list = layout_.ClusterMetadataBlockRefs();
+  DataRef GetDataRef(size_t offset, size_t size, size_t file_size) override {
+    auto blocks_list = ClusterMetadataBlockRefs();
     auto cluster_index = offset >> ClusterDataLog2Size();
     int64_t block_index = cluster_index / ClustersInBlock();
     LoadMetadataBlock(blocks_list[block_index].value());
-    return GetFileDataRefFromClustersList(
-        block_index * ClustersInBlock(), offset, size, current_metadata_block,
+    return GetDataRefFromClustersList(
+        block_index * ClustersInBlock(), offset, size, file_size, current_metadata_block,
         std::span<const DataBlocksClusterMetadata>{
             current_metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)),
             ClustersInBlock()});
+  }
+
+  std::vector<DataBlockRef> EnumerateBlocks() const override {
+    std::vector<DataBlockRef> refs;
+    auto blocks_list = ClusterMetadataBlockRefs();
+    size_t cluster_list_start = 0;
+    for (const auto& block_number : blocks_list) {
+      if (cluster_list_start << ClusterDataLog2Size() >= file_->metadata()->size_on_disk.value())
+        break;
+      const auto metadata_block = throw_if_error(file_->quota()->LoadMetadataBlock(block_number.value()));
+      auto block_refs = EnumerateClusterDataBlockRefs(
+          cluster_list_start, metadata_block,
+          std::span<const DataBlocksClusterMetadata>{
+              metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)), ClustersInBlock()},
+          file_->metadata()->size_on_disk.value());
+      refs.insert(refs.end(), block_refs.begin(), block_refs.end());
+      cluster_list_start += ClustersInBlock();
+    }
+    return refs;
+  }
+
+  void FreeOwnedBlocks() override {
+    ClustersLayoutAccessor::FreeOwnedBlocks();
+    for (const auto& block_number : ClusterMetadataBlockRefs()) {
+      if (!file_->quota()->DeleteBlocks(block_number.value(), 1))
+        throw WfsException(WfsError::kFreeBlocksAllocatorCorrupted);
+    }
   }
 
  protected:
@@ -326,21 +466,21 @@ class File::DataCategory4Reader : public File::DataCategory3Reader {
     current_metadata_block = std::move(*metadata_block);
   }
 
-  size_t ClustersInBlock() const { return layout_.ClustersPerMetadataBlock(); }
+  size_t ClustersInBlock() const { return ClustersPerMetadataBlock(); }
 };
 
-std::shared_ptr<File::DataCategoryReader> File::CreateReader(std::shared_ptr<File> file) {
+std::shared_ptr<File::LayoutAccessor> File::CreateLayoutAccessor(std::shared_ptr<File> file) {
   switch (FileLayout::CategoryFromValue(file->metadata()->size_category.value())) {
     case FileLayoutCategory::Inline:
-      return std::make_shared<DataCategory0Reader>(file);
+      return std::make_shared<InlineLayoutAccessor>(file);
     case FileLayoutCategory::Blocks:
-      return std::make_shared<DataCategory1Reader>(file);
+      return std::make_shared<BlocksLayoutAccessor>(file);
     case FileLayoutCategory::LargeBlocks:
-      return std::make_shared<DataCategory2Reader>(file);
+      return std::make_shared<LargeBlocksLayoutAccessor>(file);
     case FileLayoutCategory::Clusters:
-      return std::make_shared<DataCategory3Reader>(file);
+      return std::make_shared<ClustersLayoutAccessor>(file);
     case FileLayoutCategory::ClusterMetadataBlocks:
-      return std::make_shared<DataCategory4Reader>(file);
+      return std::make_shared<ClusterMetadataBlocksLayoutAccessor>(file);
   }
   throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
 }
@@ -350,11 +490,12 @@ void File::Resize(size_t new_size) {
   new_size = std::min(new_size, static_cast<size_t>(metadata_.get()->size_on_disk.value()));
   size_t old_size = metadata_.get()->file_size.value();
   if (new_size != old_size) {
-    CreateReader(shared_from_this())->Resize(new_size);
+    CreateLayoutAccessor(shared_from_this())->Resize(new_size);
   }
 }
 
-File::file_device::file_device(const std::shared_ptr<File>& file) : file_(file), reader_(CreateReader(file)), pos_(0) {}
+File::file_device::file_device(const std::shared_ptr<File>& file)
+    : file_(file), layout_(CreateLayoutAccessor(file)), pos_(0) {}
 
 size_t File::file_device::size() const {
   return file_->metadata()->file_size.value();
@@ -370,7 +511,7 @@ std::streamsize File::file_device::read(char_type* s, std::streamsize n) {
   std::streamsize to_read = result;
   while (to_read > 0) {
     size_t read =
-        reader_->Read(reinterpret_cast<std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_read));
+        layout_->Read(reinterpret_cast<std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_read));
     s += read;
     pos_ += read;
     to_read -= read;
@@ -382,7 +523,7 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n) 
   if (n > amt) {
     // Try to resize file
     // TODO: This call can't stay like that when we will need to allocate new pages and even change the category
-    reader_->Resize(std::min(static_cast<size_t>(file_->SizeOnDisk()), static_cast<size_t>(pos_ + n)));
+    layout_->Resize(std::min(static_cast<size_t>(file_->SizeOnDisk()), static_cast<size_t>(pos_ + n)));
     amt = static_cast<std::streamsize>(size() - pos_);
   }
   std::streamsize result = std::min(n, amt);
@@ -393,7 +534,7 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n) 
   std::streamsize to_write = result;
   while (to_write > 0) {
     size_t wrote =
-        reader_->Write(reinterpret_cast<const std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_write));
+        layout_->Write(reinterpret_cast<const std::byte*>(s), static_cast<size_t>(pos_), static_cast<size_t>(to_write));
     s += wrote;
     pos_ += wrote;
     to_write -= wrote;
