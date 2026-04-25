@@ -55,6 +55,8 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
+  class DataLayoutAccessor;
+
   std::shared_ptr<QuotaArea> quota() const { return quota_; }
 
   // TODO: We may have cyclic reference here if we do cache in area.
