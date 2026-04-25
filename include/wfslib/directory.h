@@ -25,16 +25,19 @@ class Directory : public Entry, public std::enable_shared_from_this<Directory> {
   using iterator = DirectoryIterator;
 
   // TODO: Replace name with tree iterator?
-  Directory(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota, std::shared_ptr<Block> block);
+  Directory(std::string name,
+            MetadataHandlePtr metadata,
+            std::shared_ptr<QuotaArea> quota,
+            std::shared_ptr<DirectoryMap> map);
 
   std::expected<std::shared_ptr<Entry>, WfsError> GetEntry(std::string_view name) const;
   std::expected<std::shared_ptr<Directory>, WfsError> GetDirectory(std::string_view name) const;
   std::expected<std::shared_ptr<File>, WfsError> GetFile(std::string_view name) const;
 
-  size_t size() const { return map_.size(); }
+  size_t size() const { return map_->size(); }
 
-  iterator begin() const { return {map_.begin()}; }
-  iterator end() const { return {map_.end()}; }
+  iterator begin() const { return {map_, map_->begin()}; }
+  iterator end() const { return {map_, map_->end()}; }
 
   iterator find(std::string_view key) const;
 
@@ -44,7 +47,6 @@ class Directory : public Entry, public std::enable_shared_from_this<Directory> {
   friend class Recovery;
 
   std::shared_ptr<QuotaArea> quota_;
-  std::shared_ptr<Block> block_;
 
-  DirectoryMap map_;
+  std::shared_ptr<DirectoryMap> map_;
 };

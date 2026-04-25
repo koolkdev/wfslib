@@ -17,6 +17,7 @@
 #include <vector>
 
 #include <wfslib/wfs_device.h>
+#include <wfslib/file.h>
 
 #include "directory_map.h"
 #include "free_blocks_allocator.h"
@@ -58,6 +59,17 @@ void InsertFixedSizeEntries(DirectoryMap& dir_tree, uint32_t entries_count, int 
   TestEntryMetadata metadata(6);
   for (uint32_t i = 0; i < entries_count; ++i) {
     metadata.data()->flags = i;
+    REQUIRE(dir_tree.insert(EntryName(i, width), metadata.data()));
+  }
+}
+
+void InsertFixedSizeFiles(DirectoryMap& dir_tree, uint32_t entries_count, int width = 5) {
+  TestEntryMetadata metadata(6);
+  metadata.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+  metadata.data()->filename_length = static_cast<uint8_t>(width);
+  for (uint32_t i = 0; i < entries_count; ++i) {
+    metadata.data()->file_size = i;
+    metadata.data()->size_on_disk = i;
     REQUIRE(dir_tree.insert(EntryName(i, width), metadata.data()));
   }
 }
@@ -279,6 +291,64 @@ TEST_CASE_METHOD(DirectoryMapFixture,
     REQUIRE(dir_tree.erase(EntryName(i)));
   }
   CHECK(free_blocks == (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count());
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap refreshes live metadata handles after a leaf split",
+                 "[directory-map][white-box]") {
+  auto block = *wfs_device->GetRootArea()->AllocMetadataBlock();
+  auto map = std::make_shared<DirectoryMap>(wfs_device->GetRootArea(), block);
+  map->Init();
+  InsertFixedSizeFiles(*map, 80);
+
+  constexpr uint32_t kLiveIndex = 10;
+  auto live_it = map->find(EntryName(kLiveIndex));
+  REQUIRE(!live_it.is_end());
+  auto live_entry = map->LoadEntry(live_it);
+  REQUIRE(live_entry.has_value());
+  auto live_file = std::dynamic_pointer_cast<File>(*live_entry);
+  REQUIRE(live_file);
+  CHECK(live_file->Size() == kLiveIndex);
+
+  SubBlockAllocator<DirectoryTreeHeader> allocator{block};
+  while (allocator.Alloc(8)) {
+  }
+
+  TestEntryMetadata replacement(8);
+  replacement.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+  replacement.data()->filename_length = 5;
+  replacement.data()->file_size = 40;
+  replacement.data()->size_on_disk = 40;
+  auto result = map->replace_metadata(EntryName(40), replacement.data());
+  REQUIRE(result.has_value());
+
+  auto current_live = map->find(EntryName(kLiveIndex));
+  REQUIRE(!current_live.is_end());
+  (*current_live).metadata.get_mutable()->file_size = 1234;
+  CHECK(live_file->Size() == 1234);
+}
+
+TEST_CASE_METHOD(MetadataBlockFixture,
+                 "WfsDevice returns the same live file instance for repeated path lookups",
+                 "[directory-map][cache]") {
+  auto wfs_device = *WfsDevice::Create(test_device);
+  auto root_area = wfs_device->GetRootArea();
+  auto root_block = *root_area->LoadMetadataBlock(3, /*new_block=*/true);
+  DirectoryMap root_map{root_area, root_block};
+  root_map.Init();
+
+  TestEntryMetadata metadata(6);
+  metadata.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+  metadata.data()->filename_length = 4;
+  metadata.data()->file_size = 12;
+  metadata.data()->size_on_disk = 12;
+  REQUIRE(root_map.insert("file", metadata.data()));
+
+  auto first = wfs_device->GetFile("/file");
+  REQUIRE(first);
+  auto second = wfs_device->GetFile("/file");
+  REQUIRE(second);
+  CHECK(first == second);
 }
 
 TEST_CASE_METHOD(DirectoryMapFixture,

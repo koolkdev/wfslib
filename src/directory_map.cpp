@@ -47,6 +47,82 @@ DirectoryMap::iterator DirectoryMap::end() const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
+std::expected<std::shared_ptr<Entry>, WfsError> DirectoryMap::LoadEntry(iterator it) {
+  if (it.is_end())
+    return std::unexpected(WfsError::kEntryNotFound);
+
+  auto val = *it;
+  if (auto entry_it = entries_.find(val.name); entry_it != entries_.end()) {
+    if (auto entry = entry_it->second.lock())
+      return entry;
+    entries_.erase(entry_it);
+  }
+
+  auto metadata = metadata_handle(val.name, val.metadata);
+  auto name = metadata->get()->GetCaseSensitiveName(val.name);
+  auto entry = Entry::Load(quota_, name, metadata, shared_from_this());
+  if (entry.has_value())
+    entries_[val.name] = *entry;
+  return entry;
+}
+
+Entry::MetadataHandlePtr DirectoryMap::metadata_handle(std::string_view name,
+                                                       Block::DataRef<EntryMetadata> metadata) const {
+  auto key = std::ranges::to<std::string>(name);
+  if (auto it = metadata_handles_.find(key); it != metadata_handles_.end()) {
+    if (auto handle = it->second.lock()) {
+      handle->Update(std::move(metadata));
+      return handle;
+    }
+    metadata_handles_.erase(it);
+  }
+
+  auto handle = Entry::CreateMetadataHandle(std::move(metadata));
+  metadata_handles_.emplace(std::move(key), handle);
+  return handle;
+}
+
+void DirectoryMap::update_metadata_handle(std::string_view name, Block::DataRef<EntryMetadata> metadata) const {
+  auto it = metadata_handles_.find(std::ranges::to<std::string>(name));
+  if (it == metadata_handles_.end())
+    return;
+  if (auto handle = it->second.lock()) {
+    handle->Update(std::move(metadata));
+  } else {
+    metadata_handles_.erase(it);
+  }
+}
+
+void DirectoryMap::invalidate_metadata_handle(std::string_view name) const {
+  auto it = metadata_handles_.find(std::ranges::to<std::string>(name));
+  if (it == metadata_handles_.end())
+    return;
+  if (auto handle = it->second.lock())
+    handle->Invalidate();
+  metadata_handles_.erase(it);
+}
+
+void DirectoryMap::refresh_live_metadata_handles() const {
+  std::vector<std::pair<std::string, Entry::MetadataHandlePtr>> live_handles;
+  for (auto it = metadata_handles_.begin(); it != metadata_handles_.end();) {
+    if (auto handle = it->second.lock()) {
+      live_handles.emplace_back(it->first, std::move(handle));
+      ++it;
+    } else {
+      it = metadata_handles_.erase(it);
+    }
+  }
+
+  for (auto& [name, handle] : live_handles) {
+    auto it = find(name);
+    if (it.is_end()) {
+      handle->Invalidate();
+    } else {
+      handle->Update((*it).metadata);
+    }
+  }
+}
+
 // Or maybe realloc?
 Block::DataRef<EntryMetadata> DirectoryMap::alloc_metadata(iterator it, size_t log2_size) {
   auto size = static_cast<uint16_t>(1 << log2_size);
@@ -137,11 +213,14 @@ bool DirectoryMap::erase(std::string_view name) {
     // Not in tree
     return false;
   }
+  auto key = (*it).name;
   auto parents = it.parents();
   // Free the entry metadata first
   it.leaf().node.Free((*it.leaf().iterator).value(),
                       static_cast<uint16_t>(1 << (*it).metadata->metadata_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);
+  entries_.erase(key);
+  invalidate_metadata_handle(key);
   bool last_empty = it.leaf().node.empty();
   if (!last_empty)
     return true;
@@ -200,11 +279,13 @@ std::expected<Block::DataRef<EntryMetadata>, WfsError> DirectoryMap::replace_met
   if (old_log2_size == new_log2_size) {
     if (old_metadata.get() != metadata)
       std::memcpy(old_metadata.get_mutable(), metadata, new_size);
+    update_metadata_handle(name, old_metadata);
     return old_metadata;
   }
 
   auto new_metadata = realloc_metadata(it, new_log2_size);
   std::memcpy(new_metadata.get_mutable(), metadata, new_size);
+  update_metadata_handle(name, new_metadata);
   return new_metadata;
 }
 
@@ -254,6 +335,9 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   assert(!parents.back().iterator.is_end());
 
   tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+  if constexpr (std::same_as<TreeType, DirectoryLeafTree>) {
+    refresh_live_metadata_handles();
+  }
   return true;
 }
 

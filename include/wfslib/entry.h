@@ -9,18 +9,22 @@
 
 #include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "block.h"
 #include "structs.h"
 
 class QuotaArea;
+class DirectoryMap;
 
 class Entry {
  public:
   using MetadataRef = Block::DataRef<EntryMetadata>;
+  class MetadataHandle;
+  using MetadataHandlePtr = std::shared_ptr<MetadataHandle>;
 
-  Entry(std::string name, MetadataRef block);
+  Entry(std::string name, MetadataHandlePtr metadata, std::shared_ptr<DirectoryMap> directory_map);
   virtual ~Entry();
 
   std::string_view name() const { return name_; }
@@ -37,14 +41,34 @@ class Entry {
 
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                               std::string name,
-                                                              MetadataRef metadata_ref);
+                                                              MetadataHandlePtr metadata,
+                                                              std::shared_ptr<DirectoryMap> directory_map);
+  static MetadataHandlePtr CreateMetadataHandle(MetadataRef metadata);
 
  protected:
   // TODO: Metadata copy as it can change?
-  EntryMetadata* mutable_metadata() { return metadata_.get_mutable(); }
-  const EntryMetadata* metadata() const { return metadata_.get(); }
-  const std::shared_ptr<Block>& metadata_block() const { return metadata_.block; }
+  EntryMetadata* mutable_metadata();
+  const EntryMetadata* metadata() const;
+  const std::shared_ptr<Block>& metadata_block() const;
 
   std::string name_;
-  MetadataRef metadata_;
+  MetadataHandlePtr metadata_;
+  std::shared_ptr<DirectoryMap> directory_map_;
+};
+
+class Entry::MetadataHandle {
+ public:
+  explicit MetadataHandle(MetadataRef metadata);
+
+  const EntryMetadata* get() const;
+  EntryMetadata* get_mutable() const;
+  const std::shared_ptr<Block>& block() const;
+
+ private:
+  friend class DirectoryMap;
+
+  void Update(MetadataRef metadata);
+  void Invalidate();
+
+  std::optional<MetadataRef> metadata_;
 };

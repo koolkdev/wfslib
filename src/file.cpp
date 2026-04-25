@@ -26,8 +26,8 @@ bool File::IsEncrypted() const {
 
 void File::Resize(size_t new_size) {
   // TODO: implment it, write now change up to size_on_disk without ever chaning size_on_disk
-  new_size = std::min(new_size, static_cast<size_t>(metadata_.get()->size_on_disk.value()));
-  size_t old_size = metadata_.get()->file_size.value();
+  new_size = std::min(new_size, static_cast<size_t>(metadata()->size_on_disk.value()));
+  size_t old_size = metadata()->file_size.value();
   if (new_size != old_size) {
     CreateLayoutAccessor(shared_from_this())->Resize(new_size);
   }
