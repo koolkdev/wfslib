@@ -24,6 +24,7 @@ enum WfsError {
   kInvalidWfsVersion,
   kNoSpace,
   kFileTooLarge,
+  kUnsupportedFileResize,
 };
 
 class WfsException : public std::exception {

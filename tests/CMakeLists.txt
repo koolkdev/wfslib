@@ -10,6 +10,7 @@ set(WFSLIB_BEHAVIOR_TEST_SOURCES
   eptree_tests.cpp
   file_layout_accessor_tests.cpp
   file_layout_tests.cpp
+  file_resize_tests.cpp
   free_blocks_allocator_tests.cpp
   free_blocks_tree_bucket_tests.cpp
   free_blocks_tree_tests.cpp
