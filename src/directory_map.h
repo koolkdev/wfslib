@@ -8,6 +8,7 @@
 #pragma once
 
 #include "directory_map_iterator.h"
+#include "errors.h"
 
 template <typename T>
 concept DirectoryTreeImpl = std::same_as<T, DirectoryLeafTree> || std::same_as<T, DirectoryParentTree>;
@@ -27,6 +28,8 @@ class DirectoryMap {
 
   bool insert(std::string_view name, const EntryMetadata* metadata);
   bool erase(std::string_view name);
+  std::expected<Block::DataRef<EntryMetadata>, WfsError> replace_metadata(std::string_view name,
+                                                                          const EntryMetadata* metadata);
 
   void Init();
 
@@ -34,6 +37,7 @@ class DirectoryMap {
   template <DirectoryTreeImpl TreeType>
   bool split_tree(std::vector<iterator::parent_node_info>& parents, TreeType& tree, std::string_view for_key);
   Block::DataRef<EntryMetadata> alloc_metadata(iterator it, size_t log2_size);
+  Block::DataRef<EntryMetadata> realloc_metadata(iterator it, size_t log2_size);
 
   size_t CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const;
 

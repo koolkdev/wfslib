@@ -72,6 +72,28 @@ void RequireEntriesInOrder(const DirectoryMap& dir_tree, uint32_t entries_count,
   }
 }
 
+size_t MetadataSize(uint8_t log2_size) {
+  return size_t{1} << log2_size;
+}
+
+void FillMetadataBytes(EntryMetadata* metadata, size_t start, size_t end, std::byte value) {
+  auto* bytes = reinterpret_cast<std::byte*>(metadata);
+  std::fill(bytes + start, bytes + end, value);
+}
+
+void FillMetadataPayload(EntryMetadata* metadata, uint8_t log2_size, std::byte value) {
+  FillMetadataBytes(metadata, sizeof(EntryMetadata), MetadataSize(log2_size), value);
+}
+
+void FillMetadataPayload(Block::DataRef<EntryMetadata> metadata, uint8_t log2_size, std::byte value) {
+  FillMetadataPayload(metadata.get_mutable(), log2_size, value);
+}
+
+bool MetadataPayloadEquals(Block::DataRef<EntryMetadata> metadata, size_t start, size_t end, std::byte value) {
+  auto* bytes = reinterpret_cast<const std::byte*>(metadata.get());
+  return std::all_of(bytes + start, bytes + end, [value](std::byte byte) { return byte == value; });
+}
+
 constexpr int kDirectoryMapStressEntries = 100000;
 
 }  // namespace
@@ -151,6 +173,132 @@ TEST_CASE_METHOD(DirectoryMapFixture,
     CHECK(entry.name == EntryName(i, 4));
     CHECK(entry.metadata.get()->flags.value() == i);
     CHECK(entry.metadata.get()->metadata_log2_size.value() == (i % 5) + 6);
+  }
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement reports missing entries",
+                 "[directory-map][unit]") {
+  TestEntryMetadata replacement(6);
+  auto result = dir_tree.replace_metadata("missing", replacement.data());
+  REQUIRE(!result.has_value());
+  CHECK(result.error() == WfsError::kEntryNotFound);
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement keeps same-size allocations",
+                 "[directory-map][unit]") {
+  TestEntryMetadata metadata(6);
+  metadata.data()->flags = 0x1234;
+  REQUIRE(dir_tree.insert("a", metadata.data()));
+
+  auto entry = dir_tree.find("a");
+  REQUIRE(!entry.is_end());
+  auto original_metadata = (*entry).metadata;
+
+  TestEntryMetadata replacement(6);
+  replacement.data()->flags = 0x5678;
+  auto result = dir_tree.replace_metadata("a", replacement.data());
+
+  REQUIRE(result.has_value());
+  CHECK(result->block == original_metadata.block);
+  CHECK(result->offset == original_metadata.offset);
+  CHECK(result->get()->flags.value() == 0x5678);
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement grows metadata using prepared bytes",
+                 "[directory-map][unit]") {
+  TestEntryMetadata metadata(6);
+  metadata.data()->flags = 0x2345;
+  REQUIRE(dir_tree.insert("a", metadata.data()));
+
+  auto original_entry = dir_tree.find("a");
+  REQUIRE(!original_entry.is_end());
+  FillMetadataPayload((*original_entry).metadata, 6, std::byte{0x5a});
+
+  TestEntryMetadata replacement(8);
+  replacement.data()->flags = 0x6789;
+  FillMetadataBytes(replacement.data(), MetadataSize(8) - 16, MetadataSize(8), std::byte{0x6b});
+  auto result = dir_tree.replace_metadata("a", replacement.data());
+
+  REQUIRE(result.has_value());
+  auto entry = dir_tree.find("a");
+  REQUIRE(!entry.is_end());
+  CHECK((*entry).metadata.block == result->block);
+  CHECK((*entry).metadata.offset == result->offset);
+  CHECK(result->get()->flags.value() == 0x6789);
+  CHECK(result->get()->metadata_log2_size.value() == 8);
+  CHECK(MetadataPayloadEquals(*result, sizeof(EntryMetadata), MetadataSize(6), std::byte{0}));
+  CHECK(MetadataPayloadEquals(*result, MetadataSize(8) - 16, MetadataSize(8), std::byte{0x6b}));
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement shrinks metadata and frees space",
+                 "[directory-map][unit]") {
+  SubBlockAllocator<DirectoryTreeHeader> allocator{root_block};
+  TestEntryMetadata metadata(8);
+  metadata.data()->flags = 0x3456;
+  REQUIRE(dir_tree.insert("a", metadata.data()));
+  auto free_after_insert = allocator.GetFreeBytes();
+
+  TestEntryMetadata replacement(6);
+  replacement.data()->flags = 0x4567;
+  auto result = dir_tree.replace_metadata("a", replacement.data());
+
+  REQUIRE(result.has_value());
+  CHECK(allocator.GetFreeBytes() > free_after_insert);
+  CHECK(result->get()->flags.value() == 0x4567);
+  CHECK(result->get()->metadata_log2_size.value() == 6);
+  REQUIRE(dir_tree.erase("a"));
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement handles a forced leaf split",
+                 "[directory-map][white-box]") {
+  auto free_blocks = (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count();
+  InsertFixedSizeEntries(dir_tree, 80);
+
+  auto target = EntryName(40);
+
+  SubBlockAllocator<DirectoryTreeHeader> allocator{root_block};
+  while (allocator.Alloc(8)) {
+  }
+
+  TestEntryMetadata replacement(8);
+  replacement.data()->flags = 40;
+  FillMetadataBytes(replacement.data(), MetadataSize(8) - 16, MetadataSize(8), std::byte{0x6b});
+  auto result = dir_tree.replace_metadata(target, replacement.data());
+
+  REQUIRE(result.has_value());
+  CHECK(result->get()->flags.value() == 40);
+  CHECK(result->get()->metadata_log2_size.value() == 8);
+  CHECK(MetadataPayloadEquals(*result, MetadataSize(8) - 16, MetadataSize(8), std::byte{0x6b}));
+  RequireEntriesInOrder(dir_tree, 80);
+  for (uint32_t i = 0; i < 80; ++i) {
+    REQUIRE(dir_tree.erase(EntryName(i)));
+  }
+  CHECK(free_blocks == (*wfs_device->GetRootArea()->GetFreeBlocksAllocator())->free_blocks_count());
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement works in a multi-level tree",
+                 "[directory-map][integration]") {
+  constexpr uint32_t kEntriesCount = 10000;
+  InsertFixedSizeEntries(dir_tree, kEntriesCount);
+
+  TestEntryMetadata replacement(8);
+  replacement.data()->flags = 5678;
+  auto result = dir_tree.replace_metadata(EntryName(5678), replacement.data());
+
+  REQUIRE(result.has_value());
+  CHECK(result->get()->flags.value() == 5678);
+  CHECK(result->get()->metadata_log2_size.value() == 8);
+  REQUIRE(dir_tree.size() == kEntriesCount);
+  for (auto index : {uint32_t{0}, uint32_t{5678}, kEntriesCount - 1}) {
+    auto entry = dir_tree.find(EntryName(index));
+    REQUIRE(!entry.is_end());
+    CHECK((*entry).metadata.get()->flags.value() == index);
   }
 }
 

@@ -62,6 +62,25 @@ Block::DataRef<EntryMetadata> DirectoryMap::alloc_metadata(iterator it, size_t l
   }
 }
 
+Block::DataRef<EntryMetadata> DirectoryMap::realloc_metadata(iterator it, size_t log2_size) {
+  auto name = (*it).name;
+  auto old_metadata = (*it).metadata;
+  auto old_log2_size = old_metadata->metadata_log2_size.value();
+  assert(old_log2_size != log2_size);
+
+  auto old_size = static_cast<uint16_t>(1 << old_log2_size);
+  auto new_metadata = alloc_metadata(it, log2_size);
+
+  auto updated_it = find(name);
+  assert(!updated_it.is_end());
+  assert(updated_it.leaf().node.block() == new_metadata.block);
+  auto old_offset = (*updated_it.leaf().iterator).value();
+  (*updated_it.leaf().iterator).set_value(static_cast<uint16_t>(new_metadata.offset));
+  updated_it.leaf().node.Free(old_offset, old_size);
+
+  return new_metadata;
+}
+
 DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
   auto current_block = root_block_;
   std::vector<iterator::parent_node_info> parents;
@@ -164,6 +183,29 @@ bool DirectoryMap::erase(std::string_view name) {
     }
     parents.pop_back();
   }
+}
+
+std::expected<Block::DataRef<EntryMetadata>, WfsError> DirectoryMap::replace_metadata(std::string_view name,
+                                                                                      const EntryMetadata* metadata) {
+  auto new_log2_size = metadata->metadata_log2_size.value();
+  assert(new_log2_size >= 6 && new_log2_size <= SubBlockAllocatorBase::MAX_BLOCK_SIZE);
+
+  auto it = find(name);
+  if (it.is_end())
+    return std::unexpected(WfsError::kEntryNotFound);
+
+  auto old_metadata = (*it).metadata;
+  auto old_log2_size = old_metadata->metadata_log2_size.value();
+  auto new_size = static_cast<uint16_t>(1 << new_log2_size);
+  if (old_log2_size == new_log2_size) {
+    if (old_metadata.get() != metadata)
+      std::memcpy(old_metadata.get_mutable(), metadata, new_size);
+    return old_metadata;
+  }
+
+  auto new_metadata = realloc_metadata(it, new_log2_size);
+  std::memcpy(new_metadata.get_mutable(), metadata, new_size);
+  return new_metadata;
 }
 
 template <DirectoryTreeImpl TreeType>
