@@ -11,9 +11,11 @@
 #include <boost/iostreams/positioning.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <memory>
+#include <utility>
 #include "entry.h"
 
 class QuotaArea;
+struct FileLayout;
 
 class File : public Entry, public std::enable_shared_from_this<File> {
   class LayoutAccessor;
@@ -25,8 +27,10 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   class ClusterMetadataBlocksLayoutAccessor;
 
  public:
-  File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota)
-      : Entry(std::move(name), std::move(metadata)), quota_(std::move(quota)) {}
+  File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota, MetadataUpdater metadata_updater = {})
+      : Entry(std::move(name), std::move(metadata)),
+        quota_(std::move(quota)),
+        metadata_updater_(std::move(metadata_updater)) {}
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;
@@ -56,9 +60,12 @@ class File : public Entry, public std::enable_shared_from_this<File> {
 
  private:
   std::shared_ptr<QuotaArea> quota() const { return quota_; }
+  void ReplaceMetadata(const EntryMetadata* metadata);
+  void ResizeInline(const FileLayout& layout);
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;
+  MetadataUpdater metadata_updater_;
 
   static std::shared_ptr<LayoutAccessor> CreateLayoutAccessor(std::shared_ptr<File> file);
 };

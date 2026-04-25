@@ -35,6 +35,8 @@ char const* WfsException::what() const noexcept {
       return "Not enough free space";
     case WfsError::kFileTooLarge:
       return "File too large";
+    case WfsError::kUnsupportedFileResize:
+      return "Unsupported file resize";
   }
   return "";
 }

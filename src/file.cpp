@@ -8,9 +8,24 @@
 #include "file.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cstring>
+#include <limits>
+#include <vector>
 
 #include "block.h"
+#include "errors.h"
+#include "file_layout.h"
 #include "file_layout_accessor.h"
+
+namespace {
+uint32_t CheckedFileSize(size_t size, uint8_t block_size_log2) {
+  if (size > FileLayout::MaxFileSize(block_size_log2))
+    throw WfsException(WfsError::kFileTooLarge);
+  assert(size <= std::numeric_limits<uint32_t>::max());
+  return static_cast<uint32_t>(size);
+}
+}  // namespace
 
 uint32_t File::Size() const {
   return metadata()->file_size.value();
@@ -25,12 +40,56 @@ bool File::IsEncrypted() const {
 }
 
 void File::Resize(size_t new_size) {
-  // TODO: implment it, write now change up to size_on_disk without ever chaning size_on_disk
-  new_size = std::min(new_size, static_cast<size_t>(metadata_.get()->size_on_disk.value()));
-  size_t old_size = metadata_.get()->file_size.value();
-  if (new_size != old_size) {
-    CreateLayoutAccessor(shared_from_this())->Resize(new_size);
+  size_t old_size = metadata()->file_size.value();
+  if (new_size == old_size)
+    return;
+
+  const auto current_category = FileLayout::CategoryFromValue(metadata()->size_category.value());
+  if (current_category != FileLayoutCategory::Inline) {
+    // External block allocation is introduced in later resize stages. Preserve the old logical-only behavior for now.
+    new_size = std::min(new_size, static_cast<size_t>(metadata()->size_on_disk.value()));
+    if (new_size != old_size)
+      CreateLayoutAccessor(shared_from_this())->Resize(new_size);
+    return;
   }
+
+  const auto file_size = CheckedFileSize(new_size, quota()->block_size_log2());
+  const auto layout = FileLayout::Calculate(file_size, metadata()->filename_length.value(), quota()->block_size_log2(),
+                                            FileLayoutMode::MinimumForGrow);
+  if (layout.category != FileLayoutCategory::Inline)
+    throw WfsException(WfsError::kUnsupportedFileResize);
+
+  ResizeInline(layout);
+}
+
+void File::ReplaceMetadata(const EntryMetadata* metadata) {
+  if (metadata_updater_) {
+    metadata_ = throw_if_error(metadata_updater_(metadata));
+    return;
+  }
+
+  assert(metadata->metadata_log2_size.value() == metadata_->metadata_log2_size.value());
+  if (metadata != metadata_.get())
+    std::memcpy(metadata_.get_mutable(), metadata, size_t{1} << metadata->metadata_log2_size.value());
+}
+
+void File::ResizeInline(const FileLayout& layout) {
+  assert(layout.category == FileLayoutCategory::Inline);
+
+  const auto old_size = metadata()->file_size.value();
+  const auto bytes_to_preserve = std::min(old_size, layout.file_size);
+  std::vector<std::byte> metadata_bytes(size_t{1} << layout.metadata_log2_size, std::byte{0});
+  auto* updated_metadata = reinterpret_cast<EntryMetadata*>(metadata_bytes.data());
+
+  std::memcpy(updated_metadata, metadata(), metadata()->size());
+  updated_metadata->file_size = layout.file_size;
+  updated_metadata->size_on_disk = layout.size_on_disk;
+  updated_metadata->metadata_log2_size = layout.metadata_log2_size;
+  updated_metadata->size_category = FileLayout::CategoryValue(layout.category);
+
+  std::copy_n(reinterpret_cast<const std::byte*>(metadata()) + metadata()->size(), bytes_to_preserve,
+              reinterpret_cast<std::byte*>(updated_metadata) + updated_metadata->size());
+  ReplaceMetadata(updated_metadata);
 }
 
 File::file_device::file_device(const std::shared_ptr<File>& file)

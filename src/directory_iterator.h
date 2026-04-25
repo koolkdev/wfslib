@@ -10,6 +10,9 @@
 #include "directory_map_iterator.h"
 #include "errors.h"
 
+#include <memory>
+
+class DirectoryMap;
 class QuotaArea;
 class Entry;
 
@@ -29,7 +32,7 @@ class DirectoryIterator {
   using reference = ref_type;
 
   DirectoryIterator() = default;
-  DirectoryIterator(DirectoryMapIterator base);
+  DirectoryIterator(DirectoryMapIterator base, std::shared_ptr<DirectoryMap> map);
 
   reference operator*() const;
 
@@ -48,4 +51,5 @@ class DirectoryIterator {
 
  private:
   DirectoryMapIterator base_;
+  std::shared_ptr<DirectoryMap> map_;
 };
