@@ -17,6 +17,7 @@
 
 class QuotaArea;
 class DirectoryMap;
+class DirectoryEntryCache;
 
 class Entry {
  public:
@@ -65,7 +66,7 @@ class Entry::MetadataHandle {
   const std::shared_ptr<Block>& block() const;
 
  private:
-  friend class DirectoryMap;
+  friend class DirectoryEntryCache;
 
   void Update(MetadataRef metadata);
   void Invalidate();
