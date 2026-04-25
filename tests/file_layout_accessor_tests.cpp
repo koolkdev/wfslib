@@ -32,6 +32,8 @@
 
 namespace {
 constexpr std::string_view kTestFilename = "file";
+constexpr std::array kInitialData{std::byte{0x11}, std::byte{0x22}, std::byte{0x33}, std::byte{0x44}};
+constexpr std::array kReplacementData{std::byte{0xaa}, std::byte{0xbb}, std::byte{0xcc}, std::byte{0xdd}};
 
 struct TestFile {
   std::shared_ptr<File> file;
@@ -115,70 +117,158 @@ void SetReversedBlockList(EntryMetadata* metadata, uint8_t block_size_log2, std:
     block_refs[block_numbers.size() - i - 1].block_number = block_numbers[i];
   }
 }
+
+void SetReversedClusterList(EntryMetadata* metadata,
+                            uint8_t block_size_log2,
+                            std::span<const uint32_t> cluster_block_numbers) {
+  const auto category = FileLayout::CategoryFromValue(metadata->size_category.value());
+  const auto metadata_items_count =
+      FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), block_size_log2);
+  REQUIRE(metadata_items_count == cluster_block_numbers.size());
+
+  auto cluster_refs = AlignedMetadataItems<DataBlocksClusterMetadata>(metadata, metadata_items_count);
+  for (size_t i = 0; i < cluster_block_numbers.size(); ++i) {
+    cluster_refs[cluster_block_numbers.size() - i - 1].block_number = cluster_block_numbers[i];
+  }
+}
+
+void SetReversedMetadataBlockList(EntryMetadata* metadata,
+                                  uint8_t block_size_log2,
+                                  std::span<const uint32_t> metadata_block_numbers) {
+  const auto category = FileLayout::CategoryFromValue(metadata->size_category.value());
+  const auto metadata_items_count =
+      FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), block_size_log2);
+  REQUIRE(metadata_items_count == metadata_block_numbers.size());
+
+  auto metadata_block_refs = AlignedMetadataItems<uint32_be_t>(metadata, metadata_items_count);
+  for (size_t i = 0; i < metadata_block_numbers.size(); ++i) {
+    metadata_block_refs[metadata_block_numbers.size() - i - 1] = metadata_block_numbers[i];
+  }
+}
+
+std::span<DataBlocksClusterMetadata> ClusterMetadataItems(const std::shared_ptr<Block>& metadata_block, size_t count) {
+  return {metadata_block->get_mutable_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)), count};
+}
+
+template <size_t Size>
+void RequireReadThenReplace(const std::shared_ptr<File>& file,
+                            size_t offset,
+                            const std::array<std::byte, Size>& initial_data,
+                            const std::array<std::byte, Size>& replacement_data) {
+  std::array<std::byte, Size> output{};
+  CHECK(ReadFile(file, output, offset) == output.size());
+  CHECK(std::ranges::equal(output, initial_data));
+
+  CHECK(WriteFile(file, replacement_data, offset) == replacement_data.size());
+
+  std::ranges::fill(output, std::byte{0});
+  CHECK(ReadFile(file, output, offset) == output.size());
+  CHECK(std::ranges::equal(output, replacement_data));
+}
 }  // namespace
 
 TEST_CASE_METHOD(FileLayoutAccessorFixture,
                  "File layout accessor reads and writes inline data",
                  "[file-layout-accessor][unit]") {
-  constexpr std::array initial_data{std::byte{0x11}, std::byte{0x22}, std::byte{0x33}, std::byte{0x44}};
-  constexpr std::array replacement_data{std::byte{0xaa}, std::byte{0xbb}};
-  constexpr std::array expected_data{std::byte{0x11}, std::byte{0xaa}, std::byte{0xbb}, std::byte{0x44}};
-
-  auto source = CreateFile(kTestFilename, initial_data.size());
+  auto source = CreateFile(kTestFilename, kInitialData.size());
   REQUIRE(source.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Inline));
-  std::ranges::copy(initial_data, InlinePayload(source.metadata).begin());
+  std::ranges::copy(kInitialData, InlinePayload(source.metadata).begin());
 
-  std::array<std::byte, initial_data.size()> output{};
-  CHECK(ReadFile(source.file, output) == output.size());
-  CHECK(std::ranges::equal(output, initial_data));
-
-  CHECK(WriteFile(source.file, replacement_data, 1) == replacement_data.size());
-  CHECK(ReadFile(source.file, output) == output.size());
-  CHECK(std::ranges::equal(output, expected_data));
+  RequireReadThenReplace(source.file, 0, kInitialData, kReplacementData);
 }
 
 TEST_CASE_METHOD(FileLayoutAccessorFixture,
-                 "File layout accessor reads reversed block list metadata in logical order",
+                 "File layout accessor reads and writes reversed block list metadata in logical order",
                  "[file-layout-accessor][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   constexpr std::array<uint32_t, 2> data_blocks{50, 51};
-  constexpr std::array first_block_start{std::byte{0xa1}, std::byte{0xa2}, std::byte{0xa3}};
-  constexpr std::array second_block_data{std::byte{0xb1}, std::byte{0xb2}, std::byte{0xb3}};
-  auto test_file = CreateFile(kTestFilename, block_size + 3);
+  auto test_file = CreateFile(kTestFilename, block_size + kInitialData.size());
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
   SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
 
   std::vector<std::byte> first_block_data(block_size, std::byte{0x99});
-  std::ranges::copy(first_block_start, first_block_data.begin());
   StoreDataBlock(data_blocks[0], first_block_data);
-  StoreDataBlock(data_blocks[1], second_block_data);
+  StoreDataBlock(data_blocks[1], kInitialData);
 
-  std::array<std::byte, first_block_start.size()> first_output{};
-  CHECK(ReadFile(test_file.file, first_output) == first_output.size());
-  CHECK(std::ranges::equal(first_output, first_block_start));
-
-  std::array<std::byte, second_block_data.size()> second_output{};
-  CHECK(ReadFile(test_file.file, second_output, block_size) == second_output.size());
-  CHECK(std::ranges::equal(second_output, second_block_data));
+  RequireReadThenReplace(test_file.file, block_size, kInitialData, kReplacementData);
 }
 
 TEST_CASE_METHOD(FileLayoutAccessorFixture,
-                 "File layout accessor reads across external block boundaries",
+                 "File layout accessor reads and writes across external block boundaries",
                  "[file-layout-accessor][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   constexpr std::array<uint32_t, 2> data_blocks{70, 71};
-  constexpr std::array second_block_data{std::byte{0xc1}, std::byte{0xc2}, std::byte{0xc3}};
-  constexpr std::array expected_data{std::byte{0xd0}, std::byte{0xc1}, std::byte{0xc2}, std::byte{0xc3}};
-  auto test_file = CreateFile(kTestFilename, block_size + second_block_data.size());
+  auto test_file = CreateFile(kTestFilename, block_size + kInitialData.size() - 1);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
   SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
 
   std::vector<std::byte> first_block_data(block_size, std::byte{0x99});
-  first_block_data.back() = expected_data[0];
+  first_block_data.back() = kInitialData[0];
   StoreDataBlock(data_blocks[0], first_block_data);
-  StoreDataBlock(data_blocks[1], second_block_data);
+  StoreDataBlock(data_blocks[1], std::span{kInitialData}.subspan(1));
 
-  std::array<std::byte, expected_data.size()> output{};
-  CHECK(ReadFile(test_file.file, output, block_size - 1) == output.size());
-  CHECK(std::ranges::equal(output, expected_data));
+  RequireReadThenReplace(test_file.file, block_size - 1, kInitialData, kReplacementData);
+}
+
+TEST_CASE_METHOD(FileLayoutAccessorFixture,
+                 "File layout accessor reads and writes large block metadata",
+                 "[file-layout-accessor][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_size = block_size << log2_size(BlockType::Large);
+  constexpr std::array<uint32_t, 1> data_blocks{120};
+  const auto offset = 5 * block_size;
+  auto test_file = CreateFile(kTestFilename, offset + kInitialData.size());
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
+
+  std::vector<std::byte> large_block_data(offset + kInitialData.size(), std::byte{0x99});
+  REQUIRE(large_block_data.size() <= large_block_size);
+  std::ranges::copy(kInitialData, large_block_data.begin() + offset);
+  StoreDataBlock(data_blocks[0], large_block_data);
+
+  RequireReadThenReplace(test_file.file, offset, kInitialData, kReplacementData);
+}
+
+TEST_CASE_METHOD(FileLayoutAccessorFixture,
+                 "File layout accessor reads and writes reversed cluster metadata",
+                 "[file-layout-accessor][unit]") {
+  const auto large_block_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Large));
+  const auto cluster_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Cluster));
+  constexpr std::array<uint32_t, 2> cluster_blocks{240, 360};
+  auto test_file = CreateFile(kTestFilename, cluster_size + kInitialData.size());
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  SetReversedClusterList(test_file.metadata, quota->block_size_log2(), cluster_blocks);
+
+  StoreDataBlock(cluster_blocks[1], kInitialData);
+
+  RequireReadThenReplace(test_file.file, cluster_size, kInitialData, kReplacementData);
+
+  std::vector<std::byte> large_block_data(large_block_size, std::byte{0x99});
+  std::ranges::copy(kInitialData, large_block_data.begin());
+  StoreDataBlock(cluster_blocks[0] + 5 * (1 << log2_size(BlockType::Large)), large_block_data);
+  RequireReadThenReplace(test_file.file, 5 * large_block_size, kInitialData, kReplacementData);
+}
+
+TEST_CASE_METHOD(FileLayoutAccessorFixture,
+                 "File layout accessor reads and writes cluster metadata block lists",
+                 "[file-layout-accessor][unit]") {
+  const auto cluster_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Cluster));
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
+  const auto offset = clusters_per_metadata_block * cluster_size;
+  constexpr uint32_t data_block = 700;
+
+  auto test_file = CreateFile(kTestFilename, offset + kInitialData.size());
+  REQUIRE(test_file.metadata->size_category.value() ==
+          FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+
+  auto first_metadata_block = *quota->AllocMetadataBlock();
+  auto second_metadata_block = *quota->AllocMetadataBlock();
+  const std::array metadata_blocks{quota->to_area_block_number(first_metadata_block->physical_block_number()),
+                                   quota->to_area_block_number(second_metadata_block->physical_block_number())};
+  SetReversedMetadataBlockList(test_file.metadata, quota->block_size_log2(), metadata_blocks);
+
+  ClusterMetadataItems(second_metadata_block, clusters_per_metadata_block)[0].block_number = data_block;
+  StoreDataBlock(data_block, kInitialData);
+
+  RequireReadThenReplace(test_file.file, offset, kInitialData, kReplacementData);
 }
