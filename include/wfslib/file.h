@@ -80,6 +80,9 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   }
   void ReplaceMetadata(const EntryMetadata* metadata);
   void ResizeInline(const FileLayout& layout);
+  void ResizeExternal(const FileLayout& layout);
+  void ResizeExternalDataBlocks(uint32_t old_file_size, uint32_t new_file_size, const FileLayout& layout);
+  void FlushAndDetachExternalDataBlocks(const FileLayout& layout);
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;

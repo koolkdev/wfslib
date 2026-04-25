@@ -39,9 +39,17 @@ struct FileLayout {
   static uint32_t ClustersPerClusterMetadataBlock(uint8_t block_size_log2);
   static uint32_t ClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
   static uint32_t MaxFileSize(uint8_t block_size_log2);
+  static bool CategoryCanStore(FileLayoutCategory category,
+                               uint32_t file_size,
+                               uint8_t filename_length,
+                               uint8_t block_size_log2);
 
   static FileLayout Calculate(uint32_t file_size,
                               uint8_t filename_length,
                               uint8_t block_size_log2,
                               FileLayoutMode mode);
+  static FileLayout CalculateForCategory(uint32_t file_size,
+                                         uint8_t filename_length,
+                                         uint8_t block_size_log2,
+                                         FileLayoutCategory category);
 };

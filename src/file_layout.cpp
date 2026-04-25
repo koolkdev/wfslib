@@ -214,6 +214,33 @@ uint32_t FileLayout::MaxFileSize(uint8_t block_size_log2) {
   return static_cast<uint32_t>(std::min(max_by_size_on_disk, max_by_cluster_metadata_blocks));
 }
 
+bool FileLayout::CategoryCanStore(FileLayoutCategory category,
+                                  uint32_t file_size,
+                                  uint8_t filename_length,
+                                  uint8_t block_size_log2) {
+  if (file_size > FileLayout::MaxFileSize(block_size_log2))
+    throw WfsException(WfsError::kFileTooLarge);
+
+  const auto single_block_size = pow2<uint32_t>(block_size_log2);
+  const auto large_block_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Large));
+  const auto cluster_size = pow2<uint32_t>(DataBlockLog2Size(block_size_log2, BlockType::Cluster));
+
+  switch (category) {
+    case FileLayoutCategory::Inline:
+      return file_size <= FileLayout::InlineCapacity(filename_length);
+    case FileLayoutCategory::Blocks:
+      return file_size > FileLayout::InlineCapacity(filename_length) &&
+             file_size <= kBlocksMaxCount * single_block_size;
+    case FileLayoutCategory::LargeBlocks:
+      return file_size > single_block_size && file_size <= kLargeBlocksMaxCount * large_block_size;
+    case FileLayoutCategory::Clusters:
+      return file_size > large_block_size && file_size <= kClustersMaxCount * cluster_size;
+    case FileLayoutCategory::ClusterMetadataBlocks:
+      return file_size >= cluster_size;
+  }
+  throw std::invalid_argument("Unexpected file layout category");
+}
+
 FileLayout FileLayout::Calculate(uint32_t file_size,
                                  uint8_t filename_length,
                                  uint8_t block_size_log2,
@@ -221,5 +248,14 @@ FileLayout FileLayout::Calculate(uint32_t file_size,
   const auto category = mode == FileLayoutMode::MinimumForGrow
                             ? MinimumCategory(file_size, filename_length, block_size_log2)
                             : MaximumCategory(file_size, filename_length, block_size_log2);
+  return BuildLayout(file_size, filename_length, block_size_log2, category);
+}
+
+FileLayout FileLayout::CalculateForCategory(uint32_t file_size,
+                                            uint8_t filename_length,
+                                            uint8_t block_size_log2,
+                                            FileLayoutCategory category) {
+  if (!FileLayout::CategoryCanStore(category, file_size, filename_length, block_size_log2))
+    throw std::invalid_argument("File layout category cannot store file size");
   return BuildLayout(file_size, filename_length, block_size_log2, category);
 }

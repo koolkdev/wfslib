@@ -115,12 +115,16 @@ std::expected<std::shared_ptr<Block>, WfsError> Block::LoadDataBlock(std::shared
                                                                      bool check_hash) {
   auto cached_block = device->GetFromCache(physical_block_number);
   if (cached_block) {
-    assert(cached_block->physical_block_number() == physical_block_number);
-    assert(cached_block->block_size() == block_size);
-    assert(cached_block->block_type() == block_type);
-    assert(cached_block->size() == data_size);
-    assert(cached_block->encrypted() == encrypted);
-    return cached_block;
+    if (!load_data) {
+      cached_block->Detach();
+    } else {
+      assert(cached_block->physical_block_number() == physical_block_number);
+      assert(cached_block->block_size() == block_size);
+      assert(cached_block->block_type() == block_type);
+      assert(cached_block->size() == data_size);
+      assert(cached_block->encrypted() == encrypted);
+      return cached_block;
+    }
   }
   auto block = std::make_shared<Block>(device, physical_block_number, block_size, block_type, data_size, iv,
                                        std::move(data_hash), encrypted);

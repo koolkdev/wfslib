@@ -10,6 +10,7 @@
 #include <numeric>
 #include <ranges>
 
+#include "blocks_device.h"
 #include "directory.h"
 #include "free_blocks_allocator.h"
 #include "utils.h"
@@ -92,6 +93,15 @@ std::expected<std::vector<uint32_t>, WfsError> QuotaArea::AllocDataBlocks(uint32
   auto res = (*allocator)->AllocBlocks(count, type, false);
   if (!res)
     return std::unexpected(kNoSpace);
+  const auto cache_step =
+      type == BlockType::Cluster ? uint32_t{1} << log2_size(BlockType::Large) : uint32_t{1} << log2_size(type);
+  const auto blocks_count = uint32_t{1} << log2_size(type);
+  for (const auto block_number : *res) {
+    for (uint32_t offset = 0; offset < blocks_count; offset += cache_step) {
+      if (auto cached_block = wfs_device()->device()->GetFromCache(to_physical_block_number(block_number + offset)))
+        cached_block->Detach();
+    }
+  }
   return *res;
 }
 
