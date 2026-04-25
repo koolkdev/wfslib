@@ -8,6 +8,7 @@ enable_testing()
 set(WFSLIB_BEHAVIOR_TEST_SOURCES
   block_tests.cpp
   eptree_tests.cpp
+  file_layout_accessor_tests.cpp
   file_layout_tests.cpp
   free_blocks_allocator_tests.cpp
   free_blocks_tree_bucket_tests.cpp
