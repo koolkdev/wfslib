@@ -33,6 +33,7 @@
 namespace {
 constexpr std::string_view kTestFilename = "file";
 constexpr std::array kInitialData{std::byte{0x11}, std::byte{0x22}, std::byte{0x33}, std::byte{0x44}};
+constexpr uint32_t kInitialDataSize = static_cast<uint32_t>(kInitialData.size());
 constexpr std::array kReplacementData{std::byte{0xaa}, std::byte{0xbb}, std::byte{0xcc}, std::byte{0xdd}};
 
 struct TestFile {
@@ -170,7 +171,7 @@ void RequireReadThenReplace(const std::shared_ptr<File>& file,
 TEST_CASE_METHOD(FileLayoutAccessorFixture,
                  "File layout accessor reads and writes inline data",
                  "[file-layout-accessor][unit]") {
-  auto source = CreateFile(kTestFilename, kInitialData.size());
+  auto source = CreateFile(kTestFilename, kInitialDataSize);
   REQUIRE(source.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Inline));
   std::ranges::copy(kInitialData, InlinePayload(source.metadata).begin());
 
@@ -182,7 +183,7 @@ TEST_CASE_METHOD(FileLayoutAccessorFixture,
                  "[file-layout-accessor][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   constexpr std::array<uint32_t, 2> data_blocks{50, 51};
-  auto test_file = CreateFile(kTestFilename, block_size + kInitialData.size());
+  auto test_file = CreateFile(kTestFilename, block_size + kInitialDataSize);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
   SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
 
@@ -198,7 +199,7 @@ TEST_CASE_METHOD(FileLayoutAccessorFixture,
                  "[file-layout-accessor][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   constexpr std::array<uint32_t, 2> data_blocks{70, 71};
-  auto test_file = CreateFile(kTestFilename, block_size + kInitialData.size() - 1);
+  auto test_file = CreateFile(kTestFilename, block_size + kInitialDataSize - 1);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
   SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
 
@@ -217,7 +218,7 @@ TEST_CASE_METHOD(FileLayoutAccessorFixture,
   const auto large_block_size = block_size << log2_size(BlockType::Large);
   constexpr std::array<uint32_t, 1> data_blocks{120};
   const auto offset = 5 * block_size;
-  auto test_file = CreateFile(kTestFilename, offset + kInitialData.size());
+  auto test_file = CreateFile(kTestFilename, offset + kInitialDataSize);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
   SetReversedBlockList(test_file.metadata, quota->block_size_log2(), data_blocks);
 
@@ -235,7 +236,7 @@ TEST_CASE_METHOD(FileLayoutAccessorFixture,
   const auto large_block_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Large));
   const auto cluster_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Cluster));
   constexpr std::array<uint32_t, 2> cluster_blocks{240, 360};
-  auto test_file = CreateFile(kTestFilename, cluster_size + kInitialData.size());
+  auto test_file = CreateFile(kTestFilename, cluster_size + kInitialDataSize);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
   SetReversedClusterList(test_file.metadata, quota->block_size_log2(), cluster_blocks);
 
@@ -254,10 +255,10 @@ TEST_CASE_METHOD(FileLayoutAccessorFixture,
                  "[file-layout-accessor][unit]") {
   const auto cluster_size = static_cast<uint32_t>(quota->block_size() << log2_size(BlockType::Cluster));
   const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
-  const auto offset = clusters_per_metadata_block * cluster_size;
+  const uint32_t offset = clusters_per_metadata_block * cluster_size;
   constexpr uint32_t data_block = 700;
 
-  auto test_file = CreateFile(kTestFilename, offset + kInitialData.size());
+  auto test_file = CreateFile(kTestFilename, offset + kInitialDataSize);
   REQUIRE(test_file.metadata->size_category.value() ==
           FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
 
