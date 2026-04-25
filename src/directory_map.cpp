@@ -7,12 +7,31 @@
 
 #include "directory_map.h"
 
+#include <cassert>
 #include <cstring>
 #include <numeric>
 #include <utility>
 
 #include "quota_area.h"
 #include "structs.h"
+
+namespace {
+
+void assert_same_entry_identity(const EntryMetadata* old_metadata, const EntryMetadata* new_metadata) {
+  assert(old_metadata->is_link() == new_metadata->is_link());
+  assert(old_metadata->is_directory() == new_metadata->is_directory());
+  assert(old_metadata->is_quota() == new_metadata->is_quota());
+  assert(old_metadata->filename_length.value() == new_metadata->filename_length.value());
+
+  const auto case_bitmap_size = div_ceil(old_metadata->filename_length.value(), 8);
+  assert(std::memcmp(&old_metadata->case_bitmap, &new_metadata->case_bitmap, case_bitmap_size) == 0);
+
+  if (old_metadata->is_directory()) {
+    assert(old_metadata->directory_block_number.value() == new_metadata->directory_block_number.value());
+  }
+}
+
+}  // namespace
 
 DirectoryMap::DirectoryMap(std::shared_ptr<QuotaArea> quota, std::shared_ptr<Block> root_block)
     : quota_(std::move(quota)), root_block_(std::move(root_block)) {}
@@ -274,6 +293,8 @@ std::expected<Block::DataRef<EntryMetadata>, WfsError> DirectoryMap::replace_met
     return std::unexpected(WfsError::kEntryNotFound);
 
   auto old_metadata = (*it).metadata;
+  assert_same_entry_identity(old_metadata.get(), metadata);
+
   auto old_log2_size = old_metadata->metadata_log2_size.value();
   auto new_size = static_cast<uint16_t>(1 << new_log2_size);
   if (old_log2_size == new_log2_size) {
