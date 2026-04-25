@@ -86,21 +86,15 @@ uint32_t Entry::modification_time() const {
 Entry::MetadataHandle::MetadataHandle(MetadataRef metadata) : metadata_(std::move(metadata)) {}
 
 const EntryMetadata* Entry::MetadataHandle::get() const {
-  if (!metadata_.has_value())
-    throw std::logic_error("Entry metadata handle is no longer attached to a directory entry");
-  return metadata_->get();
+  return metadata_ref().get();
 }
 
 EntryMetadata* Entry::MetadataHandle::get_mutable() const {
-  if (!metadata_.has_value())
-    throw std::logic_error("Entry metadata handle is no longer attached to a directory entry");
-  return metadata_->get_mutable();
+  return metadata_ref().get_mutable();
 }
 
 const std::shared_ptr<Block>& Entry::MetadataHandle::block() const {
-  if (!metadata_.has_value())
-    throw std::logic_error("Entry metadata handle is no longer attached to a directory entry");
-  return metadata_->block;
+  return metadata_ref().block;
 }
 
 void Entry::MetadataHandle::Update(MetadataRef metadata) {
@@ -109,4 +103,10 @@ void Entry::MetadataHandle::Update(MetadataRef metadata) {
 
 void Entry::MetadataHandle::Invalidate() {
   metadata_.reset();
+}
+
+const Entry::MetadataRef& Entry::MetadataHandle::metadata_ref() const {
+  if (!metadata_.has_value())
+    throw std::logic_error("Invalid entry metadata handle");
+  return *metadata_;
 }

@@ -70,6 +70,7 @@ class Entry::MetadataHandle {
 
   void Update(MetadataRef metadata);
   void Invalidate();
+  const MetadataRef& metadata_ref() const;
 
   std::optional<MetadataRef> metadata_;
 };
