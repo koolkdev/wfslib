@@ -96,7 +96,7 @@ std::shared_ptr<QuotaArea> WfsDevice::GetRootArea() {
 
 std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory() {
   return GetRootArea()->LoadRootDirectory(
-      "", Entry::CreateMetadataHandle({root_block_, root_block_->to_offset(&header()->root_quota_metadata)}));
+      Entry::CreateEntryHandle("", {root_block_, root_block_->to_offset(&header()->root_quota_metadata)}));
 }
 
 // static

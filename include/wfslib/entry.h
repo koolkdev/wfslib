@@ -22,13 +22,13 @@ class DirectoryEntryCache;
 class Entry {
  public:
   using MetadataRef = Block::DataRef<EntryMetadata>;
-  class MetadataHandle;
-  using MetadataHandlePtr = std::shared_ptr<MetadataHandle>;
+  class EntryHandle;
+  using EntryHandlePtr = std::shared_ptr<EntryHandle>;
 
-  Entry(std::string name, MetadataHandlePtr metadata, std::shared_ptr<DirectoryMap> directory_map);
+  Entry(EntryHandlePtr handle, std::shared_ptr<DirectoryMap> directory_map);
   virtual ~Entry();
 
-  std::string_view name() const { return name_; }
+  std::string_view name() const;
   bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
   bool is_file() const { return !metadata()->is_link() && !metadata()->is_directory(); }
   bool is_link() const { return metadata()->is_link(); }
@@ -41,10 +41,9 @@ class Entry {
   uint32_t modification_time() const;
 
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
-                                                              std::string name,
-                                                              MetadataHandlePtr metadata,
+                                                              EntryHandlePtr handle,
                                                               std::shared_ptr<DirectoryMap> directory_map);
-  static MetadataHandlePtr CreateMetadataHandle(MetadataRef metadata);
+  static EntryHandlePtr CreateEntryHandle(std::string name, MetadataRef metadata);
 
  protected:
   // TODO: Metadata copy as it can change?
@@ -52,15 +51,15 @@ class Entry {
   const EntryMetadata* metadata() const;
   const std::shared_ptr<Block>& metadata_block() const;
 
-  std::string name_;
-  MetadataHandlePtr metadata_;
+  EntryHandlePtr handle_;
   std::shared_ptr<DirectoryMap> directory_map_;
 };
 
-class Entry::MetadataHandle {
+class Entry::EntryHandle {
  public:
-  explicit MetadataHandle(MetadataRef metadata);
+  EntryHandle(std::string name, MetadataRef metadata);
 
+  std::string_view name() const;
   const EntryMetadata* get() const;
   EntryMetadata* get_mutable() const;
   const std::shared_ptr<Block>& block() const;
@@ -68,9 +67,10 @@ class Entry::MetadataHandle {
  private:
   friend class DirectoryEntryCache;
 
-  void Update(MetadataRef metadata);
+  void Update(std::string name, MetadataRef metadata);
   void Invalidate();
   const MetadataRef& metadata_ref() const;
 
+  std::string name_;
   std::optional<MetadataRef> metadata_;
 };

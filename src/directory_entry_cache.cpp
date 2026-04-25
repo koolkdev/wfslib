@@ -26,22 +26,22 @@ std::expected<std::shared_ptr<Entry>, WfsError> DirectoryEntryCache::Load(Direct
     entries_.erase(entry_it);
   }
 
-  auto metadata = HandleFor(val.name, val.metadata);
-  auto name = metadata->get()->GetCaseSensitiveName(val.name);
-  auto entry = Entry::Load(std::move(quota), name, metadata, directory_map.shared_from_this());
+  auto handle = HandleFor(val.name, val.metadata);
+  auto entry = Entry::Load(std::move(quota), handle, directory_map.shared_from_this());
   if (entry.has_value())
     entries_[val.name] = *entry;
   return entry;
 }
 
 void DirectoryEntryCache::MetadataUpdated(std::string_view name, Block::DataRef<EntryMetadata> metadata) {
-  auto it = metadata_handles_.find(std::string{name});
-  if (it == metadata_handles_.end())
+  auto it = handles_.find(std::string{name});
+  if (it == handles_.end())
     return;
   if (auto handle = it->second.lock()) {
-    handle->Update(std::move(metadata));
+    auto real_name = metadata->GetCaseSensitiveName(name);
+    handle->Update(std::move(real_name), std::move(metadata));
   } else {
-    metadata_handles_.erase(it);
+    handles_.erase(it);
   }
 }
 
@@ -49,22 +49,22 @@ void DirectoryEntryCache::EntryRemoved(std::string_view name) {
   auto key = std::string{name};
   entries_.erase(key);
 
-  auto it = metadata_handles_.find(key);
-  if (it == metadata_handles_.end())
+  auto it = handles_.find(key);
+  if (it == handles_.end())
     return;
   if (auto handle = it->second.lock())
     handle->Invalidate();
-  metadata_handles_.erase(it);
+  handles_.erase(it);
 }
 
 void DirectoryEntryCache::RefreshMetadataRefs(const DirectoryMap& directory_map) {
-  std::vector<std::pair<std::string, Entry::MetadataHandlePtr>> live_handles;
-  for (auto it = metadata_handles_.begin(); it != metadata_handles_.end();) {
+  std::vector<std::pair<std::string, Entry::EntryHandlePtr>> live_handles;
+  for (auto it = handles_.begin(); it != handles_.end();) {
     if (auto handle = it->second.lock()) {
       live_handles.emplace_back(it->first, std::move(handle));
       ++it;
     } else {
-      it = metadata_handles_.erase(it);
+      it = handles_.erase(it);
     }
   }
 
@@ -73,23 +73,26 @@ void DirectoryEntryCache::RefreshMetadataRefs(const DirectoryMap& directory_map)
     if (it.is_end()) {
       handle->Invalidate();
     } else {
-      handle->Update((*it).metadata);
+      auto metadata = (*it).metadata;
+      auto real_name = metadata->GetCaseSensitiveName(name);
+      handle->Update(std::move(real_name), std::move(metadata));
     }
   }
 }
 
-Entry::MetadataHandlePtr DirectoryEntryCache::HandleFor(std::string_view name,
-                                                        Block::DataRef<EntryMetadata> metadata) {
-  auto key = std::string{name};
-  if (auto it = metadata_handles_.find(key); it != metadata_handles_.end()) {
+Entry::EntryHandlePtr DirectoryEntryCache::HandleFor(std::string_view key, Block::DataRef<EntryMetadata> metadata) {
+  auto map_key = std::string{key};
+  if (auto it = handles_.find(map_key); it != handles_.end()) {
     if (auto handle = it->second.lock()) {
-      handle->Update(std::move(metadata));
+      auto name = metadata->GetCaseSensitiveName(key);
+      handle->Update(std::move(name), std::move(metadata));
       return handle;
     }
-    metadata_handles_.erase(it);
+    handles_.erase(it);
   }
 
-  auto handle = Entry::CreateMetadataHandle(std::move(metadata));
-  metadata_handles_.emplace(std::move(key), handle);
+  auto name = metadata->GetCaseSensitiveName(key);
+  auto handle = Entry::CreateEntryHandle(std::move(name), std::move(metadata));
+  handles_.emplace(std::move(map_key), handle);
   return handle;
 }

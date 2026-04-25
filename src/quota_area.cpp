@@ -40,12 +40,11 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::share
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadDirectory(uint32_t area_block_number,
-                                                                             std::string name,
-                                                                             Entry::MetadataHandlePtr metadata) {
+                                                                             Entry::EntryHandlePtr handle) {
   auto map = LoadDirectoryMap(area_block_number);
   if (!map.has_value())
     return std::unexpected(map.error());
-  return std::make_shared<Directory>(std::move(name), std::move(metadata), shared_from_this(), std::move(*map));
+  return std::make_shared<Directory>(std::move(handle), shared_from_this(), std::move(*map));
 }
 
 std::expected<std::shared_ptr<DirectoryMap>, WfsError> QuotaArea::LoadDirectoryMap(uint32_t area_block_number) {
@@ -63,19 +62,18 @@ std::expected<std::shared_ptr<DirectoryMap>, WfsError> QuotaArea::LoadDirectoryM
   return map;
 }
 
-std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(std::string name,
-                                                                                 Entry::MetadataHandlePtr metadata) {
-  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(metadata));
+std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(Entry::EntryHandlePtr handle) {
+  return LoadDirectory(header()->root_directory_block_number.value(), std::move(handle));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory1() {
-  return LoadDirectory(header()->shadow_directory_block_number_1.value(), ".shadow_dir_1",
-                       Entry::CreateMetadataHandle({}));
+  return LoadDirectory(header()->shadow_directory_block_number_1.value(),
+                       Entry::CreateEntryHandle(".shadow_dir_1", {}));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory2() {
-  return LoadDirectory(header()->shadow_directory_block_number_2.value(), ".shadow_dir_2",
-                       Entry::CreateMetadataHandle({}));
+  return LoadDirectory(header()->shadow_directory_block_number_2.value(),
+                       Entry::CreateEntryHandle(".shadow_dir_2", {}));
 }
 
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::LoadQuotaArea(uint32_t area_block_number,

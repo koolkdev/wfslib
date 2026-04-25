@@ -16,8 +16,8 @@
 #include <string>
 #include <vector>
 
-#include <wfslib/wfs_device.h>
 #include <wfslib/file.h>
+#include <wfslib/wfs_device.h>
 
 #include "directory_map.h"
 #include "free_blocks_allocator.h"
@@ -326,6 +326,34 @@ TEST_CASE_METHOD(DirectoryMapFixture,
   REQUIRE(!current_live.is_end());
   (*current_live).metadata.get_mutable()->file_size = 1234;
   CHECK(live_file->Size() == 1234);
+}
+
+TEST_CASE_METHOD(DirectoryMapFixture,
+                 "DirectoryMap metadata replacement updates live entry names",
+                 "[directory-map][cache]") {
+  auto block = *wfs_device->GetRootArea()->AllocMetadataBlock();
+  auto map = std::make_shared<DirectoryMap>(wfs_device->GetRootArea(), block);
+  map->Init();
+
+  TestEntryMetadata metadata(6);
+  metadata.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+  metadata.data()->filename_length = 8;
+  REQUIRE(map->insert("filename", metadata.data()));
+
+  auto it = map->find("filename");
+  REQUIRE(!it.is_end());
+  auto entry = map->LoadEntry(it);
+  REQUIRE(entry.has_value());
+  CHECK((*entry)->name() == "filename");
+
+  TestEntryMetadata replacement(6);
+  replacement.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+  replacement.data()->filename_length = 8;
+  replacement.data()->case_bitmap = 0x1;
+  auto result = map->replace_metadata("filename", replacement.data());
+  REQUIRE(result.has_value());
+
+  CHECK((*entry)->name() == "Filename");
 }
 
 TEST_CASE_METHOD(MetadataBlockFixture,

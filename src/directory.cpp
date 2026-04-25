@@ -12,13 +12,8 @@
 #include "file.h"
 #include "quota_area.h"
 
-Directory::Directory(std::string name,
-                     MetadataHandlePtr metadata,
-                     std::shared_ptr<QuotaArea> quota,
-                     std::shared_ptr<DirectoryMap> map)
-    : Entry(std::move(name), std::move(metadata), map),
-      quota_(std::move(quota)),
-      map_(std::move(map)) {}
+Directory::Directory(EntryHandlePtr handle, std::shared_ptr<QuotaArea> quota, std::shared_ptr<DirectoryMap> map)
+    : Entry(std::move(handle), map), quota_(std::move(quota)), map_(std::move(map)) {}
 
 std::expected<std::shared_ptr<Entry>, WfsError> Directory::GetEntry(std::string_view name) const {
   try {
