@@ -96,6 +96,25 @@ DirectoryMap::iterator DirectoryMap::find(std::string_view key) const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
+std::expected<Entry::MetadataHandleRef, WfsError> DirectoryMap::metadata_handle(std::string_view name) const {
+  auto it = find(name);
+  if (it.is_end())
+    return std::unexpected(WfsError::kEntryNotFound);
+
+  const auto metadata = (*it).metadata;
+  auto key = std::ranges::to<std::string>(name);
+  auto [handle_it, inserted] = metadata_handles_.try_emplace(key);
+  (void)inserted;
+  if (auto handle = handle_it->second.lock()) {
+    handle->metadata = metadata;
+    return handle;
+  }
+
+  auto handle = Entry::CreateMetadataHandle(metadata);
+  handle_it->second = handle;
+  return handle;
+}
+
 size_t DirectoryMap::CalcSizeOfDirectoryBlock(std::shared_ptr<Block> block) const {
   if (block->get_object<MetadataBlockHeader>(0)->block_flags.value() &
       MetadataBlockHeader::Flags::DIRECTORY_LEAF_TREE) {
@@ -138,6 +157,7 @@ bool DirectoryMap::erase(std::string_view name) {
     return false;
   }
   auto parents = it.parents();
+  metadata_handles_.erase(std::ranges::to<std::string>(name));
   // Free the entry metadata first
   it.leaf().node.Free((*it.leaf().iterator).value(),
                       static_cast<uint16_t>(1 << (*it).metadata->metadata_log2_size.value()));
@@ -200,12 +220,25 @@ std::expected<Block::DataRef<EntryMetadata>, WfsError> DirectoryMap::replace_met
   if (old_log2_size == new_log2_size) {
     if (old_metadata.get() != metadata)
       std::memcpy(old_metadata.get_mutable(), metadata, new_size);
+    update_metadata_handle(name, old_metadata);
     return old_metadata;
   }
 
   auto new_metadata = realloc_metadata(it, new_log2_size);
   std::memcpy(new_metadata.get_mutable(), metadata, new_size);
+  update_metadata_handle(name, new_metadata);
   return new_metadata;
+}
+
+void DirectoryMap::update_metadata_handle(std::string_view name, Block::DataRef<EntryMetadata> metadata) const {
+  auto handle_it = metadata_handles_.find(name);
+  if (handle_it == metadata_handles_.end())
+    return;
+  if (auto handle = handle_it->second.lock()) {
+    handle->metadata = std::move(metadata);
+  } else {
+    metadata_handles_.erase(handle_it);
+  }
 }
 
 template <DirectoryTreeImpl TreeType>
@@ -258,6 +291,7 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
 }
 
 void DirectoryMap::Init() {
+  metadata_handles_.clear();
   DirectoryLeafTree root_tree{root_block_};
   root_tree.Init(/*is_root=*/true);
 }

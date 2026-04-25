@@ -15,13 +15,21 @@
 #include "structs.h"
 
 class QuotaArea;
+class DirectoryMap;
 
 class Entry {
  public:
   using MetadataRef = Block::DataRef<EntryMetadata>;
+  struct MetadataHandle {
+    explicit MetadataHandle(MetadataRef metadata) : metadata(std::move(metadata)) {}
+    MetadataRef metadata;
+  };
+  using MetadataHandleRef = std::shared_ptr<MetadataHandle>;
 
-  Entry(std::string name, MetadataRef block);
+  Entry(std::string name, MetadataHandleRef metadata);
   virtual ~Entry();
+
+  static MetadataHandleRef CreateMetadataHandle(MetadataRef metadata);
 
   std::string_view name() const { return name_; }
   bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
@@ -37,14 +45,16 @@ class Entry {
 
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                               std::string name,
-                                                              MetadataRef metadata_ref);
+                                                              MetadataHandleRef metadata,
+                                                              std::shared_ptr<DirectoryMap> directory_map,
+                                                              std::string directory_key);
 
  protected:
   // TODO: Metadata copy as it can change?
-  EntryMetadata* mutable_metadata() { return metadata_.get_mutable(); }
-  const EntryMetadata* metadata() const { return metadata_.get(); }
-  const std::shared_ptr<Block>& metadata_block() const { return metadata_.block; }
+  EntryMetadata* mutable_metadata() { return metadata_->metadata.get_mutable(); }
+  const EntryMetadata* metadata() const { return metadata_->metadata.get(); }
+  const std::shared_ptr<Block>& metadata_block() const { return metadata_->metadata.block; }
 
   std::string name_;
-  MetadataRef metadata_;
+  MetadataHandleRef metadata_;
 };

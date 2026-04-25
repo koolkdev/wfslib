@@ -8,9 +8,27 @@
 #include "file.h"
 
 #include <algorithm>
+#include <cassert>
+#include <cstring>
+#include <utility>
 
 #include "block.h"
+#include "directory_map.h"
+#include "errors.h"
 #include "file_layout_accessor.h"
+#include "file_resizer.h"
+
+File::File(std::string name,
+           MetadataHandleRef metadata,
+           std::shared_ptr<QuotaArea> quota,
+           std::shared_ptr<DirectoryMap> directory_map,
+           std::string directory_key)
+    : Entry(std::move(name), std::move(metadata)),
+      quota_(std::move(quota)),
+      directory_map_(std::move(directory_map)),
+      directory_key_(std::move(directory_key)) {
+  assert(directory_map_);
+}
 
 uint32_t File::Size() const {
   return metadata()->file_size.value();
@@ -25,12 +43,19 @@ bool File::IsEncrypted() const {
 }
 
 void File::Resize(size_t new_size) {
-  // TODO: implment it, write now change up to size_on_disk without ever chaning size_on_disk
-  new_size = std::min(new_size, static_cast<size_t>(metadata_.get()->size_on_disk.value()));
-  size_t old_size = metadata_.get()->file_size.value();
-  if (new_size != old_size) {
-    CreateLayoutAccessor(shared_from_this())->Resize(new_size);
-  }
+  FileResizer::Resize(*this, new_size);
+}
+
+void File::OverwriteMetadata(const EntryMetadata* new_metadata) {
+  auto* current_metadata = mutable_metadata();
+  assert(new_metadata->metadata_log2_size.value() == current_metadata->metadata_log2_size.value());
+  if (new_metadata != current_metadata)
+    std::memcpy(current_metadata, new_metadata, size_t{1} << new_metadata->metadata_log2_size.value());
+}
+
+void File::ReallocateMetadata(const EntryMetadata* new_metadata) {
+  assert(new_metadata->metadata_log2_size.value() != metadata()->metadata_log2_size.value());
+  metadata_->metadata = throw_if_error(directory_map_->replace_metadata(directory_key_, new_metadata));
 }
 
 File::file_device::file_device(const std::shared_ptr<File>& file)

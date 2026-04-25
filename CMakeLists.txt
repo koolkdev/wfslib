@@ -41,6 +41,7 @@ add_library(${PROJECT_NAME}
     src/file_device.cpp
     src/file_layout.cpp
     src/file_layout_accessor.cpp
+    src/file_resizer.cpp
     src/free_blocks_allocator.cpp
     src/free_blocks_tree_iterator.cpp
     src/free_blocks_tree.cpp

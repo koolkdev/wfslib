@@ -11,8 +11,11 @@
 #include <boost/iostreams/positioning.hpp>
 #include <boost/iostreams/stream.hpp>
 #include <memory>
+#include <string>
 #include "entry.h"
 
+class DirectoryMap;
+class FileResizer;
 class QuotaArea;
 
 class File : public Entry, public std::enable_shared_from_this<File> {
@@ -25,8 +28,11 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   class ClusterMetadataBlocksLayoutAccessor;
 
  public:
-  File(std::string name, MetadataRef metadata, std::shared_ptr<QuotaArea> quota)
-      : Entry(std::move(name), std::move(metadata)), quota_(std::move(quota)) {}
+  File(std::string name,
+       MetadataHandleRef metadata,
+       std::shared_ptr<QuotaArea> quota,
+       std::shared_ptr<DirectoryMap> directory_map,
+       std::string directory_key);
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;
@@ -55,10 +61,16 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   typedef boost::iostreams::stream<file_device> stream;
 
  private:
+  friend class FileResizer;
+
   std::shared_ptr<QuotaArea> quota() const { return quota_; }
+  void OverwriteMetadata(const EntryMetadata* metadata);
+  void ReallocateMetadata(const EntryMetadata* metadata);
 
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;
+  std::shared_ptr<DirectoryMap> directory_map_;
+  std::string directory_key_;
 
   static std::shared_ptr<LayoutAccessor> CreateLayoutAccessor(std::shared_ptr<File> file);
 };

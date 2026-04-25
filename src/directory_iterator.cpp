@@ -7,14 +7,20 @@
 
 #include "directory_iterator.h"
 
+#include "directory_map.h"
 #include "entry.h"
 
-DirectoryIterator::DirectoryIterator(DirectoryMapIterator base) : base_(base) {}
+DirectoryIterator::DirectoryIterator(DirectoryMapIterator base, std::shared_ptr<DirectoryMap> map)
+    : base_(base), map_(std::move(map)) {}
 
 DirectoryIterator::reference DirectoryIterator::operator*() const {
   auto val = *base_;
-  auto name = val.metadata.get()->GetCaseSensitiveName(val.name);
-  return {name, Entry::Load(base_.quota(), name, val.metadata)};
+  auto metadata = map_->metadata_handle(val.name);
+  if (!metadata.has_value())
+    return {val.name, std::unexpected(metadata.error())};
+
+  auto name = (*metadata)->metadata.get()->GetCaseSensitiveName(val.name);
+  return {name, Entry::Load(base_.quota(), name, *metadata, map_, val.name)};
 }
 
 DirectoryIterator& DirectoryIterator::operator++() {

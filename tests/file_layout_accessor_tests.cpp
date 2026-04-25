@@ -19,10 +19,12 @@
 #include <vector>
 
 #include <wfslib/device.h>
+#include <wfslib/directory.h>
 #include <wfslib/file.h>
 #include <wfslib/wfs_device.h>
 
 #include "block.h"
+#include "directory_map.h"
 #include "file_layout.h"
 #include "quota_area.h"
 #include "structs.h"
@@ -46,12 +48,15 @@ class FileLayoutAccessorFixture : public MetadataBlockFixture {
  public:
   std::shared_ptr<WfsDevice> wfs_device = *WfsDevice::Create(test_device);
   std::shared_ptr<QuotaArea> quota = wfs_device->GetRootArea();
+  std::shared_ptr<Block> root_block = *quota->AllocMetadataBlock();
+  DirectoryMap directory_map{quota, root_block};
+  std::shared_ptr<Directory> directory = std::make_shared<Directory>("", Entry::MetadataRef{}, quota, root_block);
+
+  FileLayoutAccessorFixture() { directory_map.Init(); }
 
   TestFile CreateFile(std::string_view name, const FileLayout& layout) {
-    auto metadata_block = *quota->AllocMetadataBlock();
-    auto* metadata = metadata_block->get_mutable_object<EntryMetadata>(0);
-    std::fill(reinterpret_cast<std::byte*>(metadata),
-              reinterpret_cast<std::byte*>(metadata) + (size_t{1} << layout.metadata_log2_size), std::byte{0});
+    std::vector<std::byte> metadata_bytes(size_t{1} << layout.metadata_log2_size, std::byte{0});
+    auto* metadata = reinterpret_cast<EntryMetadata*>(metadata_bytes.data());
     metadata->flags = EntryMetadata::UNENCRYPTED_FILE;
     metadata->file_size = layout.file_size;
     metadata->size_on_disk = layout.size_on_disk;
@@ -59,8 +64,13 @@ class FileLayoutAccessorFixture : public MetadataBlockFixture {
     metadata->size_category = FileLayout::CategoryValue(layout.category);
     metadata->filename_length = static_cast<uint8_t>(name.size());
 
-    auto file = std::make_shared<File>(std::string{name}, Entry::MetadataRef{metadata_block, 0}, quota);
-    return {std::move(file), std::move(metadata_block), metadata};
+    REQUIRE(directory_map.insert(name, metadata));
+    auto file = directory->GetFile(name);
+    REQUIRE(file.has_value());
+    auto it = directory->find(name);
+    REQUIRE(!it.is_end());
+    auto metadata_ref = (*it.base()).metadata;
+    return {*file, metadata_ref.block, metadata_ref.get_mutable()};
   }
 
   TestFile CreateFile(std::string_view name, uint32_t file_size) {

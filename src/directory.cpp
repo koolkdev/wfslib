@@ -16,10 +16,10 @@ Directory::Directory(std::string name,
                      MetadataRef metadata,
                      std::shared_ptr<QuotaArea> quota,
                      std::shared_ptr<Block> block)
-    : Entry(std::move(name), std::move(metadata)),
+    : Entry(std::move(name), Entry::CreateMetadataHandle(std::move(metadata))),
       quota_(std::move(quota)),
       block_(std::move(block)),
-      map_{quota_, block_} {}
+      map_{std::make_shared<DirectoryMap>(quota_, block_)} {}
 
 std::expected<std::shared_ptr<Entry>, WfsError> Directory::GetEntry(std::string_view name) const {
   try {
@@ -59,5 +59,5 @@ Directory::iterator Directory::find(std::string_view key) const {
   std::string lowercase_key{key};
   // to lowercase
   std::ranges::transform(lowercase_key, lowercase_key.begin(), [](char c) { return std::tolower(c); });
-  return {map_.find(lowercase_key)};
+  return {map_->find(lowercase_key), map_};
 }
