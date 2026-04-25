@@ -11,12 +11,12 @@
 #include <array>
 #include <cstddef>
 #include <cstdint>
-#include <format>
 #include <initializer_list>
 #include <ios>
 #include <memory>
 #include <ranges>
 #include <span>
+#include <string>
 #include <string_view>
 #include <vector>
 
@@ -88,7 +88,10 @@ class FileResizeFixture : public MetadataBlockFixture {
 };
 
 std::string EntryName(uint32_t index) {
-  return std::format("{:05}", index);
+  auto name = std::to_string(index);
+  if (name.size() < 5)
+    name.insert(name.begin(), 5 - name.size(), '0');
+  return name;
 }
 
 std::vector<std::byte> Bytes(std::initializer_list<uint8_t> values) {
@@ -175,6 +178,29 @@ TEST_CASE_METHOD(FileResizeFixture,
   WriteFile(file, replacement, small_inline_capacity);
   expected.back() = replacement.front();
   CHECK(ReadFile(file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize keeps existing file handles valid after inline metadata reallocation",
+                 "[file][resize]") {
+  const auto small_inline_capacity =
+      (size_t{1} << 6) - FileLayout::BaseMetadataSize(static_cast<uint8_t>(kTestFilename.size()));
+  std::vector<std::byte> initial(small_inline_capacity, std::byte{0x2a});
+  auto first_file = InsertInlineFile(kTestFilename, initial);
+  auto second_file = directory->GetFile(kTestFilename);
+  REQUIRE(second_file.has_value());
+
+  first_file->Resize(small_inline_capacity + 1);
+
+  auto expected = initial;
+  expected.push_back(std::byte{0});
+  CHECK((*second_file)->Size() == expected.size());
+  CHECK(ReadFile(*second_file, expected.size()) == expected);
+
+  constexpr std::array replacement{std::byte{0xf0}};
+  WriteFile(*second_file, replacement, small_inline_capacity);
+  expected.back() = replacement.front();
+  CHECK(ReadFile(first_file, expected.size()) == expected);
 }
 
 TEST_CASE_METHOD(FileResizeFixture,

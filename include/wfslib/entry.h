@@ -21,6 +21,7 @@ class Entry {
  public:
   using MetadataRef = Block::DataRef<EntryMetadata>;
   using MetadataUpdater = std::function<std::expected<MetadataRef, WfsError>(const EntryMetadata*)>;
+  using MetadataRefresher = std::function<std::expected<MetadataRef, WfsError>()>;
 
   Entry(std::string name, MetadataRef block);
   virtual ~Entry();
@@ -40,7 +41,8 @@ class Entry {
   static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
                                                               std::string name,
                                                               MetadataRef metadata_ref,
-                                                              MetadataUpdater metadata_updater = {});
+                                                              MetadataUpdater metadata_updater = {},
+                                                              MetadataRefresher metadata_refresher = {});
 
  protected:
   // TODO: Metadata copy as it can change?

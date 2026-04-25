@@ -62,13 +62,21 @@ void File::Resize(size_t new_size) {
   ResizeInline(layout);
 }
 
+void File::RefreshMetadata() const {
+  if (metadata_refresher_)
+    const_cast<File*>(this)->metadata_ = throw_if_error(metadata_refresher_());
+}
+
 void File::ReplaceMetadata(const EntryMetadata* metadata) {
   if (metadata_updater_) {
     metadata_ = throw_if_error(metadata_updater_(metadata));
     return;
   }
 
-  assert(metadata->metadata_log2_size.value() == metadata_->metadata_log2_size.value());
+  if (metadata->metadata_log2_size.value() != metadata_->metadata_log2_size.value()) {
+    assert(false);
+    throw WfsException(WfsError::kUnsupportedFileResize);
+  }
   if (metadata != metadata_.get())
     std::memcpy(metadata_.get_mutable(), metadata, size_t{1} << metadata->metadata_log2_size.value());
 }

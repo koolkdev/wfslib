@@ -17,14 +17,24 @@ DirectoryIterator::reference DirectoryIterator::operator*() const {
   auto val = *base_;
   auto name = val.metadata.get()->GetCaseSensitiveName(val.name);
   Entry::MetadataUpdater metadata_updater;
+  Entry::MetadataRefresher metadata_refresher;
   if (map_) {
-    auto map = map_;
-    auto map_name = val.name;
-    metadata_updater = [map = std::move(map), map_name = std::move(map_name)](const EntryMetadata* metadata) {
-      return map->replace_metadata(map_name, metadata);
+    auto updater_map = map_;
+    auto updater_name = val.name;
+    metadata_updater = [map = std::move(updater_map), map_name = std::move(updater_name)](
+                           const EntryMetadata* metadata) { return map->replace_metadata(map_name, metadata); };
+    auto refresher_map = map_;
+    auto refresher_name = val.name;
+    metadata_refresher = [map = std::move(refresher_map),
+                          map_name = std::move(refresher_name)]() -> std::expected<Entry::MetadataRef, WfsError> {
+      auto it = map->find(map_name);
+      if (it.is_end())
+        return std::unexpected(WfsError::kEntryNotFound);
+      return (*it).metadata;
     };
   }
-  return {name, Entry::Load(base_.quota(), name, val.metadata, std::move(metadata_updater))};
+  return {name,
+          Entry::Load(base_.quota(), name, val.metadata, std::move(metadata_updater), std::move(metadata_refresher))};
 }
 
 DirectoryIterator& DirectoryIterator::operator++() {
