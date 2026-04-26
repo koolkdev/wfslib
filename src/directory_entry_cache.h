@@ -29,7 +29,9 @@ class DirectoryEntryCache {
   void RefreshMetadataRefs(const DirectoryMap& directory_map);
 
  private:
-  Entry::EntryHandlePtr HandleFor(std::string_view key, Block::DataRef<EntryMetadata> metadata);
+  Entry::EntryHandlePtr HandleFor(std::shared_ptr<DirectoryMap> directory_map,
+                                  std::string_view key,
+                                  Block::DataRef<EntryMetadata> metadata);
 
   std::map<std::string, std::weak_ptr<Entry::EntryHandle>> handles_;
   std::map<std::string, std::weak_ptr<Entry>> entries_;

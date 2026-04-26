@@ -15,8 +15,7 @@ class QuotaArea;
 
 class Link : public Entry, public std::enable_shared_from_this<Link> {
  public:
-  Link(EntryHandlePtr handle, std::shared_ptr<QuotaArea> quota, std::shared_ptr<DirectoryMap> directory_map)
-      : Entry(std::move(handle), std::move(directory_map)), quota_(std::move(quota)) {}
+  Link(EntryHandlePtr handle, std::shared_ptr<QuotaArea> quota) : Entry(std::move(handle)), quota_(std::move(quota)) {}
 
  private:
   // TODO: We may have cyclic reference here if we do cache in area.

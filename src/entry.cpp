@@ -14,13 +14,14 @@
 #include "link.h"
 #include "quota_area.h"
 
-Entry::Entry(EntryHandlePtr handle, std::shared_ptr<DirectoryMap> directory_map)
-    : handle_(std::move(handle)), directory_map_(std::move(directory_map)) {}
+Entry::Entry(EntryHandlePtr handle) : handle_(std::move(handle)) {}
 
 Entry::~Entry() = default;
 
-std::string_view Entry::name() const {
-  return handle_->name();
+std::string Entry::name() const {
+  if (!handle_->directory_map())
+    return std::string{handle_->key()};
+  return handle_->get()->GetCaseSensitiveName(handle_->key());
 }
 
 EntryMetadata* Entry::mutable_metadata() {
@@ -36,13 +37,11 @@ const std::shared_ptr<Block>& Entry::metadata_block() const {
 }
 
 // static
-std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<QuotaArea> quota,
-                                                            EntryHandlePtr handle,
-                                                            std::shared_ptr<DirectoryMap> directory_map) {
+std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<QuotaArea> quota, EntryHandlePtr handle) {
   auto* metadata = handle->get();
   if (metadata->is_link()) {
     // TODO, I think that the link info is in the metadata metadata
-    return std::make_shared<Link>(std::move(handle), std::move(quota), std::move(directory_map));
+    return std::make_shared<Link>(std::move(handle), std::move(quota));
   } else if (metadata->is_directory()) {
     if (metadata->flags.value() & metadata->Flags::QUOTA) {
       // The directory is quota, aka new area
@@ -59,13 +58,20 @@ std::expected<std::shared_ptr<Entry>, WfsError> Entry::Load(std::shared_ptr<Quot
     }
   } else {
     // IsFile()
-    return std::make_shared<File>(std::move(handle), std::move(quota), std::move(directory_map));
+    return std::make_shared<File>(std::move(handle), std::move(quota));
   }
 }
 
 // static
-Entry::EntryHandlePtr Entry::CreateEntryHandle(std::string name, MetadataRef metadata) {
-  return std::make_shared<EntryHandle>(std::move(name), std::move(metadata));
+Entry::EntryHandlePtr Entry::CreateEntryHandle(std::shared_ptr<DirectoryMap> directory_map,
+                                               std::string key,
+                                               MetadataRef metadata) {
+  return std::make_shared<EntryHandle>(std::move(directory_map), std::move(key), std::move(metadata));
+}
+
+// static
+Entry::EntryHandlePtr Entry::CreateSyntheticEntryHandle(std::string name, MetadataRef metadata) {
+  return std::make_shared<EntryHandle>(nullptr, std::move(name), std::move(metadata));
 }
 
 uint32_t Entry::owner() const {
@@ -84,11 +90,15 @@ uint32_t Entry::modification_time() const {
   return metadata()->mtime.value();
 }
 
-Entry::EntryHandle::EntryHandle(std::string name, MetadataRef metadata)
-    : name_(std::move(name)), metadata_(std::move(metadata)) {}
+Entry::EntryHandle::EntryHandle(std::shared_ptr<DirectoryMap> directory_map, std::string key, MetadataRef metadata)
+    : directory_map_(std::move(directory_map)), key_(std::move(key)), metadata_(std::move(metadata)) {}
 
-std::string_view Entry::EntryHandle::name() const {
-  return name_;
+std::string_view Entry::EntryHandle::key() const {
+  return key_;
+}
+
+const std::shared_ptr<DirectoryMap>& Entry::EntryHandle::directory_map() const {
+  return directory_map_;
 }
 
 const EntryMetadata* Entry::EntryHandle::get() const {
@@ -103,8 +113,8 @@ const std::shared_ptr<Block>& Entry::EntryHandle::block() const {
   return metadata_ref().block;
 }
 
-void Entry::EntryHandle::Update(std::string name, MetadataRef metadata) {
-  name_ = std::move(name);
+void Entry::EntryHandle::Update(std::string key, MetadataRef metadata) {
+  key_ = std::move(key);
   metadata_ = std::move(metadata);
 }
 

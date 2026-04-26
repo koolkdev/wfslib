@@ -25,10 +25,10 @@ class Entry {
   class EntryHandle;
   using EntryHandlePtr = std::shared_ptr<EntryHandle>;
 
-  Entry(EntryHandlePtr handle, std::shared_ptr<DirectoryMap> directory_map);
+  explicit Entry(EntryHandlePtr handle);
   virtual ~Entry();
 
-  std::string_view name() const;
+  std::string name() const;
   bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
   bool is_file() const { return !metadata()->is_link() && !metadata()->is_directory(); }
   bool is_link() const { return metadata()->is_link(); }
@@ -40,26 +40,26 @@ class Entry {
   uint32_t creation_time() const;
   uint32_t modification_time() const;
 
-  static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
-                                                              EntryHandlePtr handle,
-                                                              std::shared_ptr<DirectoryMap> directory_map);
-  static EntryHandlePtr CreateEntryHandle(std::string name, MetadataRef metadata);
+  static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota, EntryHandlePtr handle);
+  static EntryHandlePtr CreateEntryHandle(std::shared_ptr<DirectoryMap> directory_map,
+                                          std::string key,
+                                          MetadataRef metadata);
+  static EntryHandlePtr CreateSyntheticEntryHandle(std::string name, MetadataRef metadata);
 
  protected:
-  // TODO: Metadata copy as it can change?
   EntryMetadata* mutable_metadata();
   const EntryMetadata* metadata() const;
   const std::shared_ptr<Block>& metadata_block() const;
 
   EntryHandlePtr handle_;
-  std::shared_ptr<DirectoryMap> directory_map_;
 };
 
 class Entry::EntryHandle {
  public:
-  EntryHandle(std::string name, MetadataRef metadata);
+  EntryHandle(std::shared_ptr<DirectoryMap> directory_map, std::string key, MetadataRef metadata);
 
-  std::string_view name() const;
+  std::string_view key() const;
+  const std::shared_ptr<DirectoryMap>& directory_map() const;
   const EntryMetadata* get() const;
   EntryMetadata* get_mutable() const;
   const std::shared_ptr<Block>& block() const;
@@ -67,10 +67,11 @@ class Entry::EntryHandle {
  private:
   friend class DirectoryEntryCache;
 
-  void Update(std::string name, MetadataRef metadata);
+  void Update(std::string key, MetadataRef metadata);
   void Invalidate();
   const MetadataRef& metadata_ref() const;
 
-  std::string name_;
+  std::shared_ptr<DirectoryMap> directory_map_;
+  std::string key_;
   std::optional<MetadataRef> metadata_;
 };

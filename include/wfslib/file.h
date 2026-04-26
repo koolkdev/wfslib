@@ -25,8 +25,7 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   class ClusterMetadataBlocksLayoutAccessor;
 
  public:
-  File(EntryHandlePtr handle, std::shared_ptr<QuotaArea> quota, std::shared_ptr<DirectoryMap> directory_map)
-      : Entry(std::move(handle), std::move(directory_map)), quota_(std::move(quota)) {}
+  File(EntryHandlePtr handle, std::shared_ptr<QuotaArea> quota) : Entry(std::move(handle)), quota_(std::move(quota)) {}
 
   uint32_t Size() const;
   uint32_t SizeOnDisk() const;

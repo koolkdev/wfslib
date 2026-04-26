@@ -68,12 +68,12 @@ std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory1() {
   return LoadDirectory(header()->shadow_directory_block_number_1.value(),
-                       Entry::CreateEntryHandle(".shadow_dir_1", {}));
+                       Entry::CreateSyntheticEntryHandle(".shadow_dir_1", {}));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory2() {
   return LoadDirectory(header()->shadow_directory_block_number_2.value(),
-                       Entry::CreateEntryHandle(".shadow_dir_2", {}));
+                       Entry::CreateSyntheticEntryHandle(".shadow_dir_2", {}));
 }
 
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::LoadQuotaArea(uint32_t area_block_number,
