@@ -116,20 +116,24 @@ std::shared_ptr<Block> LoadResizableDataBlock(const std::shared_ptr<QuotaArea>& 
 }
 
 template <FileLayoutCategory Category>
-void FlushAndDetachCachedDataBlocks(const std::shared_ptr<QuotaArea>& quota,
-                                    const std::shared_ptr<Block>& metadata_block,
-                                    EntryMetadata* metadata,
-                                    const FileLayout& layout,
-                                    bool encrypted,
-                                    uint8_t block_size_log2) {
+void DetachOldDataBlocks(const std::shared_ptr<QuotaArea>& quota,
+                         const std::shared_ptr<Block>& metadata_block,
+                         EntryMetadata* metadata,
+                         const FileLayout& old_layout,
+                         const FileLayout& target_layout,
+                         bool encrypted,
+                         uint8_t block_size_log2) {
   const auto data_block_log2_size = FileDataBlockLog2Size<Category>(block_size_log2);
-  const auto data_blocks_count = div_ceil(layout.file_size, uint32_t{1} << data_block_log2_size);
+  const auto data_blocks_count = div_ceil(old_layout.file_size, uint32_t{1} << data_block_log2_size);
   for (const auto data_block_index : std::views::iota(size_t{0}, data_blocks_count)) {
     const auto block_offset = data_block_index << data_block_log2_size;
-    const auto data_size = UsedDataBlockSize(layout.file_size, block_offset, data_block_log2_size);
+    const auto data_size = UsedDataBlockSize(old_layout.file_size, block_offset, data_block_log2_size);
+    const auto target_data_size = UsedDataBlockSize(target_layout.file_size, block_offset, data_block_log2_size);
     auto data_block = LoadResizableDataBlock<Category>(quota, metadata_block, metadata, data_block_index, data_size,
                                                        encrypted, /*new_block=*/true, block_size_log2);
-    data_block->Flush();
+    // Dropped blocks follow truncate semantics; only retained bytes need current hashes copied to replacement metadata.
+    if (target_data_size != 0)
+      data_block->Flush();
     data_block->Detach();
   }
 }
@@ -186,8 +190,8 @@ void FileResizer::ResizeDataUnitLayout(const FileLayout& target_layout) {
   const auto old_layout = CurrentLayout<Category>(metadata, block_size_log2);
   const auto encrypted = !(metadata->flags.value() & EntryMetadata::UNENCRYPTED_FILE);
 
-  FlushAndDetachCachedDataBlocks<Category>(file_->quota(), file_->metadata_block(), file_->mutable_metadata(),
-                                           old_layout, encrypted, block_size_log2);
+  DetachOldDataBlocks<Category>(file_->quota(), file_->metadata_block(), file_->mutable_metadata(), old_layout,
+                                target_layout, encrypted, block_size_log2);
 
   const auto old_metadata = LogicalMetadata<Category>(metadata, old_layout.data_units_count);
   const auto allocated_units_count = target_layout.data_units_count > old_layout.data_units_count
