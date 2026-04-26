@@ -51,6 +51,9 @@ target_compile_options(${PROJECT_NAME} PRIVATE
   $<$<CXX_COMPILER_ID:MSVC>:/W4 /WX>
   $<$<NOT:$<CXX_COMPILER_ID:MSVC>>:-Wall -Wextra -Wpedantic -Werror>
 )
+target_compile_definitions(${PROJECT_NAME} PRIVATE
+  $<$<AND:$<CXX_COMPILER_ID:Clang>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,22>>:CATCH_CONFIG_NO_COUNTER>
+)
 
 get_property(wfs_include_dirs TARGET wfslib PROPERTY INCLUDE_DIRECTORIES)
 
