@@ -10,7 +10,9 @@
 #include <random>
 #include <ranges>
 
+#include "eptree.h"
 #include "free_blocks_tree.h"
+#include "free_blocks_tree_bucket.h"
 
 #include "utils/range_assertions.h"
 #include "utils/test_fixtures.h"
@@ -294,4 +296,65 @@ TEST_CASE_METHOD(AreaAllocatorFixture,
   REQUIRE(ranges->at(0).blocks_count == kTreeBlocksCount / 2);
   REQUIRE(ranges->at(1).block_number == kThirdFragmentAddress);
   REQUIRE(ranges->at(1).blocks_count == kTreeBlocksCount);
+}
+
+TEST_CASE_METHOD(FreeBlocksAllocatorFixture,
+                 "FreeBlocksAllocator finds a nearby free extent without an exact key match",
+                 "[free-blocks][allocator][regression]") {
+  REQUIRE(allocator.Init(0));
+
+  FreeBlocksTreeBucket bucket{&allocator, 0};
+  REQUIRE(bucket.insert({10, nibble{0}}));
+
+  std::vector<FreeBlocksExtentInfo> allocated;
+  REQUIRE(allocator.FindSmallestFreeBlockExtent(11, allocated) == 10);
+  REQUIRE(allocated == std::vector<FreeBlocksExtentInfo>{{10, 1, 0}});
+}
+
+TEST_CASE_METHOD(AreaAllocatorFixture,
+                 "FreeBlocksAllocator recreates a collapsed EPTree",
+                 "[free-blocks][allocator][regression]") {
+  REQUIRE(allocator.Init(1000000));
+
+  EPTree eptree{&allocator};
+  constexpr uint32_t kExtraEntries = 1000;
+  for (uint32_t i = 1; i <= kExtraEntries; ++i) {
+    REQUIRE(eptree.insert({i, i + 1000}));
+  }
+
+  std::vector<FreeBlocksRangeInfo> blocks_to_delete;
+  for (uint32_t i = 1; i <= kExtraEntries; ++i) {
+    REQUIRE(eptree.erase(i, blocks_to_delete));
+  }
+  REQUIRE((eptree.tree_header()->depth.value() > 1 || eptree.tree_header()->current_tree.tree_depth.value() > 0));
+
+  allocator.RecreateEPTreeForTesting();
+
+  EPTree recreated_eptree{&allocator};
+  REQUIRE(recreated_eptree.tree_header()->depth.value() == 1);
+  REQUIRE(recreated_eptree.tree_header()->current_tree.tree_depth.value() == 0);
+  REQUIRE(CollectKeyValues(recreated_eptree) ==
+          std::vector<std::pair<uint32_t, uint32_t>>{{0, allocator.initial_ftrees_block_number()}});
+}
+
+TEST_CASE_METHOD(AreaAllocatorFixture,
+                 "FreeBlocksAllocator trims fragmented area allocation from the lowest selected range",
+                 "[free-blocks][allocator][regression]") {
+  REQUIRE(allocator.Init(0));
+  allocator.set_blocks_cache_size_log2(0);
+
+  REQUIRE(allocator.AddFreeBlocks({1000, 100}));
+  REQUIRE(allocator.AddFreeBlocks({2000, 100}));
+
+  auto ranges = allocator.AllocAreaBlocks(150, BlockType::Single);
+  REQUIRE(ranges);
+  REQUIRE(ranges->size() == 2);
+  REQUIRE(ranges->at(0).block_number == 1050);
+  REQUIRE(ranges->at(0).blocks_count == 50);
+  REQUIRE(ranges->at(1).block_number == 2000);
+  REQUIRE(ranges->at(1).blocks_count == 100);
+  REQUIRE(allocator.GetHeader()->free_blocks_count.value() == 50);
+  REQUIRE(allocator.IsRangeIsFree({1000, 50}));
+  REQUIRE_FALSE(allocator.IsRangeIsFree({1050, 50}));
+  REQUIRE_FALSE(allocator.IsRangeIsFree({2000, 100}));
 }

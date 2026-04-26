@@ -17,7 +17,10 @@ FTreesIterator& FTreesIterator::operator++() {
     reverse_end_.reset(index_);
     // todo: enumrate
     for (auto& ftree : ftrees_) {
-      while (!reverse_end_.test(ftree.node.index()) && !ftree.iterator.is_end() && (*++ftree.iterator).key() < key) {
+      while (!reverse_end_.test(ftree.node.index()) && !ftree.iterator.is_end()) {
+        ++ftree.iterator;
+        if (ftree.iterator.is_end() || (*ftree.iterator).key() >= key)
+          break;
       }
     }
     is_forward_ = true;

@@ -27,6 +27,8 @@ class TestFreeBlocksAllocator : public FreeBlocksAllocator {
   uint32_t initial_frees_block_number() const { return initial_frees_block_number_; }
 
   void set_blocks_cache_size_log2(size_t size) { blocks_cache_size_log2_ = size; }
+  void set_free_blocks_count_for_testing(uint32_t count) { mutable_header()->free_blocks_count = count; }
+  void RecreateEPTreeForTesting() { RecreateEPTreeIfNeeded(); }
 
   const FreeBlocksAllocatorHeader* GetHeader() const { return header(); }
 
