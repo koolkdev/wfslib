@@ -340,6 +340,29 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 1 by one block",
   CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
+TEST_CASE_METHOD(FileResizeFixture, "File resize preserves dirty cached data blocks", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size + 4;
+  const auto target_size = 2 * block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  {
+    File::file_device writer(test_file.file);
+    const auto wrote = writer.write(reinterpret_cast<const char*>(kReplacementData.data()),
+                                    static_cast<std::streamsize>(kReplacementData.size()));
+    REQUIRE(wrote == static_cast<std::streamsize>(kReplacementData.size()));
+
+    test_file.file->Resize(target_size);
+  }
+
+  auto expected = initial_data;
+  std::ranges::copy(kReplacementData, expected.begin());
+  expected.resize(target_size, std::byte{0});
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
 TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 1 to one block", "[file-resize][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   const auto initial_size = 2 * block_size + 4;
