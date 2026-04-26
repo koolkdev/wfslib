@@ -7,13 +7,16 @@
 
 #pragma once
 
+#include <memory>
+
+#include "directory_entry_cache.h"
 #include "directory_map_iterator.h"
 #include "errors.h"
 
 template <typename T>
 concept DirectoryTreeImpl = std::same_as<T, DirectoryLeafTree> || std::same_as<T, DirectoryParentTree>;
 
-class DirectoryMap {
+class DirectoryMap : public std::enable_shared_from_this<DirectoryMap> {
  public:
   using iterator = DirectoryMapIterator;
 
@@ -25,6 +28,7 @@ class DirectoryMap {
   iterator end() const;
 
   iterator find(std::string_view key) const;
+  std::expected<std::shared_ptr<Entry>, WfsError> LoadEntry(iterator it);
 
   bool insert(std::string_view name, const EntryMetadata* metadata);
   bool erase(std::string_view name);
@@ -43,4 +47,5 @@ class DirectoryMap {
 
   std::shared_ptr<QuotaArea> quota_;
   std::shared_ptr<Block> root_block_;
+  DirectoryEntryCache entry_cache_;
 };

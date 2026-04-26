@@ -47,6 +47,10 @@ DirectoryMap::iterator DirectoryMap::end() const {
   return {quota_, std::move(parents), std::move(leaf)};
 }
 
+std::expected<std::shared_ptr<Entry>, WfsError> DirectoryMap::LoadEntry(iterator it) {
+  return entry_cache_.Load(*this, std::move(it), quota_);
+}
+
 // Or maybe realloc?
 Block::DataRef<EntryMetadata> DirectoryMap::alloc_metadata(iterator it, size_t log2_size) {
   auto size = static_cast<uint16_t>(1 << log2_size);
@@ -137,11 +141,13 @@ bool DirectoryMap::erase(std::string_view name) {
     // Not in tree
     return false;
   }
+  auto key = (*it).name;
   auto parents = it.parents();
   // Free the entry metadata first
   it.leaf().node.Free((*it.leaf().iterator).value(),
                       static_cast<uint16_t>(1 << (*it).metadata->metadata_log2_size.value()));
   it.leaf().node.erase(it.leaf().iterator);
+  entry_cache_.EntryRemoved(key);
   bool last_empty = it.leaf().node.empty();
   if (!last_empty)
     return true;
@@ -195,16 +201,21 @@ std::expected<Block::DataRef<EntryMetadata>, WfsError> DirectoryMap::replace_met
     return std::unexpected(WfsError::kEntryNotFound);
 
   auto old_metadata = (*it).metadata;
+  assert((old_metadata->flags.value() & (EntryMetadata::LINK | EntryMetadata::DIRECTORY | EntryMetadata::QUOTA)) ==
+         (metadata->flags.value() & (EntryMetadata::LINK | EntryMetadata::DIRECTORY | EntryMetadata::QUOTA)));
+
   auto old_log2_size = old_metadata->metadata_log2_size.value();
   auto new_size = static_cast<uint16_t>(1 << new_log2_size);
   if (old_log2_size == new_log2_size) {
     if (old_metadata.get() != metadata)
       std::memcpy(old_metadata.get_mutable(), metadata, new_size);
+    entry_cache_.MetadataUpdated(name, old_metadata);
     return old_metadata;
   }
 
   auto new_metadata = realloc_metadata(it, new_log2_size);
   std::memcpy(new_metadata.get_mutable(), metadata, new_size);
+  entry_cache_.MetadataUpdated(name, new_metadata);
   return new_metadata;
 }
 
@@ -254,6 +265,9 @@ bool DirectoryMap::split_tree(std::vector<iterator::parent_node_info>& parents,
   assert(!parents.back().iterator.is_end());
 
   tree = std::ranges::lexicographical_compare(for_key, middle_key) ? new_left_tree : new_right_tree;
+  if constexpr (std::same_as<TreeType, DirectoryLeafTree>) {
+    entry_cache_.RefreshMetadataRefs(*this);
+  }
   return true;
 }
 

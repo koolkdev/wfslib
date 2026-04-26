@@ -9,21 +9,26 @@
 
 #include <expected>
 #include <memory>
+#include <optional>
 #include <string>
 
 #include "block.h"
 #include "structs.h"
 
 class QuotaArea;
+class DirectoryMap;
+class DirectoryEntryCache;
 
 class Entry {
  public:
   using MetadataRef = Block::DataRef<EntryMetadata>;
+  class EntryHandle;
+  using EntryHandlePtr = std::shared_ptr<EntryHandle>;
 
-  Entry(std::string name, MetadataRef block);
+  explicit Entry(EntryHandlePtr handle);
   virtual ~Entry();
 
-  std::string_view name() const { return name_; }
+  std::string name() const;
   bool is_directory() const { return !metadata()->is_link() && metadata()->is_directory(); }
   bool is_file() const { return !metadata()->is_link() && !metadata()->is_directory(); }
   bool is_link() const { return metadata()->is_link(); }
@@ -35,16 +40,38 @@ class Entry {
   uint32_t creation_time() const;
   uint32_t modification_time() const;
 
-  static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota,
-                                                              std::string name,
-                                                              MetadataRef metadata_ref);
+  static std::expected<std::shared_ptr<Entry>, WfsError> Load(std::shared_ptr<QuotaArea> quota, EntryHandlePtr handle);
+  static EntryHandlePtr CreateEntryHandle(std::shared_ptr<DirectoryMap> directory_map,
+                                          std::string key,
+                                          MetadataRef metadata);
+  static EntryHandlePtr CreateSyntheticEntryHandle(std::string name, MetadataRef metadata);
 
  protected:
-  // TODO: Metadata copy as it can change?
-  EntryMetadata* mutable_metadata() { return metadata_.get_mutable(); }
-  const EntryMetadata* metadata() const { return metadata_.get(); }
-  const std::shared_ptr<Block>& metadata_block() const { return metadata_.block; }
+  EntryMetadata* mutable_metadata();
+  const EntryMetadata* metadata() const;
+  const std::shared_ptr<Block>& metadata_block() const;
 
-  std::string name_;
-  MetadataRef metadata_;
+  EntryHandlePtr handle_;
+};
+
+class Entry::EntryHandle {
+ public:
+  EntryHandle(std::shared_ptr<DirectoryMap> directory_map, std::string key, MetadataRef metadata);
+
+  std::string_view key() const;
+  const std::shared_ptr<DirectoryMap>& directory_map() const;
+  const EntryMetadata* get() const;
+  EntryMetadata* get_mutable() const;
+  const std::shared_ptr<Block>& block() const;
+
+ private:
+  friend class DirectoryEntryCache;
+
+  void Update(std::string key, MetadataRef metadata);
+  void Invalidate();
+  const MetadataRef& metadata_ref() const;
+
+  std::shared_ptr<DirectoryMap> directory_map_;
+  std::string key_;
+  std::optional<MetadataRef> metadata_;
 };

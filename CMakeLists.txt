@@ -27,6 +27,7 @@ add_library(${PROJECT_NAME}
     src/block.cpp
     src/blocks_device.cpp
     src/device_encryption.cpp
+    src/directory_entry_cache.cpp
     src/directory_iterator.cpp
     src/directory_leaf_tree.cpp
     src/directory_map_iterator.cpp

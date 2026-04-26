@@ -87,11 +87,16 @@ void WfsDevice::Flush() {
 }
 
 std::shared_ptr<QuotaArea> WfsDevice::GetRootArea() {
-  return std::make_shared<QuotaArea>(shared_from_this(), root_block_);
+  if (auto root_area = root_area_.lock())
+    return root_area;
+  auto root_area = std::make_shared<QuotaArea>(shared_from_this(), root_block_);
+  root_area_ = root_area;
+  return root_area;
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> WfsDevice::GetRootDirectory() {
-  return GetRootArea()->LoadRootDirectory("", {root_block_, root_block_->to_offset(&header()->root_quota_metadata)});
+  return GetRootArea()->LoadRootDirectory(
+      Entry::CreateSyntheticEntryHandle("", {root_block_, root_block_->to_offset(&header()->root_quota_metadata)}));
 }
 
 // static

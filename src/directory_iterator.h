@@ -7,11 +7,14 @@
 
 #pragma once
 
+#include <memory>
+
 #include "directory_map_iterator.h"
 #include "errors.h"
 
 class QuotaArea;
 class Entry;
+class DirectoryMap;
 
 struct DiretoryEntry {
   std::string name;
@@ -29,7 +32,7 @@ class DirectoryIterator {
   using reference = ref_type;
 
   DirectoryIterator() = default;
-  DirectoryIterator(DirectoryMapIterator base);
+  DirectoryIterator(std::shared_ptr<DirectoryMap> map, DirectoryMapIterator base);
 
   reference operator*() const;
 
@@ -47,5 +50,6 @@ class DirectoryIterator {
   bool is_end() const { return base_.is_end(); }
 
  private:
+  std::shared_ptr<DirectoryMap> map_;
   DirectoryMapIterator base_;
 };

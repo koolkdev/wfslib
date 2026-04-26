@@ -84,4 +84,6 @@ class WfsDevice : public std::enable_shared_from_this<WfsDevice> {
 
   std::shared_ptr<BlocksDevice> device_;
   std::shared_ptr<Block> root_block_;
+  // Keep weak to avoid a WfsDevice -> QuotaArea -> WfsDevice reference cycle.
+  std::weak_ptr<QuotaArea> root_area_;
 };

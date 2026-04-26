@@ -11,12 +11,15 @@
 #include <ranges>
 
 #include "directory.h"
+#include "directory_map.h"
 #include "free_blocks_allocator.h"
 #include "utils.h"
 #include "wfs_device.h"
 
-QuotaArea::QuotaArea(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block)
-    : Area(std::move(wfs_device), std::move(header_block)) {}
+QuotaArea::QuotaArea(std::shared_ptr<WfsDevice> wfs_device,
+                     std::shared_ptr<Block> header_block,
+                     std::shared_ptr<Area> parent_area)
+    : Area(std::move(wfs_device), std::move(header_block), std::move(parent_area)) {}
 
 // static
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::shared_ptr<WfsDevice> wfs_device,
@@ -27,45 +30,69 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::share
   // TODO: size
   std::shared_ptr<Block> block;
   if (parent_area) {
-    auto loaded_block = parent_area->LoadMetadataBlock(fragments[0].block_number);
+    auto loaded_block = parent_area->LoadMetadataBlock(fragments[0].block_number, /*new_block=*/true);
     if (!loaded_block.has_value())
       return std::unexpected(loaded_block.error());
+    block = std::move(*loaded_block);
   } else {
     block = wfs_device->root_block();
   }
-  auto quota = std::make_shared<QuotaArea>(wfs_device, std::move(block));
+  auto quota = std::make_shared<QuotaArea>(wfs_device, std::move(block), parent_area);
   quota->Init(parent_area, blocks_count, block_size, fragments);
   return quota;
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadDirectory(uint32_t area_block_number,
-                                                                             std::string name,
-                                                                             Entry::MetadataRef metadata) {
+                                                                             Entry::EntryHandlePtr handle) {
+  auto map = LoadDirectoryMap(area_block_number);
+  if (!map.has_value())
+    return std::unexpected(map.error());
+  return std::make_shared<Directory>(std::move(handle), shared_from_this(), std::move(*map));
+}
+
+std::expected<std::shared_ptr<DirectoryMap>, WfsError> QuotaArea::LoadDirectoryMap(uint32_t area_block_number) {
+  if (auto it = directory_maps_.find(area_block_number); it != directory_maps_.end()) {
+    if (auto map = it->second.lock())
+      return map;
+    directory_maps_.erase(it);
+  }
+
   auto block = LoadMetadataBlock(area_block_number);
   if (!block.has_value())
     return std::unexpected(WfsError::kDirectoryCorrupted);
-  return std::make_shared<Directory>(std::move(name), std::move(metadata), shared_from_this(), std::move(*block));
+  auto map = std::make_shared<DirectoryMap>(shared_from_this(), std::move(*block));
+  directory_maps_.emplace(area_block_number, map);
+  return map;
 }
 
-std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(std::string name,
-                                                                                 Entry::MetadataRef metadata) {
-  return LoadDirectory(header()->root_directory_block_number.value(), std::move(name), std::move(metadata));
+std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::LoadRootDirectory(Entry::EntryHandlePtr handle) {
+  return LoadDirectory(header()->root_directory_block_number.value(), std::move(handle));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory1() {
-  return LoadDirectory(header()->shadow_directory_block_number_1.value(), ".shadow_dir_1", {});
+  return LoadDirectory(header()->shadow_directory_block_number_1.value(),
+                       Entry::CreateSyntheticEntryHandle(".shadow_dir_1", {}));
 }
 
 std::expected<std::shared_ptr<Directory>, WfsError> QuotaArea::GetShadowDirectory2() {
-  return LoadDirectory(header()->shadow_directory_block_number_2.value(), ".shadow_dir_2", {});
+  return LoadDirectory(header()->shadow_directory_block_number_2.value(),
+                       Entry::CreateSyntheticEntryHandle(".shadow_dir_2", {}));
 }
 
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::LoadQuotaArea(uint32_t area_block_number,
                                                                              BlockSize block_size) {
+  if (auto it = quota_areas_.find(area_block_number); it != quota_areas_.end()) {
+    if (auto quota = it->second.lock())
+      return quota;
+    quota_areas_.erase(it);
+  }
+
   auto area_metadata_block = LoadMetadataBlock(area_block_number, block_size);
   if (!area_metadata_block.has_value())
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
-  return std::make_shared<QuotaArea>(wfs_device(), std::move(*area_metadata_block));
+  auto quota = std::make_shared<QuotaArea>(wfs_device(), std::move(*area_metadata_block), shared_from_this());
+  quota_areas_.emplace(area_block_number, quota);
+  return quota;
 }
 
 std::expected<std::shared_ptr<FreeBlocksAllocator>, WfsError> QuotaArea::GetFreeBlocksAllocator() {
