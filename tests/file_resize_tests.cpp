@@ -394,6 +394,37 @@ TEST_CASE_METHOD(FileResizeFixture,
   CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize failure keeps dirty writes in blocks that would be dropped",
+                 "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 2 * block_size + 4;
+  const auto target_size = block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  auto it = directory_map->find(kTestFilename);
+  REQUIRE(!it.is_end());
+  auto synthetic_file =
+      std::make_shared<File>(Entry::CreateSyntheticEntryHandle(std::string{kTestFilename}, (*it).metadata), quota);
+
+  File::file_device writer(synthetic_file);
+  writer.seek(block_size, std::ios_base::beg);
+  const auto wrote = writer.write(reinterpret_cast<const char*>(kReplacementData.data()),
+                                  static_cast<std::streamsize>(kReplacementData.size()));
+  REQUIRE(wrote == static_cast<std::streamsize>(kReplacementData.size()));
+
+  CHECK_THROWS_AS(synthetic_file->Resize(target_size), std::logic_error);
+
+  std::array<std::byte, kReplacementData.size()> observed{};
+  writer.seek(block_size, std::ios_base::beg);
+  const auto read =
+      writer.read(reinterpret_cast<char*>(observed.data()), static_cast<std::streamsize>(observed.size()));
+  REQUIRE(read == static_cast<std::streamsize>(observed.size()));
+  CHECK(observed == kReplacementData);
+}
+
 TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 1 to one block", "[file-resize][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   const auto initial_size = 2 * block_size + 4;
