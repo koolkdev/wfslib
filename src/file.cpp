@@ -11,6 +11,7 @@
 
 #include "block.h"
 #include "file_layout_accessor.h"
+#include "file_resizer.h"
 
 uint32_t File::Size() const {
   return metadata()->file_size.value();
@@ -25,12 +26,7 @@ bool File::IsEncrypted() const {
 }
 
 void File::Resize(size_t new_size) {
-  // TODO: implment it, write now change up to size_on_disk without ever chaning size_on_disk
-  new_size = std::min(new_size, static_cast<size_t>(metadata()->size_on_disk.value()));
-  size_t old_size = metadata()->file_size.value();
-  if (new_size != old_size) {
-    CreateLayoutAccessor(shared_from_this())->Resize(new_size);
-  }
+  FileResizer(shared_from_this()).Resize(new_size);
 }
 
 File::file_device::file_device(const std::shared_ptr<File>& file)
