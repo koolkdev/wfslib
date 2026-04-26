@@ -127,6 +127,7 @@ class Block {
   int log2_size() const { return ::log2_size(block_size_) + ::log2_size(block_type_); }
 
   bool encrypted() const { return encrypted_; }
+  bool detached() const { return detached_; }
 
   void Resize(uint32_t data_size);
 

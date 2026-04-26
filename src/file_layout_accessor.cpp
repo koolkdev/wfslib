@@ -157,7 +157,7 @@ class File::BlockListLayoutAccessor : public File::LayoutAccessor {
   }
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
-    if (current_data_block &&
+    if (current_data_block && !current_data_block->detached() &&
         file_->quota()->to_area_block_number(current_data_block->physical_block_number()) == block_number)
       return;
     auto block = file_->quota()->LoadDataBlock(block_number, static_cast<BlockSize>(file_->quota()->block_size_log2()),

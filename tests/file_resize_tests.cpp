@@ -35,6 +35,7 @@ namespace {
 constexpr std::string_view kTestFilename = "file";
 constexpr std::array kInitialData{std::byte{0x11}, std::byte{0x22}, std::byte{0x33}, std::byte{0x44}};
 constexpr std::array kReplacementData{std::byte{0xaa}, std::byte{0xbb}, std::byte{0xcc}, std::byte{0xdd}};
+constexpr std::array kPostResizeData{std::byte{0x55}, std::byte{0x66}, std::byte{0x77}, std::byte{0x88}};
 
 struct TestFile {
   std::shared_ptr<File> file;
@@ -359,6 +360,36 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize preserves dirty cached data blo
 
   auto expected = initial_data;
   std::ranges::copy(kReplacementData, expected.begin());
+  expected.resize(target_size, std::byte{0});
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize lets existing file devices reload detached blocks",
+                 "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size + 4;
+  const auto target_size = 2 * block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  {
+    std::array<std::byte, kPostResizeData.size()> data{};
+    File::file_device writer(test_file.file);
+    const auto read = writer.read(reinterpret_cast<char*>(data.data()), static_cast<std::streamsize>(data.size()));
+    REQUIRE(read == static_cast<std::streamsize>(data.size()));
+    writer.seek(0, std::ios_base::beg);
+
+    test_file.file->Resize(target_size);
+
+    const auto wrote = writer.write(reinterpret_cast<const char*>(kPostResizeData.data()),
+                                    static_cast<std::streamsize>(kPostResizeData.size()));
+    REQUIRE(wrote == static_cast<std::streamsize>(kPostResizeData.size()));
+  }
+
+  auto expected = initial_data;
+  std::ranges::copy(kPostResizeData, expected.begin());
   expected.resize(target_size, std::byte{0});
   CHECK(ReadFile(test_file.file, target_size) == expected);
 }
