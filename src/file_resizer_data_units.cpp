@@ -124,7 +124,7 @@ void DetachOldDataBlocks(const std::shared_ptr<QuotaArea>& quota,
                          bool encrypted,
                          uint8_t block_size_log2) {
   const auto data_block_log2_size = FileDataBlockLog2Size<Category>(block_size_log2);
-  const auto data_blocks_count = div_ceil(old_layout.file_size, uint32_t{1} << data_block_log2_size);
+  const auto data_blocks_count = div_ceil(old_layout.file_size, size_t{1} << data_block_log2_size);
   for (const auto data_block_index : std::views::iota(size_t{0}, data_blocks_count)) {
     const auto block_offset = data_block_index << data_block_log2_size;
     const auto data_size = UsedDataBlockSize(old_layout.file_size, block_offset, data_block_log2_size);
@@ -148,7 +148,7 @@ void ResizeChangedDataBlocks(const std::shared_ptr<QuotaArea>& quota,
                              uint8_t block_size_log2) {
   const auto data_block_log2_size = FileDataBlockLog2Size<Category>(block_size_log2);
   const auto data_blocks_count =
-      div_ceil(std::max(old_layout.file_size, target_layout.file_size), uint32_t{1} << data_block_log2_size);
+      div_ceil(std::max(old_layout.file_size, target_layout.file_size), size_t{1} << data_block_log2_size);
   for (const auto data_block_index : std::views::iota(size_t{0}, data_blocks_count)) {
     const auto block_offset = data_block_index << data_block_log2_size;
     const auto old_data_size = UsedDataBlockSize(old_layout.file_size, block_offset, data_block_log2_size);
