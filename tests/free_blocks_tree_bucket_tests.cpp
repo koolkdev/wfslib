@@ -180,3 +180,22 @@ TEST_CASE_METHOD(FreeBlocksTreeBucketFixture,
 
   RequireBidirectionalIteration(bucket, kFreeBlocksBucketStressItems, [](const auto& extent) { return extent.key(); });
 }
+
+TEST_CASE_METHOD(FreeBlocksAllocatorFixture,
+                 "FreeBlocksTreeBucket splits a full FTrees block without cache",
+                 "[free-blocks][tree-bucket][regression]") {
+  REQUIRE(allocator.Init(0));
+
+  FreeBlocksTreeBucket split_bucket{&allocator, 0};
+  constexpr uint32_t kFirstFreeBlock = 1000;
+  constexpr uint32_t kInsertedExtents = 2000;
+  allocator.set_free_blocks_count_for_testing(kInsertedExtents);
+
+  for (uint32_t i = 0; i < kInsertedExtents; ++i) {
+    CAPTURE(i);
+    REQUIRE(split_bucket.insert({kFirstFreeBlock + i, nibble{0}}));
+  }
+
+  REQUIRE(split_bucket.find(kFirstFreeBlock, true) == split_bucket.end());
+  REQUIRE(split_bucket.find(kFirstFreeBlock + kInsertedExtents - 1, true) != split_bucket.end());
+}

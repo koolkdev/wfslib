@@ -96,7 +96,7 @@ uint32_t FreeBlocksAllocator::FindSmallestFreeBlockExtent(uint32_t near, std::ve
   // logic bit more complex than original.
   for (size_t i = 0; i < kSizeBuckets.size(); ++i) {
     FreeBlocksTreeBucket bucket(this, i);
-    for (auto it = bucket.find(near); it != bucket.end(); ++it) {
+    for (auto it = bucket.find(near, /*exact_match=*/false); it != bucket.end(); ++it) {
       FreeBlocksExtentInfo possible_result = *it;
       auto res = std::ranges::find_if(allocated, [&possible_result](FreeBlocksExtentInfo& info) {
         return info.block_number == possible_result.block_number;
@@ -282,7 +282,8 @@ void FreeBlocksAllocator::RecreateEPTreeIfNeeded() {
     // Already trivial
     return;
   }
-  auto last = eptree.end()--;
+  auto last = eptree.end();
+  --last;
   if ((*last).key() || (*last).value() != 2)
     return;
   uint32_t last_value = (*last).value();
@@ -467,7 +468,7 @@ std::optional<std::vector<FreeBlocksRangeInfo>> FreeBlocksAllocator::AllocAreaBl
     return std::nullopt;  // not enough space
   // now sort by block number
   std::ranges::sort(used_ranges,
-                    [](const auto& a, const auto& b) { return a.range.block_number < b.range.blocks_count; });
+                    [](const auto& a, const auto& b) { return a.range.block_number < b.range.block_number; });
   // remove from first chunk unneeded blocks
   auto remainder = total_blocks - wanted_blocks_count;
   used_ranges[0].range.block_number += remainder;

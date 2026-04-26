@@ -37,7 +37,7 @@ bool FreeBlocksTreeBucket::insert(iterator& pos, FTree::iterator::value_type key
     for (const auto& ftree : old_ftrees.ftrees()) {
       if (ftree.size() > 0) {
         auto first = ftree.begin();
-        *allocated_extent = {(*first).key(), 1, ftree.index()};
+        allocated_extent = FreeBlocksExtentInfo{(*first).key(), 1, ftree.index()};
         break;
       }
     }

@@ -80,6 +80,20 @@ TEST_CASE_METHOD(FTreesFixture, "FTrees iterator walks forward and backward", "[
   RequireBidirectionalIteration(ftrees, kFTreesItems, [](const auto& extent) { return extent.key(); });
 }
 
+TEST_CASE_METHOD(FTreesFixture,
+                 "FTrees iterator can move forward after reversing from the last extent",
+                 "[ftrees][iterator][regression]") {
+  REQUIRE(ftrees.ftrees()[0].insert({0, nibble{0}}));
+  REQUIRE(ftrees.ftrees()[1].insert({10, nibble{0}}));
+
+  auto it = ftrees.end();
+  --it;
+  REQUIRE((*it).key() == 10);
+
+  ++it;
+  REQUIRE(it == ftrees.end());
+}
+
 TEST_CASE_METHOD(FTreesFixture, "FTrees find returns exact and nearest extents", "[ftrees][unit]") {
   for (uint32_t i = 0; i < kFTreesItems; ++i) {
     REQUIRE(ftrees.ftrees()[i % kSizeBuckets.size()].insert({i * 2, static_cast<nibble>(i % 16)}));
