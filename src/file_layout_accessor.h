@@ -19,28 +19,22 @@
 #include <vector>
 
 #include "block.h"
+#include "file_data_units.h"
 #include "file_layout.h"
 #include "quota_area.h"
 #include "structs.h"
 
 class File::LayoutAccessor {
-  template <typename T, bool AlignToEnd = false>
+  template <typename T>
   auto Metadata() const {
     const auto count = GetMetadataItemsCount();
-    const auto file_metadata_size = sizeof(T) * count;
     const auto base_metadata_size = file_->metadata()->size();
-    auto* metadata = [&]() {
-      if constexpr (std::is_const_v<T>) {
-        return reinterpret_cast<const std::byte*>(file_->metadata());
-      } else {
-        return reinterpret_cast<std::byte*>(file_->mutable_metadata());
-      }
-    }();
-    if constexpr (AlignToEnd) {
-      auto* end = metadata + align_to_power_of_2(base_metadata_size + file_metadata_size);
-      return std::span<T>{reinterpret_cast<T*>(end - file_metadata_size), count} | std::views::reverse;
+    if constexpr (std::is_const_v<T>) {
+      return std::span<T>{
+          reinterpret_cast<T*>(reinterpret_cast<const std::byte*>(file_->metadata()) + base_metadata_size), count};
     } else {
-      return std::span<T>{reinterpret_cast<T*>(metadata + base_metadata_size), count};
+      return std::span<T>{
+          reinterpret_cast<T*>(reinterpret_cast<std::byte*>(file_->mutable_metadata()) + base_metadata_size), count};
     }
   }
 
@@ -126,12 +120,28 @@ class File::LayoutAccessor {
  protected:
   auto InlinePayload() const { return Metadata<const std::byte>(); }
   auto MutableInlinePayload() const { return Metadata<std::byte>(); }
-  auto DataBlockRefs() const { return Metadata<const DataBlockMetadata, true>(); }
-  auto MutableDataBlockRefs() const { return Metadata<DataBlockMetadata, true>(); }
-  auto ClusterRefs() const { return Metadata<const DataBlocksClusterMetadata, true>(); }
-  auto MutableClusterRefs() const { return Metadata<DataBlocksClusterMetadata, true>(); }
-  auto ClusterMetadataBlockRefs() const { return Metadata<const uint32_be_t, true>(); }
-  auto MutableClusterMetadataBlockRefs() const { return Metadata<uint32_be_t, true>(); }
+  auto DataBlockRefs() const {
+    return EntryMetadataItems<DataBlockMetadata>(file_->metadata(), GetMetadataItemsCount()) | std::views::reverse;
+  }
+  auto MutableDataBlockRefs() const {
+    return MutableEntryMetadataItems<DataBlockMetadata>(file_->mutable_metadata(), GetMetadataItemsCount()) |
+           std::views::reverse;
+  }
+  auto ClusterRefs() const {
+    return EntryMetadataItems<DataBlocksClusterMetadata>(file_->metadata(), GetMetadataItemsCount()) |
+           std::views::reverse;
+  }
+  auto MutableClusterRefs() const {
+    return MutableEntryMetadataItems<DataBlocksClusterMetadata>(file_->mutable_metadata(), GetMetadataItemsCount()) |
+           std::views::reverse;
+  }
+  auto ClusterMetadataBlockRefs() const {
+    return EntryMetadataItems<uint32_be_t>(file_->metadata(), GetMetadataItemsCount()) | std::views::reverse;
+  }
+  auto MutableClusterMetadataBlockRefs() const {
+    return MutableEntryMetadataItems<uint32_be_t>(file_->mutable_metadata(), GetMetadataItemsCount()) |
+           std::views::reverse;
+  }
 
   BlockPosition BlockPositionForOffset(size_t offset, size_t log2_block_size) const {
     auto [index, offset_in_block] = div_pow2(offset, log2_block_size);

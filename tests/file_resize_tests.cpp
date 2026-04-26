@@ -25,8 +25,10 @@
 #include "block.h"
 #include "directory_map.h"
 #include "file_layout.h"
+#include "free_blocks_allocator.h"
 #include "quota_area.h"
 #include "structs.h"
+#include "utils.h"
 #include "utils/test_fixtures.h"
 
 namespace {
@@ -74,10 +76,114 @@ class FileResizeFixture : public MetadataBlockFixture {
                                                   quota->block_size_log2(), FileLayoutMode::MinimumForGrow));
   }
 
+  TestFile CreateDataUnitFile(std::string_view name, uint32_t file_size, std::span<const std::byte> data) {
+    auto test_file = CreateFile(name, file_size);
+    AssignDataBlocks(test_file.metadata);
+    StoreFileData(test_file.metadata, data);
+    return test_file;
+  }
+
   EntryMetadata* StoredMetadata(std::string_view name) {
     auto it = directory_map->find(name);
     REQUIRE(!it.is_end());
     return (*it).metadata.get_mutable();
+  }
+
+  uint32_t FreeBlocksCount() { return (*quota->GetFreeBlocksAllocator())->free_blocks_count(); }
+
+ private:
+  static FileLayoutCategory Category(const EntryMetadata* metadata) {
+    return FileLayout::CategoryFromValue(metadata->size_category.value());
+  }
+
+  static BlockType AllocationBlockType(FileLayoutCategory category) {
+    switch (category) {
+      case FileLayoutCategory::Blocks:
+        return BlockType::Single;
+      case FileLayoutCategory::LargeBlocks:
+        return BlockType::Large;
+      case FileLayoutCategory::Clusters:
+        return BlockType::Cluster;
+      case FileLayoutCategory::Inline:
+      case FileLayoutCategory::ClusterMetadataBlocks:
+        break;
+    }
+    throw std::logic_error("Unexpected test file layout category");
+  }
+
+  static BlockType DataBlockType(FileLayoutCategory category) {
+    switch (category) {
+      case FileLayoutCategory::Blocks:
+        return BlockType::Single;
+      case FileLayoutCategory::LargeBlocks:
+      case FileLayoutCategory::Clusters:
+        return BlockType::Large;
+      case FileLayoutCategory::Inline:
+      case FileLayoutCategory::ClusterMetadataBlocks:
+        break;
+    }
+    throw std::logic_error("Unexpected test file layout category");
+  }
+
+  template <typename T>
+  std::span<T> AlignedMetadataItems(EntryMetadata* metadata, size_t count) {
+    auto* metadata_bytes = reinterpret_cast<std::byte*>(metadata);
+    const auto metadata_size = sizeof(T) * count;
+    auto* end = metadata_bytes + align_to_power_of_2(metadata->size() + metadata_size);
+    return {reinterpret_cast<T*>(end - metadata_size), count};
+  }
+
+  void AssignDataBlocks(EntryMetadata* metadata) {
+    const auto category = Category(metadata);
+    const auto metadata_items_count =
+        FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), quota->block_size_log2());
+    auto allocated_blocks = quota->AllocDataBlocks(metadata_items_count, AllocationBlockType(category));
+    REQUIRE(allocated_blocks.has_value());
+
+    if (category == FileLayoutCategory::Blocks || category == FileLayoutCategory::LargeBlocks) {
+      auto block_refs = AlignedMetadataItems<DataBlockMetadata>(metadata, metadata_items_count);
+      for (size_t i = 0; i < allocated_blocks->size(); ++i)
+        block_refs[allocated_blocks->size() - i - 1].block_number = (*allocated_blocks)[i];
+      return;
+    }
+
+    auto cluster_refs = AlignedMetadataItems<DataBlocksClusterMetadata>(metadata, metadata_items_count);
+    for (size_t i = 0; i < allocated_blocks->size(); ++i)
+      cluster_refs[allocated_blocks->size() - i - 1].block_number = (*allocated_blocks)[i];
+  }
+
+  void StoreDataBlock(uint32_t area_block_number, std::span<const std::byte> data) {
+    std::vector<std::byte> aligned_data(
+        div_ceil(data.size(), test_device->device()->SectorSize()) * test_device->device()->SectorSize(), std::byte{0});
+    std::ranges::copy(data, aligned_data.begin());
+    test_device->blocks_[quota->to_physical_block_number(area_block_number)] = std::move(aligned_data);
+  }
+
+  void StoreFileData(EntryMetadata* metadata, std::span<const std::byte> data) {
+    const auto category = Category(metadata);
+    const auto data_block_size = size_t{1} << (quota->block_size_log2() + log2_size(DataBlockType(category)));
+
+    if (category == FileLayoutCategory::Blocks || category == FileLayoutCategory::LargeBlocks) {
+      auto block_refs = AlignedMetadataItems<DataBlockMetadata>(
+          metadata, FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), quota->block_size_log2()));
+      for (size_t i = 0, offset = 0; offset < data.size(); ++i, offset += data_block_size) {
+        const auto chunk_size = std::min(data_block_size, data.size() - offset);
+        StoreDataBlock(block_refs[block_refs.size() - i - 1].block_number.value(), data.subspan(offset, chunk_size));
+      }
+      return;
+    }
+
+    constexpr size_t kLargeBlocksPerCluster = size_t{1} << log2_size(BlockType::Cluster) >> log2_size(BlockType::Large);
+    auto cluster_refs = AlignedMetadataItems<DataBlocksClusterMetadata>(
+        metadata, FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), quota->block_size_log2()));
+    for (size_t i = 0, offset = 0; offset < data.size(); ++i, offset += data_block_size) {
+      const auto cluster_index = i / kLargeBlocksPerCluster;
+      const auto large_block_index = i % kLargeBlocksPerCluster;
+      const auto chunk_size = std::min(data_block_size, data.size() - offset);
+      const auto cluster_block_number = cluster_refs[cluster_refs.size() - cluster_index - 1].block_number.value();
+      StoreDataBlock(cluster_block_number + static_cast<uint32_t>(large_block_index << log2_size(BlockType::Large)),
+                     data.subspan(offset, chunk_size));
+    }
   }
 };
 
@@ -94,6 +200,13 @@ std::vector<std::byte> ReadFile(const std::shared_ptr<File>& file, size_t size) 
   const auto read = device.read(reinterpret_cast<char*>(output.data()), static_cast<std::streamsize>(output.size()));
   REQUIRE(read == static_cast<std::streamsize>(output.size()));
   return output;
+}
+
+std::vector<std::byte> DataPattern(size_t size) {
+  std::vector<std::byte> data(size);
+  for (size_t i = 0; i < data.size(); ++i)
+    data[i] = std::byte{static_cast<unsigned char>((i * 131 + 17) & 0xff)};
+  return data;
 }
 
 size_t WriteFile(const std::shared_ptr<File>& file, std::span<const std::byte> input, size_t offset) {
@@ -187,9 +300,185 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize truncates inline file to zero",
   CHECK(InlinePayload(metadata).empty());
 }
 
-TEST_CASE_METHOD(FileResizeFixture, "File resize throws for non-inline layouts", "[file-resize][unit]") {
+TEST_CASE_METHOD(FileResizeFixture, "File resize throws for unsupported layout transitions", "[file-resize][unit]") {
   auto test_file = CreateFile(kTestFilename, static_cast<uint32_t>(kInitialData.size()));
 
   CHECK_THROWS_AS(test_file.file->Resize(FileLayout::InlineCapacity(static_cast<uint8_t>(kTestFilename.size())) + 1),
                   std::logic_error);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize throws when shrink target category differs", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 2 * block_size + 8;
+  const auto target_size = block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  CHECK_THROWS_AS(test_file.file->Resize(target_size), std::logic_error);
+  CHECK(test_file.file->Size() == initial_size);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 1 by one block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size + 4;
+  const auto target_size = 2 * block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 3 * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(FreeBlocksCount() == free_blocks_before - 1);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 1 to one block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 2 * block_size + 4;
+  const auto target_size = block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + 2);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 1 partial last block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size + 4;
+  const auto target_size = block_size + 8;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 2 * block_size);
+  CHECK(FreeBlocksCount() == free_blocks_before);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 1 partial last block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size;
+  const auto target_size = block_size - 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == block_size);
+  CHECK(FreeBlocksCount() == free_blocks_before);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 2 by one large block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_size = block_size << log2_size(BlockType::Large);
+  const auto initial_size = 5 * block_size + 4;
+  const auto target_size = large_block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 2 * large_block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before - (uint32_t{1} << log2_size(BlockType::Large)));
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 2 by one large block", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_size = block_size << log2_size(BlockType::Large);
+  const auto initial_size = large_block_size + 4;
+  const auto target_size = 5 * block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == large_block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + (uint32_t{1} << log2_size(BlockType::Large)));
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 3 by one cluster", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_size = block_size << log2_size(BlockType::Large);
+  const auto cluster_size = block_size << log2_size(BlockType::Cluster);
+  const auto initial_size = 5 * large_block_size + 4;
+  const auto target_size = cluster_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 2 * cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  CHECK(FreeBlocksCount() == free_blocks_before - (uint32_t{1} << log2_size(BlockType::Cluster)));
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 3 by one cluster", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_size = block_size << log2_size(BlockType::Large);
+  const auto cluster_size = block_size << log2_size(BlockType::Cluster);
+  const auto initial_size = cluster_size + 4;
+  const auto target_size = 5 * large_block_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  CHECK(FreeBlocksCount() == free_blocks_before + (uint32_t{1} << log2_size(BlockType::Cluster)));
+  CHECK(ReadFile(test_file.file, target_size) == expected);
 }

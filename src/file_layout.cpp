@@ -151,6 +151,7 @@ FileLayoutCategory MaximumCategory(uint32_t file_size, uint8_t filename_length, 
     return FileLayoutCategory::Blocks;
   return FileLayoutCategory::Inline;
 }
+
 }  // namespace
 
 size_t FileLayout::BaseMetadataSize(uint8_t filename_length) {
