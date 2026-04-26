@@ -16,7 +16,9 @@ class WfsDevice;
 
 class Area {
  public:
-  Area(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block);
+  Area(std::shared_ptr<WfsDevice> wfs_device,
+       std::shared_ptr<Block> header_block,
+       std::shared_ptr<Area> parent_area = nullptr);
 
   // TODO Create transactions area
 
@@ -81,4 +83,5 @@ class Area {
  private:
   std::shared_ptr<WfsDevice> wfs_device_;
   std::shared_ptr<Block> header_block_;
+  std::shared_ptr<Area> parent_area_;
 };

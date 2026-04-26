@@ -25,7 +25,9 @@ class QuotaArea : public Area, public std::enable_shared_from_this<QuotaArea> {
     uint32_t blocks_count;
   };
 
-  QuotaArea(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block);
+  QuotaArea(std::shared_ptr<WfsDevice> wfs_device,
+            std::shared_ptr<Block> header_block,
+            std::shared_ptr<Area> parent_area = nullptr);
 
   // If parent_area null it is root area
   static std::expected<std::shared_ptr<QuotaArea>, WfsError> Create(std::shared_ptr<WfsDevice> wfs_device,

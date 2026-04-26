@@ -11,8 +11,12 @@
 
 #include "wfs_device.h"
 
-Area::Area(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block)
-    : wfs_device_(std::move(wfs_device)), header_block_(std::move(header_block)) {}
+Area::Area(std::shared_ptr<WfsDevice> wfs_device,
+           std::shared_ptr<Block> header_block,
+           std::shared_ptr<Area> parent_area)
+    : wfs_device_(std::move(wfs_device)),
+      header_block_(std::move(header_block)),
+      parent_area_(std::move(parent_area)) {}
 
 void Area::Init(std::shared_ptr<Area> parent_area, uint32_t blocks_count, BlockSize block_size) {
   std::random_device rand_device;

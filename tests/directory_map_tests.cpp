@@ -379,6 +379,49 @@ TEST_CASE_METHOD(MetadataBlockFixture,
   CHECK(first == second);
 }
 
+TEST_CASE_METHOD(MetadataBlockFixture,
+                 "WfsDevice keeps quota-backed live file instances across root area lookups",
+                 "[directory-map][cache]") {
+  auto wfs_device = *WfsDevice::Create(test_device);
+
+  {
+    constexpr uint32_t kChildBlocksCount = 256;
+    auto root_area = wfs_device->GetRootArea();
+    auto root_block = *root_area->LoadMetadataBlock(3, /*new_block=*/true);
+    DirectoryMap root_map{root_area, root_block};
+    root_map.Init();
+
+    auto fragments = root_area->AllocAreaBlocks(kChildBlocksCount);
+    REQUIRE(fragments.has_value());
+    auto child_area = QuotaArea::Create(wfs_device, root_area, kChildBlocksCount, BlockSize::Logical, *fragments);
+    REQUIRE(child_area.has_value());
+
+    auto child_root_block = *(*child_area)->LoadMetadataBlock(3, /*new_block=*/true);
+    DirectoryMap child_root_map{*child_area, child_root_block};
+    child_root_map.Init();
+
+    TestEntryMetadata quota_metadata(6);
+    quota_metadata.data()->flags = EntryMetadata::DIRECTORY | EntryMetadata::AREA_SIZE_REGULAR | EntryMetadata::QUOTA;
+    quota_metadata.data()->filename_length = 5;
+    quota_metadata.data()->quota_blocks_count = kChildBlocksCount;
+    quota_metadata.data()->directory_block_number = (*fragments)[0].block_number;
+    REQUIRE(root_map.insert("quota", quota_metadata.data()));
+
+    TestEntryMetadata file_metadata(6);
+    file_metadata.data()->flags = EntryMetadata::UNENCRYPTED_FILE;
+    file_metadata.data()->filename_length = 4;
+    file_metadata.data()->file_size = 12;
+    file_metadata.data()->size_on_disk = 12;
+    REQUIRE(child_root_map.insert("file", file_metadata.data()));
+  }
+
+  auto first = wfs_device->GetFile("/quota/file");
+  REQUIRE(first);
+  auto second = wfs_device->GetFile("/quota/file");
+  REQUIRE(second);
+  CHECK(first == second);
+}
+
 TEST_CASE_METHOD(DirectoryMapFixture,
                  "DirectoryMap metadata replacement works in a multi-level tree",
                  "[directory-map][integration]") {

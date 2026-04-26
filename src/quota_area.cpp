@@ -16,8 +16,10 @@
 #include "utils.h"
 #include "wfs_device.h"
 
-QuotaArea::QuotaArea(std::shared_ptr<WfsDevice> wfs_device, std::shared_ptr<Block> header_block)
-    : Area(std::move(wfs_device), std::move(header_block)) {}
+QuotaArea::QuotaArea(std::shared_ptr<WfsDevice> wfs_device,
+                     std::shared_ptr<Block> header_block,
+                     std::shared_ptr<Area> parent_area)
+    : Area(std::move(wfs_device), std::move(header_block), std::move(parent_area)) {}
 
 // static
 std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::shared_ptr<WfsDevice> wfs_device,
@@ -28,13 +30,14 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::Create(std::share
   // TODO: size
   std::shared_ptr<Block> block;
   if (parent_area) {
-    auto loaded_block = parent_area->LoadMetadataBlock(fragments[0].block_number);
+    auto loaded_block = parent_area->LoadMetadataBlock(fragments[0].block_number, /*new_block=*/true);
     if (!loaded_block.has_value())
       return std::unexpected(loaded_block.error());
+    block = std::move(*loaded_block);
   } else {
     block = wfs_device->root_block();
   }
-  auto quota = std::make_shared<QuotaArea>(wfs_device, std::move(block));
+  auto quota = std::make_shared<QuotaArea>(wfs_device, std::move(block), parent_area);
   quota->Init(parent_area, blocks_count, block_size, fragments);
   return quota;
 }
@@ -87,7 +90,7 @@ std::expected<std::shared_ptr<QuotaArea>, WfsError> QuotaArea::LoadQuotaArea(uin
   auto area_metadata_block = LoadMetadataBlock(area_block_number, block_size);
   if (!area_metadata_block.has_value())
     return std::unexpected(WfsError::kAreaHeaderCorrupted);
-  auto quota = std::make_shared<QuotaArea>(wfs_device(), std::move(*area_metadata_block));
+  auto quota = std::make_shared<QuotaArea>(wfs_device(), std::move(*area_metadata_block), shared_from_this());
   quota_areas_.emplace(area_block_number, quota);
   return quota;
 }
