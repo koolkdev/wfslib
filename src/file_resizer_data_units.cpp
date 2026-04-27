@@ -104,7 +104,7 @@ std::vector<typename FileDataUnitLayoutTraits<Category>::Metadata> BuildReplacem
 
   auto appended_metadata = replacement_metadata | std::views::drop(old_metadata.size());
   for (auto&& [metadata, block_number] : std::views::zip(appended_metadata, allocated_block_numbers))
-    Traits::SetUnitBlockNumber(metadata, block_number);
+    Traits::set_unit_block_number(metadata, block_number);
 
   return replacement_metadata;
 }
@@ -219,7 +219,7 @@ void FreeRemovedDataUnits(const std::shared_ptr<QuotaArea>& quota,
   using Traits = FileDataUnitLayoutTraits<Category>;
 
   for (const auto& metadata : old_metadata | std::views::drop(target_units_count)) {
-    if (!quota->DeleteBlocks(Traits::UnitBlockNumber(metadata), FileDataUnitAreaBlocksCount<Category>()))
+    if (!quota->DeleteBlocks(Traits::unit_block_number(metadata), FileDataUnitAreaBlocksCount<Category>()))
       throw WfsException(WfsError::kFreeBlocksAllocatorCorrupted);
   }
 }

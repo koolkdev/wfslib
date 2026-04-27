@@ -45,45 +45,32 @@ std::span<T> MutableEntryMetadataItems(EntryMetadata* metadata, size_t count) {
 template <FileLayoutCategory Category>
 struct FileDataUnitLayoutTraits;
 
-template <>
-struct FileDataUnitLayoutTraits<FileLayoutCategory::Blocks> {
+template <BlockType UnitBlockType>
+struct SingleBlockFileDataUnitLayoutTraits {
   using Metadata = DataBlockMetadata;
 
-  static constexpr BlockType kAllocationBlockType = BlockType::Single;
-  static constexpr BlockType kDataBlockType = BlockType::Single;
+  static constexpr BlockType kAllocationBlockType = UnitBlockType;
+  static constexpr BlockType kDataBlockType = UnitBlockType;
   static constexpr size_t kDataBlocksPerUnit = 1;
 
-  static uint32_t UnitBlockNumber(const Metadata& metadata) { return metadata.block_number.value(); }
+  static uint32_t unit_block_number(const Metadata& metadata) { return metadata.block_number.value(); }
 
-  static void SetUnitBlockNumber(Metadata& metadata, uint32_t block_number) { metadata.block_number = block_number; }
+  static void set_unit_block_number(Metadata& metadata, uint32_t block_number) { metadata.block_number = block_number; }
 
-  static FileDataBlockLocation DataBlockLocationForUnit(const std::shared_ptr<Block>& metadata_block,
-                                                        const Metadata& metadata,
-                                                        [[maybe_unused]] size_t block_index) {
+  static FileDataBlockLocation data_block_location_for_unit(const std::shared_ptr<Block>& metadata_block,
+                                                            const Metadata& metadata,
+                                                            [[maybe_unused]] size_t block_index) {
     assert(block_index == 0);
     return {metadata.block_number.value(), kDataBlockType, {metadata_block, metadata_block->to_offset(metadata.hash)}};
   }
 };
 
 template <>
-struct FileDataUnitLayoutTraits<FileLayoutCategory::LargeBlocks> {
-  using Metadata = DataBlockMetadata;
+struct FileDataUnitLayoutTraits<FileLayoutCategory::Blocks> : SingleBlockFileDataUnitLayoutTraits<BlockType::Single> {};
 
-  static constexpr BlockType kAllocationBlockType = BlockType::Large;
-  static constexpr BlockType kDataBlockType = BlockType::Large;
-  static constexpr size_t kDataBlocksPerUnit = 1;
-
-  static uint32_t UnitBlockNumber(const Metadata& metadata) { return metadata.block_number.value(); }
-
-  static void SetUnitBlockNumber(Metadata& metadata, uint32_t block_number) { metadata.block_number = block_number; }
-
-  static FileDataBlockLocation DataBlockLocationForUnit(const std::shared_ptr<Block>& metadata_block,
-                                                        const Metadata& metadata,
-                                                        [[maybe_unused]] size_t block_index) {
-    assert(block_index == 0);
-    return {metadata.block_number.value(), kDataBlockType, {metadata_block, metadata_block->to_offset(metadata.hash)}};
-  }
-};
+template <>
+struct FileDataUnitLayoutTraits<FileLayoutCategory::LargeBlocks>
+    : SingleBlockFileDataUnitLayoutTraits<BlockType::Large> {};
 
 template <>
 struct FileDataUnitLayoutTraits<FileLayoutCategory::Clusters> {
@@ -94,13 +81,13 @@ struct FileDataUnitLayoutTraits<FileLayoutCategory::Clusters> {
   static constexpr size_t kDataBlocksPerUnit = (size_t{1} << log2_size(BlockType::Cluster)) >>
                                                log2_size(kDataBlockType);
 
-  static uint32_t UnitBlockNumber(const Metadata& metadata) { return metadata.block_number.value(); }
+  static uint32_t unit_block_number(const Metadata& metadata) { return metadata.block_number.value(); }
 
-  static void SetUnitBlockNumber(Metadata& metadata, uint32_t block_number) { metadata.block_number = block_number; }
+  static void set_unit_block_number(Metadata& metadata, uint32_t block_number) { metadata.block_number = block_number; }
 
-  static FileDataBlockLocation DataBlockLocationForUnit(const std::shared_ptr<Block>& metadata_block,
-                                                        const Metadata& metadata,
-                                                        size_t block_index) {
+  static FileDataBlockLocation data_block_location_for_unit(const std::shared_ptr<Block>& metadata_block,
+                                                            const Metadata& metadata,
+                                                            size_t block_index) {
     assert(block_index < kDataBlocksPerUnit);
     return {metadata.block_number.value() + static_cast<uint32_t>(block_index << log2_size(kDataBlockType)),
             kDataBlockType,
@@ -147,7 +134,7 @@ FileDataBlockLocation FileDataBlockLocationForLogicalMetadata(const std::shared_
 
   const auto unit_index = data_block_index / Traits::kDataBlocksPerUnit;
   const auto block_index = data_block_index % Traits::kDataBlocksPerUnit;
-  return Traits::DataBlockLocationForUnit(metadata_block, std::ranges::begin(units)[unit_index], block_index);
+  return Traits::data_block_location_for_unit(metadata_block, std::ranges::begin(units)[unit_index], block_index);
 }
 
 template <FileLayoutCategory Category>
