@@ -24,11 +24,12 @@ constexpr uint32_t kLargeBlockSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(
 constexpr uint32_t kClusterSize = uint32_t{1} << (kBlockSizeLog2 + log2_size(BlockType::Cluster));
 
 FileLayout Minimum(uint32_t file_size, uint8_t filename_length = kDefaultTestFilenameLength) {
-  return FileLayout::Calculate(file_size, filename_length, kBlockSizeLog2, FileLayoutMode::MinimumForGrow);
+  return FileLayout::Calculate(0, file_size, filename_length, kBlockSizeLog2);
 }
 
 FileLayout Maximum(uint32_t file_size, uint8_t filename_length = kDefaultTestFilenameLength) {
-  return FileLayout::Calculate(file_size, filename_length, kBlockSizeLog2, FileLayoutMode::MaximumForShrink);
+  return FileLayout::Calculate(file_size, file_size, filename_length, kBlockSizeLog2,
+                               FileLayoutCategory::ClusterMetadataBlocks);
 }
 }  // namespace
 
@@ -150,6 +151,33 @@ TEST_CASE("File layout maximum shrink keeps the largest valid category") {
   CHECK(Maximum(kClusterSize).category == FileLayoutCategory::ClusterMetadataBlocks);
 }
 
+TEST_CASE("File layout resize shrink does not raise the current category") {
+  const auto blocks_shrink =
+      FileLayout::Calculate(2 * kSingleBlockSize + 8, kSingleBlockSize + 4, kDefaultTestFilenameLength, kBlockSizeLog2,
+                            FileLayoutCategory::Blocks);
+  CHECK(blocks_shrink.category == FileLayoutCategory::Blocks);
+  CHECK(blocks_shrink.size_on_disk == 2 * kSingleBlockSize);
+
+  const auto large_blocks_shrink =
+      FileLayout::Calculate(5 * kSingleBlockSize + 1, kSingleBlockSize, kDefaultTestFilenameLength, kBlockSizeLog2,
+                            FileLayoutCategory::LargeBlocks);
+  CHECK(large_blocks_shrink.category == FileLayoutCategory::Blocks);
+  CHECK(large_blocks_shrink.size_on_disk == kSingleBlockSize);
+}
+
+TEST_CASE("File layout resize grow does not lower the current category") {
+  const auto large_blocks_grow =
+      FileLayout::Calculate(kSingleBlockSize + 1, kSingleBlockSize + 4, kDefaultTestFilenameLength, kBlockSizeLog2,
+                            FileLayoutCategory::LargeBlocks);
+  CHECK(large_blocks_grow.category == FileLayoutCategory::LargeBlocks);
+  CHECK(large_blocks_grow.size_on_disk == kLargeBlockSize);
+
+  const auto clusters_grow = FileLayout::Calculate(kLargeBlockSize + 1, kLargeBlockSize + 4, kDefaultTestFilenameLength,
+                                                   kBlockSizeLog2, FileLayoutCategory::Clusters);
+  CHECK(clusters_grow.category == FileLayoutCategory::Clusters);
+  CHECK(clusters_grow.size_on_disk == kClusterSize);
+}
+
 TEST_CASE("File layout rounds metadata log2 sizes") {
   auto empty = Minimum(0);
   CHECK(empty.metadata_log2_size == 6);
@@ -168,8 +196,7 @@ TEST_CASE("File layout throws when requested size exceeds max file size") {
   CHECK(max_spec.file_size == max_file_size);
   CHECK(max_spec.size_on_disk == max_file_size);
 
-  CHECK_THROWS_MATCHES(FileLayout::Calculate(max_file_size + 1, kDefaultTestFilenameLength, kBlockSizeLog2,
-                                             FileLayoutMode::MinimumForGrow),
+  CHECK_THROWS_MATCHES(FileLayout::Calculate(0, max_file_size + 1, kDefaultTestFilenameLength, kBlockSizeLog2),
                        WfsException, Catch::Matchers::Predicate<WfsException>([](const WfsException& e) {
                          return e.error() == WfsError::kFileTooLarge;
                        }));

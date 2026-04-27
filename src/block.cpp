@@ -49,7 +49,7 @@ Block::~Block() {
 }
 
 void Block::Resize(uint32_t data_size) {
-  assert(!device_->device()->IsReadOnly());
+  assert(!device_ || !device_->device()->IsReadOnly());
   // Ensure that block data is aligned to device sectors
   if (data_size_ == data_size)
     return;
@@ -94,11 +94,13 @@ void Block::Flush() {
 
 uint32_t Block::GetAlignedSize(uint32_t size) const {
   assert(size > 0 && size <= capacity());
+  if (!device_)
+    return size;
   return static_cast<uint32_t>(div_ceil(size, device_->device()->SectorSize()) * device_->device()->SectorSize());
 }
 
 std::span<std::byte> Block::GetDataForWriting() {
-  assert(!device_->device()->IsReadOnly());
+  assert(!device_ || !device_->device()->IsReadOnly());
   dirty_ = true;
   return {data_.data(), data_.data() + size()};
 }

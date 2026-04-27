@@ -10,11 +10,6 @@
 #include <cstddef>
 #include <cstdint>
 
-enum class FileLayoutMode {
-  MinimumForGrow,
-  MaximumForShrink,
-};
-
 enum class FileLayoutCategory : uint8_t {
   Inline = 0,
   Blocks = 1,
@@ -40,8 +35,9 @@ struct FileLayout {
   static uint32_t ClusterMetadataBlocksCount(uint32_t clusters_count, uint8_t block_size_log2);
   static uint32_t MaxFileSize(uint8_t block_size_log2);
 
-  static FileLayout Calculate(uint32_t file_size,
+  static FileLayout Calculate(uint32_t old_file_size,
+                              uint32_t target_file_size,
                               uint8_t filename_length,
                               uint8_t block_size_log2,
-                              FileLayoutMode mode);
+                              FileLayoutCategory current_category = FileLayoutCategory::Inline);
 };
