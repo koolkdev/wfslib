@@ -8,6 +8,7 @@
 #include "file.h"
 
 #include <algorithm>
+#include <limits>
 
 #include "block.h"
 #include "file_layout_accessor.h"
@@ -36,7 +37,11 @@ size_t File::file_device::size() const {
 }
 
 std::streamsize File::file_device::read(char_type* s, std::streamsize n) {
-  std::streamsize amt = static_cast<std::streamsize>(size() - pos_);
+  const auto file_size = static_cast<boost::iostreams::stream_offset>(size());
+  if (pos_ < 0 || pos_ >= file_size)
+    return -1;  // EOF
+
+  std::streamsize amt = static_cast<std::streamsize>(file_size - pos_);
   std::streamsize result = std::min(n, amt);
 
   if (result <= 0)
@@ -54,19 +59,29 @@ std::streamsize File::file_device::read(char_type* s, std::streamsize n) {
   return result;
 }
 std::streamsize File::file_device::write(const char_type* s, std::streamsize n) {
-  auto layout = CreateLayoutAccessor(file_);
-  std::streamsize amt = static_cast<std::streamsize>(size() - pos_);
-  if (n > amt) {
-    // Try to resize file
-    // TODO: This call can't stay like that when we will need to allocate new pages and even change the category
-    layout->Resize(std::min(static_cast<size_t>(file_->SizeOnDisk()), static_cast<size_t>(pos_ + n)));
-    amt = static_cast<std::streamsize>(size() - pos_);
-  }
+  if (n <= 0)
+    return -1;  // Failed to write
+
+  const auto file_size = static_cast<boost::iostreams::stream_offset>(size());
+  if (pos_ < 0 || pos_ > file_size)
+    return -1;  // Seek beyond EOF is not supported.
+
+  if (n > std::numeric_limits<boost::iostreams::stream_offset>::max() - pos_)
+    throw std::ios_base::failure("bad write size");
+
+  const auto write_end = pos_ + static_cast<boost::iostreams::stream_offset>(n);
+  if (write_end > file_size)
+    file_->Resize(static_cast<size_t>(write_end));
+
+  const auto resized_file_size = static_cast<boost::iostreams::stream_offset>(size());
+  std::streamsize amt = static_cast<std::streamsize>(resized_file_size - pos_);
   std::streamsize result = std::min(n, amt);
 
   if (result <= 0)
     return -1;  // Failed to resize file
 
+  // Resize can change the layout category, so choose the accessor after metadata is updated.
+  auto layout = CreateLayoutAccessor(file_);
   std::streamsize to_write = result;
   while (to_write > 0) {
     size_t wrote =
@@ -79,6 +94,8 @@ std::streamsize File::file_device::write(const char_type* s, std::streamsize n) 
 }
 boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream_offset off,
                                                         std::ios_base::seekdir way) {
+  const auto file_size = static_cast<boost::iostreams::stream_offset>(size());
+
   // Determine new value of pos_
   boost::iostreams::stream_offset next;
   if (way == std::ios_base::beg) {
@@ -86,13 +103,13 @@ boost::iostreams::stream_offset File::file_device::seek(boost::iostreams::stream
   } else if (way == std::ios_base::cur) {
     next = pos_ + off;
   } else if (way == std::ios_base::end) {
-    next = size() + off - 1;
+    next = file_size + off;
   } else {
     throw std::ios_base::failure("bad seek direction");
   }
 
   // Check for errors
-  if (next < 0 || next >= static_cast<boost::iostreams::stream_offset>(size()))
+  if (next < 0 || next > file_size)
     throw std::ios_base::failure("bad seek offset");
 
   pos_ = next;

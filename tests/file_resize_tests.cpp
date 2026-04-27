@@ -288,6 +288,111 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize allows writing after inline gro
   CHECK(ReadFile(test_file.file, expected.size()) == expected);
 }
 
+TEST_CASE_METHOD(FileResizeFixture, "File device write appends to empty file", "[file-resize][unit]") {
+  auto test_file = CreateFile(kTestFilename, 0);
+
+  CHECK(WriteFile(test_file.file, kReplacementData, 0) == kReplacementData.size());
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  const std::vector<std::byte> expected(kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(test_file.file->SizeOnDisk() == expected.size());
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Inline));
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device write appends to non-empty file", "[file-resize][unit]") {
+  auto test_file = CreateFile(kTestFilename, static_cast<uint32_t>(kInitialData.size()));
+  std::ranges::copy(kInitialData, InlinePayload(test_file.metadata).begin());
+
+  CHECK(WriteFile(test_file.file, kReplacementData, kInitialData.size()) == kReplacementData.size());
+
+  std::vector<std::byte> expected(kInitialData.begin(), kInitialData.end());
+  expected.insert(expected.end(), kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device write overwrites without resizing", "[file-resize][unit]") {
+  auto test_file = CreateFile(kTestFilename, static_cast<uint32_t>(kInitialData.size()));
+  std::ranges::copy(kInitialData, InlinePayload(test_file.metadata).begin());
+
+  CHECK(WriteFile(test_file.file, kReplacementData, 0) == kReplacementData.size());
+
+  const std::vector<std::byte> expected(kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device write grows within current category", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = block_size + static_cast<uint32_t>(kInitialData.size());
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  CHECK(WriteFile(test_file.file, kReplacementData, initial_size) == kReplacementData.size());
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.insert(expected.end(), kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(test_file.file->SizeOnDisk() == 2 * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(FreeBlocksCount() == free_blocks_before);
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device write grows across categories", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto initial_size = 5 * block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  CHECK(WriteFile(test_file.file, kReplacementData, initial_size) == kReplacementData.size());
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.insert(expected.end(), kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(test_file.file->SizeOnDisk() == large_block_blocks_count * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device write appends after truncate", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 2 * block_size + static_cast<uint32_t>(kInitialData.size());
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  test_file.file->Resize(block_size);
+  CHECK(WriteFile(test_file.file, kReplacementData, block_size) == kReplacementData.size());
+
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + block_size};
+  expected.insert(expected.end(), kReplacementData.begin(), kReplacementData.end());
+  CHECK(test_file.file->Size() == expected.size());
+  CHECK(ReadFile(test_file.file, expected.size()) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device seek allows EOF but rejects beyond EOF", "[file-resize][unit]") {
+  auto test_file = CreateFile(kTestFilename, static_cast<uint32_t>(kInitialData.size()));
+  std::ranges::copy(kInitialData, InlinePayload(test_file.metadata).begin());
+
+  File::file_device device(test_file.file);
+  CHECK(device.seek(0, std::ios_base::end) == static_cast<boost::iostreams::stream_offset>(kInitialData.size()));
+  CHECK(device.seek(static_cast<boost::iostreams::stream_offset>(kInitialData.size()), std::ios_base::beg) ==
+        static_cast<boost::iostreams::stream_offset>(kInitialData.size()));
+  CHECK_THROWS_AS(device.seek(1, std::ios_base::end), std::ios_base::failure);
+  CHECK_THROWS_AS(
+      device.seek(static_cast<boost::iostreams::stream_offset>(kInitialData.size() + 1), std::ios_base::beg),
+      std::ios_base::failure);
+}
+
 TEST_CASE_METHOD(FileResizeFixture, "File resize truncates inline file to zero", "[file-resize][unit]") {
   constexpr uint32_t kInitialSize = 80;
   auto test_file = CreateFile(kTestFilename, kInitialSize);
