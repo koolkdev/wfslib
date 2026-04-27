@@ -135,14 +135,6 @@ class File::LayoutAccessor {
     return MutableEntryMetadataItems<DataBlocksClusterMetadata>(file_->mutable_metadata(), GetMetadataItemsCount()) |
            std::views::reverse;
   }
-  auto ClusterMetadataBlockRefs() const {
-    return EntryMetadataItems<uint32_be_t>(file_->metadata(), GetMetadataItemsCount()) | std::views::reverse;
-  }
-  auto MutableClusterMetadataBlockRefs() const {
-    return MutableEntryMetadataItems<uint32_be_t>(file_->mutable_metadata(), GetMetadataItemsCount()) |
-           std::views::reverse;
-  }
-
   BlockPosition BlockPositionForOffset(size_t offset, size_t log2_block_size) const {
     auto [index, offset_in_block] = div_pow2(offset, log2_block_size);
     return {index, floor_pow2(offset, log2_block_size), offset_in_block};
@@ -151,10 +143,6 @@ class File::LayoutAccessor {
   size_t DataBlockLog2Size(BlockType type) const { return file_->quota()->block_size_log2() + log2_size(type); }
 
   size_t ClusterDataLog2Size() const { return DataBlockLog2Size(BlockType::Cluster); }
-
-  size_t ClustersPerMetadataBlock() const {
-    return FileLayout::ClustersPerClusterMetadataBlock(file_->quota()->block_size_log2());
-  }
 
   uint32_t DataSizeForBlock(size_t file_size, size_t block_offset, size_t log2_block_size) const {
     if (file_size <= block_offset)

@@ -33,7 +33,7 @@ class FileResizer {
 
  private:
   void ResizeInline(const FileLayout& target_layout);
-  void ResizeAcrossLayouts(const FileLayout& target_layout);
+  void ResizeViaLayoutRebuild(const FileLayout& target_layout);
   void ReplaceMetadata(EntryMetadata* metadata);
 
   template <FileLayoutCategory Category>

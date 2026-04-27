@@ -34,9 +34,6 @@ std::span<std::byte> InlinePayload(EntryMetadata* metadata) {
   return {reinterpret_cast<std::byte*>(metadata) + metadata->size(), metadata->size_on_disk.value()};
 }
 
-[[noreturn]] void ThrowResizeUnimplemented() {
-  throw std::logic_error("File resize for this layout transition is not implemented");
-}
 }  // namespace
 
 // TODO: This is a Block only because target data-block Flush writes hashes through block-backed HashRef. If resize
@@ -80,7 +77,7 @@ void FileResizer::Resize(size_t new_size) {
                                                    file_->quota()->block_size_log2(), current_category);
 
   if (target_layout.category != current_category) {
-    ResizeAcrossLayouts(target_layout);
+    ResizeViaLayoutRebuild(target_layout);
     return;
   }
 
@@ -98,10 +95,11 @@ void FileResizer::Resize(size_t new_size) {
       ResizeDataUnitLayout<FileLayoutCategory::Clusters>(target_layout);
       return;
     case FileLayoutCategory::ClusterMetadataBlocks:
-      break;
+      ResizeViaLayoutRebuild(target_layout);
+      return;
+    default:
+      throw std::logic_error("Unexpected file resize layout state");
   }
-
-  ThrowResizeUnimplemented();
 }
 
 void FileResizer::ResizeInline(const FileLayout& target_layout) {

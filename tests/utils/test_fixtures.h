@@ -16,11 +16,14 @@
 
 class MetadataBlockFixture {
  public:
+  explicit MetadataBlockFixture(uint32_t blocks_count = 10000)
+      : test_device(std::make_shared<TestBlocksDevice>(blocks_count)) {}
+
   std::shared_ptr<TestBlock> LoadMetadataBlock(uint32_t physical_block_number, bool new_block = true) {
     return TestBlock::LoadMetadataBlock(test_device, physical_block_number, new_block);
   }
 
-  std::shared_ptr<TestBlocksDevice> test_device = std::make_shared<TestBlocksDevice>();
+  std::shared_ptr<TestBlocksDevice> test_device;
 };
 
 class FreeBlocksAllocatorFixture : public MetadataBlockFixture {

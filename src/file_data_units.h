@@ -126,6 +126,40 @@ auto MutableFileDataUnitLogicalMetadataItems(EntryMetadata* metadata, size_t cou
   return MutableEntryMetadataItems<Metadata>(metadata, count) | std::views::reverse;
 }
 
+inline auto ClusterMetadataBlockRefs(const EntryMetadata* metadata, size_t count) {
+  return EntryMetadataItems<uint32_be_t>(metadata, count) | std::views::reverse;
+}
+
+inline auto MutableClusterMetadataBlockRefs(EntryMetadata* metadata, size_t count) {
+  return MutableEntryMetadataItems<uint32_be_t>(metadata, count) | std::views::reverse;
+}
+
+inline std::span<DataBlocksClusterMetadata> MutableClusterMetadataBlockItems(
+    const std::shared_ptr<Block>& metadata_block,
+    size_t clusters_per_metadata_block) {
+  return {metadata_block->get_mutable_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)),
+          clusters_per_metadata_block};
+}
+
+inline std::span<const DataBlocksClusterMetadata> ClusterMetadataBlockItems(
+    const std::shared_ptr<Block>& metadata_block,
+    size_t clusters_per_metadata_block) {
+  return {metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)),
+          clusters_per_metadata_block};
+}
+
+inline size_t ClusterMetadataBlockIndexForDataBlock(size_t data_block_index, uint8_t block_size_log2) {
+  const auto large_blocks_per_cluster = FileDataUnitLayoutTraits<FileLayoutCategory::Clusters>::kDataBlocksPerUnit;
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(block_size_log2);
+  return data_block_index / large_blocks_per_cluster / clusters_per_metadata_block;
+}
+
+inline size_t ClusterMetadataBlockDataBlockIndex(size_t data_block_index, uint8_t block_size_log2) {
+  const auto large_blocks_per_cluster = FileDataUnitLayoutTraits<FileLayoutCategory::Clusters>::kDataBlocksPerUnit;
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(block_size_log2);
+  return data_block_index % (large_blocks_per_cluster * clusters_per_metadata_block);
+}
+
 template <FileLayoutCategory Category, std::ranges::random_access_range Units>
 FileDataBlockLocation FileDataBlockLocationForLogicalMetadata(const std::shared_ptr<Block>& metadata_block,
                                                               Units&& units,
@@ -135,6 +169,27 @@ FileDataBlockLocation FileDataBlockLocationForLogicalMetadata(const std::shared_
   const auto unit_index = data_block_index / Traits::kDataBlocksPerUnit;
   const auto block_index = data_block_index % Traits::kDataBlocksPerUnit;
   return Traits::data_block_location_for_unit(metadata_block, std::ranges::begin(units)[unit_index], block_index);
+}
+
+inline FileDataBlockLocation ClusterMetadataBlockDataBlockLocationFor(const std::shared_ptr<Block>& metadata_block,
+                                                                      size_t data_block_index,
+                                                                      uint8_t block_size_log2) {
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(block_size_log2);
+  assert(data_block_index <
+         clusters_per_metadata_block * FileDataUnitLayoutTraits<FileLayoutCategory::Clusters>::kDataBlocksPerUnit);
+  const auto cluster_metadata = ClusterMetadataBlockItems(metadata_block, clusters_per_metadata_block);
+  return FileDataBlockLocationForLogicalMetadata<FileLayoutCategory::Clusters>(metadata_block, cluster_metadata,
+                                                                               data_block_index);
+}
+
+inline FileDataBlockLocation ClusterMetadataBlocksDataBlockLocationFor(
+    std::span<const std::shared_ptr<Block>> metadata_blocks,
+    size_t data_block_index,
+    uint8_t block_size_log2) {
+  const auto metadata_block_index = ClusterMetadataBlockIndexForDataBlock(data_block_index, block_size_log2);
+  return ClusterMetadataBlockDataBlockLocationFor(metadata_blocks[metadata_block_index],
+                                                  ClusterMetadataBlockDataBlockIndex(data_block_index, block_size_log2),
+                                                  block_size_log2);
 }
 
 template <FileLayoutCategory Category>
