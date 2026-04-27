@@ -26,6 +26,8 @@ namespace {
 }
 
 struct DataBlockCacheRef {
+  // Old-cache identity captured before metadata replacement. Hash refs are intentionally omitted; post-commit detach
+  // should only evict stale cached blocks, not flush through old hash locations.
   uint32_t block_number;
   BlockType block_type;
   uint32_t data_size;
@@ -48,6 +50,7 @@ class AllocatedDataUnits {
                                         FileDataUnitLayoutTraits<Category>::kAllocationBlockType))) {}
 
   ~AllocatedDataUnits() {
+    // Until metadata replacement succeeds, newly allocated data units are rollback state.
     if (!released_) {
       for (const auto block_number : block_numbers_)
         quota_->DeleteBlocks(block_number, FileDataUnitAreaBlocksCount<Category>());
@@ -149,6 +152,8 @@ void FlushRetainedDataBlocks(const std::shared_ptr<QuotaArea>& quota,
                              const FileLayout& target_layout,
                              bool encrypted,
                              uint8_t block_size_log2) {
+  // Before the commit point, only retained blocks are flushed. Dropped blocks must stay attached because a failed
+  // metadata replacement leaves the old layout authoritative.
   const auto data_block_log2_size = FileDataBlockLog2Size<Category>(block_size_log2);
   const auto data_blocks_count = div_ceil(old_layout.file_size, size_t{1} << data_block_log2_size);
   for (const auto data_block_index : std::views::iota(size_t{0}, data_blocks_count)) {
@@ -168,6 +173,8 @@ void DetachDataBlocks(const std::shared_ptr<QuotaArea>& quota,
                       std::span<const DataBlockCacheRef> refs,
                       bool encrypted,
                       uint8_t block_size_log2) {
+  // After metadata replacement, cached blocks still point at old hash refs and may have obsolete used sizes. Load
+  // cache entries without touching disk so every old block object is detached and future I/O reloads from new metadata.
   for (const auto& ref : refs) {
     auto data_block =
         throw_if_error(quota->LoadDataBlock(ref.block_number, static_cast<BlockSize>(block_size_log2), ref.block_type,
@@ -244,6 +251,7 @@ void FileResizer::ResizeDataUnitLayout(const FileLayout& target_layout) {
                                                                            allocated_units.block_numbers());
   StoreLogicalMetadata<Category>(replacement.get(), replacement_metadata);
 
+  // Commit point: after this succeeds, the replacement metadata is authoritative and old caches/units can be dropped.
   ReplaceMetadata(replacement.get());
   allocated_units.release();
 
