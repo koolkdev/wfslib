@@ -12,6 +12,14 @@
 #include <iterator>
 #include <stdexcept>
 
+#include "file_data_units.h"
+
+namespace {
+FileLayoutCategory CurrentCategory(const EntryMetadata* metadata) {
+  return FileLayout::CategoryFromValue(metadata->size_category.value());
+}
+}  // namespace
+
 // Category 0 - File data is in the attribute metadata (limited to 512 bytes minus attribute size) (no minumum)
 class File::InlineLayoutAccessor : public File::LayoutAccessor {
  public:
@@ -72,12 +80,13 @@ class File::BlockListLayoutAccessor : public File::LayoutAccessor {
   }
 
   virtual DataRef GetDataRef(size_t offset, size_t size, size_t file_size) {
-    auto blocks_list = DataBlockRefs();
     auto block_position = BlockPositionForOffset(offset, GetDataBlockSize());
+    auto location =
+        FileDataBlockLocationFor(CurrentCategory(file_->metadata()), file_->metadata_block(), file_->metadata(),
+                                 block_position.index, file_->quota()->block_size_log2());
     auto block_ref =
-        DataBlockRef{blocks_list[block_position.index].block_number.value(), GetDataBlockType(), block_position.offset,
-                     DataSizeForBlock(file_size, block_position.offset, GetDataBlockSize()),
-                     HashRef(file_->metadata_block(), blocks_list[block_position.index].hash)};
+        DataBlockRef{location.block_number, location.block_type, block_position.offset,
+                     DataSizeForBlock(file_size, block_position.offset, GetDataBlockSize()), std::move(location.hash)};
     return GetDataFromBlock(std::move(block_ref), block_position.offset_in_block, size);
   }
 
@@ -148,7 +157,9 @@ class File::BlockListLayoutAccessor : public File::LayoutAccessor {
   }
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
-    if (current_data_block &&
+    // Resize detaches stale cached blocks; reusing them would route later writes into an object that can no longer
+    // flush to disk.
+    if (current_data_block && !current_data_block->detached() &&
         file_->quota()->to_area_block_number(current_data_block->physical_block_number()) == block_number)
       return;
     auto block = file_->quota()->LoadDataBlock(block_number, static_cast<BlockSize>(file_->quota()->block_size_log2()),
@@ -208,15 +219,13 @@ class File::ClustersLayoutAccessor : public File::LargeBlocksLayoutAccessor {
                                      const std::shared_ptr<Block>& metadata_block,
                                      ClusterArray&& clusters_list) {
     auto offset_in_cluster_list = offset - (cluster_list_start << ClusterDataLog2Size());
-    auto [cluster_index, offset_in_cluster] = div_pow2(offset_in_cluster_list, ClusterDataLog2Size());
-    auto block_position = BlockPositionForOffset(offset_in_cluster, GetDataBlockSize());
+    auto block_position = BlockPositionForOffset(offset_in_cluster_list, GetDataBlockSize());
     auto block_offset = floor_pow2(offset, GetDataBlockSize());
-    return GetDataFromBlock(
-        {clusters_list[cluster_index].block_number.value() +
-             static_cast<uint32_t>(block_position.index << log2_size(GetDataBlockType())),
-         GetDataBlockType(), block_offset, DataSizeForBlock(file_size, block_offset, GetDataBlockSize()),
-         HashRef(metadata_block, clusters_list[cluster_index].hash[block_position.index])},
-        block_position.offset_in_block, size);
+    auto location = FileDataBlockLocationForLogicalMetadata<FileLayoutCategory::Clusters>(metadata_block, clusters_list,
+                                                                                          block_position.index);
+    return GetDataFromBlock({location.block_number, location.block_type, block_offset,
+                             DataSizeForBlock(file_size, block_offset, GetDataBlockSize()), std::move(location.hash)},
+                            block_position.offset_in_block, size);
   }
 
   template <typename ClusterArray>
@@ -227,20 +236,15 @@ class File::ClustersLayoutAccessor : public File::LargeBlocksLayoutAccessor {
     std::vector<DataBlockRef> refs;
     refs.reserve(clusters_list.size() * (size_t{1} << log2_size(BlockType::Cluster) >> log2_size(GetDataBlockType())));
 
-    size_t cluster_offset = cluster_list_start << ClusterDataLog2Size();
-    for (const auto& cluster : clusters_list) {
-      if (cluster_offset >= size)
-        break;
-      for (size_t block_index = 0; block_index < std::size(cluster.hash); ++block_index) {
-        auto block_offset = cluster_offset + (block_index << GetDataBlockSize());
-        if (block_offset >= size)
-          break;
-        refs.push_back(
-            {cluster.block_number.value() + static_cast<uint32_t>(block_index << log2_size(GetDataBlockType())),
-             GetDataBlockType(), block_offset, DataSizeForBlock(size, block_offset, GetDataBlockSize()),
-             HashRef(metadata_block, cluster.hash[block_index])});
-      }
-      cluster_offset += size_t{1} << ClusterDataLog2Size();
+    size_t block_offset = cluster_list_start << ClusterDataLog2Size();
+    const auto data_blocks_count =
+        std::ranges::size(clusters_list) * FileDataUnitLayoutTraits<FileLayoutCategory::Clusters>::kDataBlocksPerUnit;
+    for (size_t data_block_index = 0; data_block_index < data_blocks_count && block_offset < size; ++data_block_index) {
+      auto location = FileDataBlockLocationForLogicalMetadata<FileLayoutCategory::Clusters>(
+          metadata_block, clusters_list, data_block_index);
+      refs.push_back({location.block_number, location.block_type, block_offset,
+                      DataSizeForBlock(size, block_offset, GetDataBlockSize()), std::move(location.hash)});
+      block_offset += size_t{1} << GetDataBlockSize();
     }
 
     return refs;

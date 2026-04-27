@@ -9,9 +9,21 @@
 
 #include <cstddef>
 #include <memory>
+#include <vector>
 
 #include "file.h"
 #include "file_layout.h"
+
+class EntryMetadataReplacement {
+ public:
+  EntryMetadataReplacement(const EntryMetadata* source, const FileLayout& layout);
+
+  EntryMetadata* get();
+  const EntryMetadata* get() const;
+
+ private:
+  std::vector<std::byte> storage_;
+};
 
 class FileResizer {
  public:
@@ -21,6 +33,10 @@ class FileResizer {
 
  private:
   void ResizeInline(const FileLayout& target_layout);
+  void ReplaceMetadata(EntryMetadata* metadata);
+
+  template <FileLayoutCategory Category>
+  void ResizeDataUnitLayout(const FileLayout& target_layout);
 
   std::shared_ptr<File> file_;
 };
