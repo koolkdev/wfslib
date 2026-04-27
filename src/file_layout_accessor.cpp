@@ -317,18 +317,18 @@ class File::ClusterMetadataBlocksLayoutAccessor : public File::ClustersLayoutAcc
   size_t ClustersInBlock() const { return ClustersPerMetadataBlock(); }
 };
 
-std::shared_ptr<File::LayoutAccessor> File::CreateLayoutAccessor(std::shared_ptr<File> file) {
+std::unique_ptr<File::LayoutAccessor> File::CreateLayoutAccessor(std::shared_ptr<File> file) {
   switch (FileLayout::CategoryFromValue(file->metadata()->size_category.value())) {
     case FileLayoutCategory::Inline:
-      return std::make_shared<InlineLayoutAccessor>(file);
+      return std::make_unique<InlineLayoutAccessor>(file);
     case FileLayoutCategory::Blocks:
-      return std::make_shared<BlocksLayoutAccessor>(file);
+      return std::make_unique<BlocksLayoutAccessor>(file);
     case FileLayoutCategory::LargeBlocks:
-      return std::make_shared<LargeBlocksLayoutAccessor>(file);
+      return std::make_unique<LargeBlocksLayoutAccessor>(file);
     case FileLayoutCategory::Clusters:
-      return std::make_shared<ClustersLayoutAccessor>(file);
+      return std::make_unique<ClustersLayoutAccessor>(file);
     case FileLayoutCategory::ClusterMetadataBlocks:
-      return std::make_shared<ClusterMetadataBlocksLayoutAccessor>(file);
+      return std::make_unique<ClusterMetadataBlocksLayoutAccessor>(file);
   }
   throw std::runtime_error("Unexpected file category");  // TODO: Change to WfsError
 }

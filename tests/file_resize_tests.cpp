@@ -576,6 +576,56 @@ TEST_CASE_METHOD(FileResizeFixture,
   CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
+TEST_CASE_METHOD(FileResizeFixture, "File device uses current layout after category growth", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 5 * block_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+  {
+    File::file_device writer(test_file.file);
+    test_file.file->Resize(target_size);
+    REQUIRE(StoredMetadata(kTestFilename)->size_category.value() ==
+            FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+
+    writer.seek(block_size, std::ios_base::beg);
+    const auto wrote = writer.write(reinterpret_cast<const char*>(kPostResizeData.data()),
+                                    static_cast<std::streamsize>(kPostResizeData.size()));
+    REQUIRE(wrote == static_cast<std::streamsize>(kPostResizeData.size()));
+  }
+
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  std::ranges::copy(kPostResizeData, expected.begin() + block_size);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File device uses current layout after category shrink", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto initial_size = 5 * block_size + 1;
+  const auto target_size = block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+
+  {
+    File::file_device writer(test_file.file);
+    test_file.file->Resize(target_size);
+    REQUIRE(StoredMetadata(kTestFilename)->size_category.value() ==
+            FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+
+    const auto wrote = writer.write(reinterpret_cast<const char*>(kPostResizeData.data()),
+                                    static_cast<std::streamsize>(kPostResizeData.size()));
+    REQUIRE(wrote == static_cast<std::streamsize>(kPostResizeData.size()));
+  }
+
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  std::ranges::copy(kPostResizeData, expected.begin());
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
 TEST_CASE_METHOD(FileResizeFixture,
                  "File resize failure keeps dirty writes in blocks that would be dropped",
                  "[file-resize][unit]") {
