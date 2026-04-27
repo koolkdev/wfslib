@@ -47,8 +47,8 @@ class File : public Entry, public std::enable_shared_from_this<File> {
 
    private:
     size_t size() const;
+
     std::shared_ptr<File> file_;
-    std::shared_ptr<LayoutAccessor> layout_;
     boost::iostreams::stream_offset pos_;
   };
 
@@ -62,5 +62,5 @@ class File : public Entry, public std::enable_shared_from_this<File> {
   // TODO: We may have cyclic reference here if we do cache in area.
   std::shared_ptr<QuotaArea> quota_;
 
-  static std::shared_ptr<LayoutAccessor> CreateLayoutAccessor(std::shared_ptr<File> file);
+  static std::unique_ptr<LayoutAccessor> CreateLayoutAccessor(std::shared_ptr<File> file);
 };
