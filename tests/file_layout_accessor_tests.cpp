@@ -74,8 +74,8 @@ class FileLayoutAccessorFixture : public MetadataBlockFixture {
   }
 
   TestFile CreateFile(std::string_view name, uint32_t file_size) {
-    return CreateFile(name, FileLayout::Calculate(file_size, static_cast<uint8_t>(name.size()),
-                                                  quota->block_size_log2(), FileLayoutMode::MinimumForGrow));
+    return CreateFile(name,
+                      FileLayout::Calculate(0, file_size, static_cast<uint8_t>(name.size()), quota->block_size_log2()));
   }
 
   void StoreDataBlock(uint32_t area_block_number, std::span<const std::byte> data) {

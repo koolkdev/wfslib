@@ -73,12 +73,17 @@ class FileResizeFixture : public MetadataBlockFixture {
   }
 
   TestFile CreateFile(std::string_view name, uint32_t file_size) {
-    return CreateFile(name, FileLayout::Calculate(file_size, static_cast<uint8_t>(name.size()),
-                                                  quota->block_size_log2(), FileLayoutMode::MinimumForGrow));
+    return CreateFile(name,
+                      FileLayout::Calculate(0, file_size, static_cast<uint8_t>(name.size()), quota->block_size_log2()));
   }
 
   TestFile CreateDataUnitFile(std::string_view name, uint32_t file_size, std::span<const std::byte> data) {
-    auto test_file = CreateFile(name, file_size);
+    return CreateDataUnitFile(
+        name, FileLayout::Calculate(0, file_size, static_cast<uint8_t>(name.size()), quota->block_size_log2()), data);
+  }
+
+  TestFile CreateDataUnitFile(std::string_view name, const FileLayout& layout, std::span<const std::byte> data) {
+    auto test_file = CreateFile(name, layout);
     AssignDataBlocks(test_file.metadata);
     StoreFileData(test_file.metadata, data);
     return test_file;
@@ -255,8 +260,8 @@ TEST_CASE_METHOD(FileResizeFixture,
   std::ranges::copy(kInitialData, InlinePayload(test_file.metadata).begin());
 
   const auto old_metadata_log2_size = test_file.metadata->metadata_log2_size.value();
-  const auto target_layout = FileLayout::Calculate(kGrownSize, static_cast<uint8_t>(kTestFilename.size()),
-                                                   quota->block_size_log2(), FileLayoutMode::MinimumForGrow);
+  const auto target_layout =
+      FileLayout::Calculate(0, kGrownSize, static_cast<uint8_t>(kTestFilename.size()), quota->block_size_log2());
   REQUIRE(target_layout.category == FileLayoutCategory::Inline);
   REQUIRE(target_layout.metadata_log2_size > old_metadata_log2_size);
 
@@ -288,8 +293,8 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize truncates inline file to zero",
   auto test_file = CreateFile(kTestFilename, kInitialSize);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Inline));
 
-  const auto target_layout = FileLayout::Calculate(0, static_cast<uint8_t>(kTestFilename.size()),
-                                                   quota->block_size_log2(), FileLayoutMode::MaximumForShrink);
+  const auto target_layout =
+      FileLayout::Calculate(kInitialSize, 0, static_cast<uint8_t>(kTestFilename.size()), quota->block_size_log2());
 
   test_file.file->Resize(0);
 
@@ -301,14 +306,27 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize truncates inline file to zero",
   CHECK(InlinePayload(metadata).empty());
 }
 
-TEST_CASE_METHOD(FileResizeFixture, "File resize throws for unsupported layout transitions", "[file-resize][unit]") {
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows inline file into category 1", "[file-resize][unit]") {
   auto test_file = CreateFile(kTestFilename, static_cast<uint32_t>(kInitialData.size()));
+  std::ranges::copy(kInitialData, InlinePayload(test_file.metadata).begin());
+  const auto target_size = FileLayout::InlineCapacity(static_cast<uint8_t>(kTestFilename.size())) + 1;
+  const auto free_blocks_before = FreeBlocksCount();
 
-  CHECK_THROWS_AS(test_file.file->Resize(FileLayout::InlineCapacity(static_cast<uint8_t>(kTestFilename.size())) + 1),
-                  std::logic_error);
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{kInitialData.begin(), kInitialData.end()};
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == quota->block_size());
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(FreeBlocksCount() == free_blocks_before - 1);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
-TEST_CASE_METHOD(FileResizeFixture, "File resize throws when shrink target category differs", "[file-resize][unit]") {
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize shrink keeps current category when target still fits",
+                 "[file-resize][unit]") {
   const auto block_size = static_cast<uint32_t>(quota->block_size());
   const auto initial_size = 2 * block_size + 8;
   const auto target_size = block_size + 4;
@@ -316,8 +334,172 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize throws when shrink target categ
   auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
   REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
 
-  CHECK_THROWS_AS(test_file.file->Resize(target_size), std::logic_error);
-  CHECK(test_file.file->Size() == initial_size);
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 2 * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 1 into inline data", "[file-resize][unit]") {
+  const auto initial_size = FileLayout::InlineCapacity(static_cast<uint8_t>(kTestFilename.size())) + 1;
+  const auto target_size = static_cast<uint32_t>(kInitialData.size());
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == target_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Inline));
+  CHECK(FreeBlocksCount() == free_blocks_before + 1);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 1 into category 2", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto initial_size = 5 * block_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == large_block_blocks_count * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + 5 - large_block_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 2 into category 1", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto initial_size = 5 * block_size + 1;
+  const auto target_size = block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + large_block_blocks_count - 1);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 2 without lowering category", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto large_block_size = large_block_blocks_count * block_size;
+  const auto initial_size = block_size + 1;
+  const auto target_size = block_size + 4;
+  const auto layout = FileLayout::Calculate(initial_size, initial_size, static_cast<uint8_t>(kTestFilename.size()),
+                                            quota->block_size_log2(), FileLayoutCategory::LargeBlocks);
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, layout, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == large_block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 2 into category 3", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto large_block_size = large_block_blocks_count * block_size;
+  const auto initial_size = 5 * large_block_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == cluster_blocks_count * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  CHECK(FreeBlocksCount() == free_blocks_before + 5 * large_block_blocks_count - cluster_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 3 into category 2", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto large_block_size = large_block_blocks_count * block_size;
+  const auto initial_size = 5 * large_block_size + 1;
+  const auto target_size = large_block_size;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == large_block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + cluster_blocks_count - large_block_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize can grow across more than one category", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto large_block_size = large_block_blocks_count * block_size;
+  const auto initial_size = block_size + 4;
+  const auto target_size = 5 * large_block_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Blocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == cluster_blocks_count * block_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  CHECK(FreeBlocksCount() == free_blocks_before + 2 - cluster_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
 TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 1 by one block", "[file-resize][unit]") {

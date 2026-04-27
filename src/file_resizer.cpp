@@ -13,7 +13,9 @@
 #include <span>
 #include <stdexcept>
 #include <utility>
+#include <vector>
 
+#include "block.h"
 #include "directory_map.h"
 #include "errors.h"
 #include "file_layout.h"
@@ -37,8 +39,10 @@ std::span<std::byte> InlinePayload(EntryMetadata* metadata) {
 }
 }  // namespace
 
+// TODO: This is a Block only because target data-block Flush writes hashes through block-backed HashRef. If resize
+// gets a staged data-block write path, keep replacement metadata as plain owned bytes instead.
 EntryMetadataReplacement::EntryMetadataReplacement(const EntryMetadata* source, const FileLayout& layout)
-    : storage_(size_t{1} << layout.metadata_log2_size, std::byte{0}) {
+    : block_(Block::CreateDetached(std::vector(size_t{1} << layout.metadata_log2_size, std::byte{0}))) {
   auto* metadata = get();
   std::memcpy(metadata, source, source->size());
   metadata->file_size = layout.file_size;
@@ -48,11 +52,15 @@ EntryMetadataReplacement::EntryMetadataReplacement(const EntryMetadata* source, 
 }
 
 EntryMetadata* EntryMetadataReplacement::get() {
-  return reinterpret_cast<EntryMetadata*>(storage_.data());
+  return block_->get_mutable_object<EntryMetadata>(0);
 }
 
 const EntryMetadata* EntryMetadataReplacement::get() const {
-  return reinterpret_cast<const EntryMetadata*>(storage_.data());
+  return block_->get_object<EntryMetadata>(0);
+}
+
+const std::shared_ptr<Block>& EntryMetadataReplacement::block() const {
+  return block_;
 }
 
 FileResizer::FileResizer(std::shared_ptr<File> file) : file_(std::move(file)) {}
@@ -67,13 +75,14 @@ void FileResizer::Resize(size_t new_size) {
   if (target_size == old_size)
     return;
 
-  const auto mode = target_size > old_size ? FileLayoutMode::MinimumForGrow : FileLayoutMode::MaximumForShrink;
-  const auto target_layout =
-      FileLayout::Calculate(target_size, metadata->filename_length.value(), file_->quota()->block_size_log2(), mode);
   const auto current_category = CurrentCategory(metadata);
+  const auto target_layout = FileLayout::Calculate(old_size, target_size, metadata->filename_length.value(),
+                                                   file_->quota()->block_size_log2(), current_category);
 
-  if (target_layout.category != current_category)
-    ThrowResizeUnimplemented();
+  if (target_layout.category != current_category) {
+    ResizeAcrossLayouts(target_layout);
+    return;
+  }
 
   switch (target_layout.category) {
     case FileLayoutCategory::Inline:

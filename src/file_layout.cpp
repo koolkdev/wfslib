@@ -152,6 +152,10 @@ FileLayoutCategory MaximumCategory(uint32_t file_size, uint8_t filename_length, 
   return FileLayoutCategory::Inline;
 }
 
+bool CategoryLess(FileLayoutCategory lhs, FileLayoutCategory rhs) {
+  return FileLayout::CategoryValue(lhs) < FileLayout::CategoryValue(rhs);
+}
+
 }  // namespace
 
 size_t FileLayout::BaseMetadataSize(uint8_t filename_length) {
@@ -215,12 +219,18 @@ uint32_t FileLayout::MaxFileSize(uint8_t block_size_log2) {
   return static_cast<uint32_t>(std::min(max_by_size_on_disk, max_by_cluster_metadata_blocks));
 }
 
-FileLayout FileLayout::Calculate(uint32_t file_size,
+FileLayout FileLayout::Calculate(uint32_t old_file_size,
+                                 uint32_t target_file_size,
                                  uint8_t filename_length,
                                  uint8_t block_size_log2,
-                                 FileLayoutMode mode) {
-  const auto category = mode == FileLayoutMode::MinimumForGrow
-                            ? MinimumCategory(file_size, filename_length, block_size_log2)
-                            : MaximumCategory(file_size, filename_length, block_size_log2);
-  return BuildLayout(file_size, filename_length, block_size_log2, category);
+                                 FileLayoutCategory current_category) {
+  if (target_file_size > old_file_size) {
+    const auto smallest_target_category = MinimumCategory(target_file_size, filename_length, block_size_log2);
+    const auto target_category = std::max(smallest_target_category, current_category, CategoryLess);
+    return BuildLayout(target_file_size, filename_length, block_size_log2, target_category);
+  }
+
+  const auto largest_target_category = MaximumCategory(target_file_size, filename_length, block_size_log2);
+  const auto target_category = std::min(largest_target_category, current_category, CategoryLess);
+  return BuildLayout(target_file_size, filename_length, block_size_log2, target_category);
 }
