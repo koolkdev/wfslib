@@ -24,6 +24,7 @@
 
 #include "block.h"
 #include "directory_map.h"
+#include "errors.h"
 #include "file_layout.h"
 #include "free_blocks_allocator.h"
 #include "quota_area.h"
@@ -96,6 +97,43 @@ class FileResizeFixture : public MetadataBlockFixture {
   }
 
   uint32_t FreeBlocksCount() { return (*quota->GetFreeBlocksAllocator())->free_blocks_count(); }
+
+  std::vector<uint32_t> ExhaustFreeBlocks() {
+    std::vector<uint32_t> blocks;
+    while (true) {
+      auto block = quota->AllocMetadataBlock();
+      if (!block.has_value()) {
+        REQUIRE(block.error() == WfsError::kNoSpace);
+        return blocks;
+      }
+
+      blocks.push_back(quota->to_area_block_number((*block)->physical_block_number()));
+      (*block)->Detach();
+    }
+  }
+
+  void RestoreAlignedFreeRange(std::vector<uint32_t>& blocks, uint32_t blocks_count, uint32_t alignment) {
+    std::ranges::sort(blocks);
+
+    size_t range_begin = 0;
+    while (range_begin < blocks.size()) {
+      size_t range_end = range_begin + 1;
+      while (range_end < blocks.size() && blocks[range_end] == blocks[range_end - 1] + 1)
+        ++range_end;
+
+      const auto aligned_start = static_cast<uint32_t>((blocks[range_begin] + alignment - 1) & ~(alignment - 1));
+      if (aligned_start >= blocks[range_begin] && aligned_start + blocks_count <= blocks[range_end - 1] + 1) {
+        REQUIRE(quota->DeleteBlocks(aligned_start, blocks_count));
+        auto erase_begin = std::ranges::lower_bound(blocks, aligned_start);
+        blocks.erase(erase_begin, erase_begin + blocks_count);
+        return;
+      }
+
+      range_begin = range_end;
+    }
+
+    FAIL("Could not find an aligned drained free-block range");
+  }
 
  private:
   static FileLayoutCategory Category(const EntryMetadata* metadata) {
@@ -749,6 +787,50 @@ TEST_CASE_METHOD(FileResizeFixture,
                                        quota->block_size_log2()) == 2);
   CHECK(FreeBlocksCount() == free_blocks_before - cluster_blocks_count - 1);
   CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize rolls back partial category 4 metadata block allocation on no space",
+                 "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto cluster_size = cluster_blocks_count * block_size;
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
+  const auto initial_size = clusters_per_metadata_block * cluster_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() ==
+          FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+
+  auto drained_blocks = ExhaustFreeBlocks();
+  const auto target_layout =
+      FileLayout::Calculate(initial_size, target_size, test_file.metadata->filename_length.value(),
+                            quota->block_size_log2(), FileLayoutCategory::ClusterMetadataBlocks);
+  REQUIRE(FileLayout::MetadataItemsCount(FileLayoutCategory::ClusterMetadataBlocks, target_layout.size_on_disk,
+                                         quota->block_size_log2()) == 2);
+
+  // Leave enough space for the rebuilt data clusters and exactly one of the two target metadata blocks. This forces
+  // partial metadata-block allocation rollback.
+  const auto restored_blocks = target_layout.data_units_count * cluster_blocks_count + 1;
+  for (uint32_t i = 0; i < target_layout.data_units_count; ++i)
+    RestoreAlignedFreeRange(drained_blocks, cluster_blocks_count, cluster_blocks_count);
+  RestoreAlignedFreeRange(drained_blocks, 1, 1);
+  REQUIRE(FreeBlocksCount() == restored_blocks);
+
+  try {
+    test_file.file->Resize(target_size);
+    FAIL("Resize should fail after the first target metadata block allocation");
+  } catch (const WfsException& error) {
+    CHECK(error.error() == WfsError::kNoSpace);
+  }
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  CHECK(FreeBlocksCount() == restored_blocks);
+  CHECK(test_file.file->Size() == initial_size);
+  CHECK(test_file.file->SizeOnDisk() == initial_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  CHECK(ReadFile(test_file.file, initial_size) == initial_data);
 }
 
 TEST_CASE_METHOD(FileResizeFixture, "File resize can grow across more than one category", "[file-resize][unit]") {
