@@ -149,21 +149,23 @@ class AllocatedTargetMetadataBlocks {
     blocks_.reserve(metadata_blocks_count);
     block_numbers_.reserve(metadata_blocks_count);
     for (uint32_t i = 0; i < metadata_blocks_count; ++i) {
-      auto block = throw_if_error(quota_->AllocMetadataBlock());
-      std::ranges::fill(block->mutable_data(), std::byte{0});
-      block_numbers_.push_back(quota_->to_area_block_number(block->physical_block_number()));
-      blocks_.push_back(std::move(block));
+      auto block = quota_->AllocMetadataBlock();
+      if (!block.has_value()) {
+        if (block.error() == WfsError::kNoSpace)
+          Rollback();
+        throw WfsException(block.error());
+      }
+
+      std::ranges::fill((*block)->mutable_data(), std::byte{0});
+      block_numbers_.push_back(quota_->to_area_block_number((*block)->physical_block_number()));
+      blocks_.push_back(std::move(*block));
     }
   }
 
   ~AllocatedTargetMetadataBlocks() {
     // Until metadata replacement succeeds, newly allocated metadata blocks are rollback state.
-    if (!released_) {
-      for (const auto& block : blocks_) {
-        quota_->DeleteBlocks(quota_->to_area_block_number(block->physical_block_number()), 1);
-        block->Detach();
-      }
-    }
+    if (!released_)
+      Rollback();
   }
 
   const std::vector<std::shared_ptr<Block>>& blocks() const { return blocks_; }
@@ -177,6 +179,15 @@ class AllocatedTargetMetadataBlocks {
   void release() { released_ = true; }
 
  private:
+  void Rollback() {
+    for (const auto& block : blocks_) {
+      quota_->DeleteBlocks(quota_->to_area_block_number(block->physical_block_number()), 1);
+      block->Detach();
+    }
+    blocks_.clear();
+    block_numbers_.clear();
+  }
+
   std::shared_ptr<QuotaArea> quota_;
   std::vector<std::shared_ptr<Block>> blocks_;
   std::vector<uint32_t> block_numbers_;
