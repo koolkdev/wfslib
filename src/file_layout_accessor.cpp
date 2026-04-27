@@ -157,6 +157,8 @@ class File::BlockListLayoutAccessor : public File::LayoutAccessor {
   }
 
   void LoadDataBlock(uint32_t block_number, uint32_t data_size, Block::HashRef data_hash) {
+    // Resize detaches stale cached blocks; reusing them would route later writes into an object that can no longer
+    // flush to disk.
     if (current_data_block && !current_data_block->detached() &&
         file_->quota()->to_area_block_number(current_data_block->physical_block_number()) == block_number)
       return;

@@ -121,6 +121,8 @@ size_t FileDataBlockLog2Size(uint8_t block_size_log2) {
 template <FileLayoutCategory Category>
 auto FileDataUnitLogicalMetadataItems(const EntryMetadata* metadata, size_t count) {
   using Metadata = typename FileDataUnitLayoutTraits<Category>::Metadata;
+  // WFS stores data-unit metadata from the end of the entry allocation backwards. Expose it in file-offset order so
+  // callers can index by logical unit number.
   return EntryMetadataItems<Metadata>(metadata, count) | std::views::reverse;
 }
 
