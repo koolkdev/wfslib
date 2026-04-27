@@ -263,39 +263,46 @@ class File::ClusterMetadataBlocksLayoutAccessor : public File::ClustersLayoutAcc
   size_t GetMetadataSize() const override { return GetMetadataItemsCount() * sizeof(uint32_be_t); }
 
   DataRef GetDataRef(size_t offset, size_t size, size_t file_size) override {
-    auto blocks_list = ClusterMetadataBlockRefs();
-    auto cluster_index = offset >> ClusterDataLog2Size();
-    int64_t block_index = cluster_index / ClustersInBlock();
-    LoadMetadataBlock(blocks_list[block_index].value());
-    return GetDataRefFromClustersList(
-        block_index * ClustersInBlock(), offset, size, file_size, current_metadata_block,
-        std::span<const DataBlocksClusterMetadata>{
-            current_metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)),
-            ClustersInBlock()});
+    auto block_position = BlockPositionForOffset(offset, GetDataBlockSize());
+    auto blocks_list = ::ClusterMetadataBlockRefs(file_->metadata(), GetMetadataItemsCount());
+    const auto metadata_block_index =
+        ClusterMetadataBlockIndexForDataBlock(block_position.index, file_->quota()->block_size_log2());
+    LoadMetadataBlock(blocks_list[metadata_block_index].value());
+
+    auto location = ClusterMetadataBlockDataBlockLocationFor(
+        current_metadata_block,
+        ClusterMetadataBlockDataBlockIndex(block_position.index, file_->quota()->block_size_log2()),
+        file_->quota()->block_size_log2());
+    return GetDataFromBlock(
+        {location.block_number, location.block_type, block_position.offset,
+         DataSizeForBlock(file_size, block_position.offset, GetDataBlockSize()), std::move(location.hash)},
+        block_position.offset_in_block, size);
   }
 
   std::vector<DataBlockRef> EnumerateBlocks() const override {
+    auto blocks_list = ::ClusterMetadataBlockRefs(file_->metadata(), GetMetadataItemsCount());
+    std::vector<std::shared_ptr<Block>> metadata_blocks;
+    metadata_blocks.reserve(blocks_list.size());
+    for (const auto& block_number : blocks_list)
+      metadata_blocks.push_back(throw_if_error(file_->quota()->LoadMetadataBlock(block_number.value())));
+
     std::vector<DataBlockRef> refs;
-    auto blocks_list = ClusterMetadataBlockRefs();
-    size_t cluster_list_start = 0;
-    for (const auto& block_number : blocks_list) {
-      if (cluster_list_start << ClusterDataLog2Size() >= file_->metadata()->size_on_disk.value())
-        break;
-      const auto metadata_block = throw_if_error(file_->quota()->LoadMetadataBlock(block_number.value()));
-      auto block_refs = EnumerateClusterDataBlockRefs(
-          cluster_list_start, metadata_block,
-          std::span<const DataBlocksClusterMetadata>{
-              metadata_block->get_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)), ClustersInBlock()},
-          file_->metadata()->size_on_disk.value());
-      refs.insert(refs.end(), block_refs.begin(), block_refs.end());
-      cluster_list_start += ClustersInBlock();
+    const auto data_block_size = size_t{1} << GetDataBlockSize();
+    refs.reserve(div_ceil(file_->metadata()->size_on_disk.value(), data_block_size));
+    for (size_t data_block_index = 0, block_offset = 0; block_offset < file_->metadata()->size_on_disk.value();
+         ++data_block_index, block_offset += data_block_size) {
+      auto location = ClusterMetadataBlocksDataBlockLocationFor(metadata_blocks, data_block_index,
+                                                                file_->quota()->block_size_log2());
+      refs.push_back({location.block_number, location.block_type, block_offset,
+                      DataSizeForBlock(file_->metadata()->size_on_disk.value(), block_offset, GetDataBlockSize()),
+                      std::move(location.hash)});
     }
     return refs;
   }
 
   void FreeOwnedBlocks() override {
     ClustersLayoutAccessor::FreeOwnedBlocks();
-    for (const auto& block_number : ClusterMetadataBlockRefs()) {
+    for (const auto& block_number : ::ClusterMetadataBlockRefs(file_->metadata(), GetMetadataItemsCount())) {
       if (!file_->quota()->DeleteBlocks(block_number.value(), 1))
         throw WfsException(WfsError::kFreeBlocksAllocatorCorrupted);
     }
@@ -313,8 +320,6 @@ class File::ClusterMetadataBlocksLayoutAccessor : public File::ClustersLayoutAcc
       throw WfsException(WfsError::kFileMetadataCorrupted);
     current_metadata_block = std::move(*metadata_block);
   }
-
-  size_t ClustersInBlock() const { return ClustersPerMetadataBlock(); }
 };
 
 std::unique_ptr<File::LayoutAccessor> File::CreateLayoutAccessor(std::shared_ptr<File> file) {

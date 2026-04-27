@@ -49,7 +49,7 @@ class FileResizeFixture : public MetadataBlockFixture {
   std::shared_ptr<Block> directory_block = *quota->AllocMetadataBlock();
   std::shared_ptr<DirectoryMap> directory_map = std::make_shared<DirectoryMap>(quota, directory_block);
 
-  FileResizeFixture() { directory_map->Init(); }
+  FileResizeFixture() : MetadataBlockFixture(20000) { directory_map->Init(); }
 
   TestFile CreateFile(std::string_view name, const FileLayout& layout) {
     std::vector<std::byte> metadata_storage(size_t{1} << layout.metadata_log2_size, std::byte{0});
@@ -123,12 +123,18 @@ class FileResizeFixture : public MetadataBlockFixture {
         return BlockType::Single;
       case FileLayoutCategory::LargeBlocks:
       case FileLayoutCategory::Clusters:
+      case FileLayoutCategory::ClusterMetadataBlocks:
         return BlockType::Large;
       case FileLayoutCategory::Inline:
-      case FileLayoutCategory::ClusterMetadataBlocks:
         break;
     }
     throw std::logic_error("Unexpected test file layout category");
+  }
+
+  static std::span<DataBlocksClusterMetadata> ClusterMetadataItems(const std::shared_ptr<Block>& metadata_block,
+                                                                   size_t clusters_per_metadata_block) {
+    return {metadata_block->get_mutable_object<DataBlocksClusterMetadata>(sizeof(MetadataBlockHeader)),
+            clusters_per_metadata_block};
   }
 
   template <typename T>
@@ -143,6 +149,12 @@ class FileResizeFixture : public MetadataBlockFixture {
     const auto category = Category(metadata);
     const auto metadata_items_count =
         FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), quota->block_size_log2());
+
+    if (category == FileLayoutCategory::ClusterMetadataBlocks) {
+      AssignClusterMetadataBlocks(metadata, metadata_items_count);
+      return;
+    }
+
     auto allocated_blocks = quota->AllocDataBlocks(metadata_items_count, AllocationBlockType(category));
     REQUIRE(allocated_blocks.has_value());
 
@@ -179,6 +191,11 @@ class FileResizeFixture : public MetadataBlockFixture {
       return;
     }
 
+    if (category == FileLayoutCategory::ClusterMetadataBlocks) {
+      StoreClusterMetadataBlockFileData(metadata, data, data_block_size);
+      return;
+    }
+
     constexpr size_t kLargeBlocksPerCluster = size_t{1} << log2_size(BlockType::Cluster) >> log2_size(BlockType::Large);
     auto cluster_refs = AlignedMetadataItems<DataBlocksClusterMetadata>(
         metadata, FileLayout::MetadataItemsCount(category, metadata->size_on_disk.value(), quota->block_size_log2()));
@@ -187,6 +204,54 @@ class FileResizeFixture : public MetadataBlockFixture {
       const auto large_block_index = i % kLargeBlocksPerCluster;
       const auto chunk_size = std::min(data_block_size, data.size() - offset);
       const auto cluster_block_number = cluster_refs[cluster_refs.size() - cluster_index - 1].block_number.value();
+      StoreDataBlock(cluster_block_number + static_cast<uint32_t>(large_block_index << log2_size(BlockType::Large)),
+                     data.subspan(offset, chunk_size));
+    }
+  }
+
+  void AssignClusterMetadataBlocks(EntryMetadata* metadata, size_t metadata_blocks_count) {
+    auto metadata_block_refs = AlignedMetadataItems<uint32_be_t>(metadata, metadata_blocks_count);
+    std::vector<std::shared_ptr<Block>> metadata_blocks;
+    metadata_blocks.reserve(metadata_blocks_count);
+    for (size_t i = 0; i < metadata_blocks_count; ++i) {
+      auto metadata_block = quota->AllocMetadataBlock();
+      REQUIRE(metadata_block.has_value());
+      metadata_block_refs[metadata_blocks_count - i - 1] =
+          quota->to_area_block_number((*metadata_block)->physical_block_number());
+      metadata_blocks.push_back(std::move(*metadata_block));
+    }
+
+    const auto clusters_count = FileLayout::DataUnitsCount(FileLayoutCategory::ClusterMetadataBlocks,
+                                                           metadata->size_on_disk.value(), quota->block_size_log2());
+    auto allocated_clusters = quota->AllocDataBlocks(clusters_count, BlockType::Cluster);
+    REQUIRE(allocated_clusters.has_value());
+
+    const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
+    for (size_t i = 0; i < allocated_clusters->size(); ++i) {
+      auto cluster_refs =
+          ClusterMetadataItems(metadata_blocks[i / clusters_per_metadata_block], clusters_per_metadata_block);
+      cluster_refs[i % clusters_per_metadata_block].block_number = (*allocated_clusters)[i];
+    }
+  }
+
+  void StoreClusterMetadataBlockFileData(EntryMetadata* metadata,
+                                         std::span<const std::byte> data,
+                                         size_t data_block_size) {
+    constexpr size_t kLargeBlocksPerCluster = size_t{1} << log2_size(BlockType::Cluster) >> log2_size(BlockType::Large);
+    const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
+    auto metadata_block_refs = AlignedMetadataItems<uint32_be_t>(
+        metadata, FileLayout::MetadataItemsCount(FileLayoutCategory::ClusterMetadataBlocks,
+                                                 metadata->size_on_disk.value(), quota->block_size_log2()));
+    for (size_t i = 0, offset = 0; offset < data.size(); ++i, offset += data_block_size) {
+      const auto cluster_index = i / kLargeBlocksPerCluster;
+      const auto metadata_block_index = cluster_index / clusters_per_metadata_block;
+      const auto cluster_index_in_metadata_block = cluster_index % clusters_per_metadata_block;
+      const auto large_block_index = i % kLargeBlocksPerCluster;
+      const auto metadata_block_number = metadata_block_refs[metadata_block_refs.size() - metadata_block_index - 1];
+      auto metadata_block = throw_if_error(quota->LoadMetadataBlock(metadata_block_number.value()));
+      auto cluster_refs = ClusterMetadataItems(metadata_block, clusters_per_metadata_block);
+      const auto cluster_block_number = cluster_refs[cluster_index_in_metadata_block].block_number.value();
+      const auto chunk_size = std::min(data_block_size, data.size() - offset);
       StoreDataBlock(cluster_block_number + static_cast<uint32_t>(large_block_index << log2_size(BlockType::Large)),
                      data.subspan(offset, chunk_size));
     }
@@ -580,6 +645,109 @@ TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 3 into categor
   CHECK(test_file.file->SizeOnDisk() == large_block_size);
   CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::LargeBlocks));
   CHECK(FreeBlocksCount() == free_blocks_before + cluster_blocks_count - large_block_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 3 into category 4", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto cluster_size = cluster_blocks_count * block_size;
+  const auto initial_size = 4 * cluster_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 5 * cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before + 4 * cluster_blocks_count - 5 * cluster_blocks_count - 1);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize shrinks category 4 into category 3", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto large_block_blocks_count = uint32_t{1} << log2_size(BlockType::Large);
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto large_block_size = large_block_blocks_count * block_size;
+  const auto cluster_size = cluster_blocks_count * block_size;
+  const auto initial_size = 4 * cluster_size + 1;
+  const auto target_size = large_block_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() ==
+          FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = std::vector<std::byte>{initial_data.begin(), initial_data.begin() + target_size};
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::Clusters));
+  CHECK(FreeBlocksCount() == free_blocks_before + 5 * cluster_blocks_count + 1 - cluster_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture, "File resize grows category 4 within category", "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto cluster_size = cluster_blocks_count * block_size;
+  const auto initial_size = 5 * cluster_size + 4;
+  const auto target_size = 6 * cluster_size + 4;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() ==
+          FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == 7 * cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  CHECK(FreeBlocksCount() == free_blocks_before - cluster_blocks_count);
+  CHECK(ReadFile(test_file.file, target_size) == expected);
+}
+
+TEST_CASE_METHOD(FileResizeFixture,
+                 "File resize grows category 4 into a second cluster metadata block",
+                 "[file-resize][unit]") {
+  const auto block_size = static_cast<uint32_t>(quota->block_size());
+  const auto cluster_blocks_count = uint32_t{1} << log2_size(BlockType::Cluster);
+  const auto cluster_size = cluster_blocks_count * block_size;
+  const auto clusters_per_metadata_block = FileLayout::ClustersPerClusterMetadataBlock(quota->block_size_log2());
+  const auto initial_size = clusters_per_metadata_block * cluster_size;
+  const auto target_size = initial_size + 1;
+  auto initial_data = DataPattern(initial_size);
+  auto test_file = CreateDataUnitFile(kTestFilename, initial_size, initial_data);
+  REQUIRE(test_file.metadata->size_category.value() ==
+          FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  REQUIRE(FileLayout::MetadataItemsCount(FileLayoutCategory::ClusterMetadataBlocks,
+                                         test_file.metadata->size_on_disk.value(), quota->block_size_log2()) == 1);
+  const auto free_blocks_before = FreeBlocksCount();
+
+  test_file.file->Resize(target_size);
+
+  auto* metadata = StoredMetadata(kTestFilename);
+  auto expected = initial_data;
+  expected.resize(target_size, std::byte{0});
+  CHECK(test_file.file->Size() == target_size);
+  CHECK(test_file.file->SizeOnDisk() == (clusters_per_metadata_block + 1) * cluster_size);
+  CHECK(metadata->size_category.value() == FileLayout::CategoryValue(FileLayoutCategory::ClusterMetadataBlocks));
+  CHECK(FileLayout::MetadataItemsCount(FileLayoutCategory::ClusterMetadataBlocks, metadata->size_on_disk.value(),
+                                       quota->block_size_log2()) == 2);
+  CHECK(FreeBlocksCount() == free_blocks_before - cluster_blocks_count - 1);
   CHECK(ReadFile(test_file.file, target_size) == expected);
 }
 
