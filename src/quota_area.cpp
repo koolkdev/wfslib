@@ -209,7 +209,11 @@ void QuotaArea::Init(std::shared_ptr<Area> parent_area,
                                        : header->remainder_blocks_count.value());
   free_blocks_allocator->Init(std::move(quota_free_blocks));
 
-  // TODO: Initialize:
-  // 1. Root directory
-  // 2. shadow directories
+  for (auto directory_block_number :
+       {kRootDirectoryBlockNumber, kShadowDirectory1BlockNumber, kShadowDirectory2BlockNumber}) {
+    auto directory_block = throw_if_error(LoadMetadataBlock(directory_block_number, /*new_block=*/true));
+    DirectoryMap{shared_from_this(), std::move(directory_block)}.Init();
+  }
+  // TODO: Initialize metadata-directory contents: create the "index" metadata file and add the initial
+  // metadata entry used to map metadata ids to their backing files.
 }

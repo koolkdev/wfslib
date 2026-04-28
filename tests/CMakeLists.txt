@@ -19,6 +19,7 @@ set(WFSLIB_BEHAVIOR_TEST_SOURCES
   rtree_tests.cpp
   sub_block_allocator_tests.cpp
   tree_nodes_allocator_tests.cpp
+  wfs_device_format_tests.cpp
 )
 
 # Requirements: P2374R4 and P2164R9.
