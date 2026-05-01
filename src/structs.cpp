@@ -6,6 +6,7 @@
  */
 
 #include <boost/dynamic_bitset.hpp>
+#include <cctype>
 #include <ranges>
 
 #include "structs.h"
@@ -18,9 +19,11 @@ std::string EntryMetadata::GetCaseSensitiveName(std::string_view name) const {
   }
   boost::dynamic_bitset<uint8_t> bits(name.size());
   boost::from_block_range(reinterpret_cast<const uint8_t*>(&case_bitmap),
-                          reinterpret_cast<const uint8_t*>(&case_bitmap) + (name.size() / 8), bits);
+                          reinterpret_cast<const uint8_t*>(&case_bitmap) + div_ceil(name.size(), 8), bits);
   std::string final_name;
-  std::ranges::transform(std::ranges::iota_view(0ull, name.size()), std::back_inserter(final_name),
-                         [&](auto i) { return bits[i] ? std::toupper(name[i]) : std::tolower(name[i]); });
+  std::ranges::transform(std::ranges::iota_view(0ull, name.size()), std::back_inserter(final_name), [&](auto i) {
+    const auto ch = static_cast<unsigned char>(name[i]);
+    return static_cast<char>(bits[i] ? std::toupper(ch) : std::tolower(ch));
+  });
   return final_name;
 }

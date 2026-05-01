@@ -35,6 +35,7 @@ add_library(${PROJECT_NAME}
     src/directory_parent_tree.cpp
     src/directory.cpp
     src/entry.cpp
+    src/entry_metadata_builder.cpp
     src/eptree_iterator.cpp
     src/eptree.cpp
     src/errors.cpp

@@ -8,6 +8,7 @@ enable_testing()
 set(WFSLIB_BEHAVIOR_TEST_SOURCES
   block_tests.cpp
   eptree_tests.cpp
+  entry_metadata_builder_tests.cpp
   file_layout_accessor_tests.cpp
   file_layout_tests.cpp
   file_resize_tests.cpp
