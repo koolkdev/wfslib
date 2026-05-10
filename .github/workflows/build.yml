@@ -7,7 +7,7 @@ on:
   pull_request:
 
 env:
-  LLVM_VERSION: 19
+  LLVM_VERSION: 22
   GCC_VERSION: 14
 
 jobs:

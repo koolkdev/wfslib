@@ -68,18 +68,15 @@ class DirectoryTreeFixture : public MetadataBlockFixture {
 
 std::vector<std::string> CartesianDirectoryKeys() {
   constexpr std::array<char, 3> chars = {'a', 'b', 'c'};
-  auto one_char = std::views::cartesian_product(chars) |
-                  std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                  std::ranges::to<std::vector>();
-  auto two_chars = std::views::cartesian_product(chars, chars) |
-                   std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                   std::ranges::to<std::vector>();
-  auto three_chars = std::views::cartesian_product(chars, chars, chars) |
-                     std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                     std::ranges::to<std::vector>();
-  auto four_chars = std::views::cartesian_product(chars, chars, chars, chars) |
-                    std::views::transform([](auto tuple) { return tuple_to_string(tuple); }) |
-                    std::ranges::to<std::vector>();
+  auto to_key = [](auto tuple) { return tuple_to_string(tuple); };
+  auto one_char_keys = std::views::cartesian_product(chars) | std::views::transform(to_key);
+  auto two_char_keys = std::views::cartesian_product(chars, chars) | std::views::transform(to_key);
+  auto three_char_keys = std::views::cartesian_product(chars, chars, chars) | std::views::transform(to_key);
+  auto four_char_keys = std::views::cartesian_product(chars, chars, chars, chars) | std::views::transform(to_key);
+  auto one_char = std::ranges::to<std::vector>(one_char_keys);
+  auto two_chars = std::ranges::to<std::vector>(two_char_keys);
+  auto three_chars = std::ranges::to<std::vector>(three_char_keys);
+  auto four_chars = std::ranges::to<std::vector>(four_char_keys);
   auto keys = std::ranges::to<std::vector>(std::views::join(std::vector{one_char, two_chars, three_chars, four_chars}));
   std::ranges::sort(keys);
   return keys;
